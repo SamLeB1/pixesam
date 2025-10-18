@@ -1,3 +1,9 @@
+import Canvas from "./components/Canvas";
+
 export default function App() {
-  return <h1>App</h1>;
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-900">
+      <Canvas gridSize={{ x: 16, y: 16 }} />
+    </div>
+  );
 }
