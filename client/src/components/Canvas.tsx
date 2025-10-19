@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useEditorStore } from "../store/editorStore";
 
 const CANVAS_SIZE = 512;
 
@@ -8,6 +9,7 @@ type CanvasProps = {
 
 export default function Canvas({ gridSize }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const selectedTool = useEditorStore((state) => state.selectedTool);
 
   function drawGrid(ctx: CanvasRenderingContext2D) {
     const pxSize = getPxSize();
