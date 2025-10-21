@@ -12,9 +12,10 @@ export default function Canvas({ gridSize }: CanvasProps) {
   const [pixelData, setPixelData] = useState<Uint8ClampedArray>(
     new Uint8ClampedArray(gridSize.x * gridSize.y * 4),
   );
+  const [isDrawing, setIsDrawing] = useState(false);
   const selectedTool = useEditorStore((state) => state.selectedTool);
 
-  function drawGrid(ctx: CanvasRenderingContext2D) {
+  function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     const pxSize = getPxSize();
     ctx.fillStyle = "oklch(92.2% 0 0)";
     for (let i = 0; i < gridSize.y; i++)
@@ -73,9 +74,7 @@ export default function Canvas({ gridSize }: CanvasProps) {
     });
   }
 
-  function handleCanvasClick(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) {
+  function handleAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     switch (selectedTool) {
       case "pencil":
         handlePencilAction(e);
@@ -88,6 +87,19 @@ export default function Canvas({ gridSize }: CanvasProps) {
     }
   }
 
+  function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+    setIsDrawing(true);
+    handleAction(e);
+  }
+
+  function handleMouseUp() {
+    setIsDrawing(false);
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+    if (isDrawing) handleAction(e);
+  }
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -95,7 +107,7 @@ export default function Canvas({ gridSize }: CanvasProps) {
     if (!ctx) return;
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    drawGrid(ctx);
+    drawCheckerboard(ctx);
 
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = gridSize.x;
@@ -130,7 +142,10 @@ export default function Canvas({ gridSize }: CanvasProps) {
       id="canvas"
       width={CANVAS_SIZE}
       height={CANVAS_SIZE}
-      onClick={handleCanvasClick}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseUp}
     ></canvas>
   );
 }
