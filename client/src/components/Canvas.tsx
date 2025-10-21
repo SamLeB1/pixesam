@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
+import { hexToRgba } from "../utils/convertColor";
 
 const CANVAS_SIZE = 512;
 
@@ -9,11 +10,12 @@ type CanvasProps = {
 
 export default function Canvas({ gridSize }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const activeMouseButton = useRef<number>(null);
   const [pixelData, setPixelData] = useState<Uint8ClampedArray>(
     new Uint8ClampedArray(gridSize.x * gridSize.y * 4),
   );
   const [isDrawing, setIsDrawing] = useState(false);
-  const selectedTool = useEditorStore((state) => state.selectedTool);
+  const { selectedTool, primaryColor, secondaryColor } = useEditorStore();
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     const pxSize = getPxSize();
@@ -35,6 +37,8 @@ export default function Canvas({ gridSize }: CanvasProps) {
   function handlePencilAction(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ) {
+    if (activeMouseButton.current !== 0 && activeMouseButton.current !== 2)
+      return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -42,13 +46,17 @@ export default function Canvas({ gridSize }: CanvasProps) {
     const x = Math.floor((e.clientX - rect.left) / getPxSize());
     const y = Math.floor((e.clientY - rect.top) / getPxSize());
     const baseIndex = getIndex(x, y);
+    const [r, g, b, a] =
+      activeMouseButton.current === 0
+        ? hexToRgba(primaryColor)
+        : hexToRgba(secondaryColor);
 
     setPixelData((prevData) => {
       const newData = new Uint8ClampedArray(prevData);
-      newData[baseIndex] = 0;
-      newData[baseIndex + 1] = 0;
-      newData[baseIndex + 2] = 0;
-      newData[baseIndex + 3] = 255;
+      newData[baseIndex] = r;
+      newData[baseIndex + 1] = g;
+      newData[baseIndex + 2] = b;
+      newData[baseIndex + 3] = a;
       return newData;
     });
   }
@@ -56,6 +64,8 @@ export default function Canvas({ gridSize }: CanvasProps) {
   function handleEraserAction(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ) {
+    if (activeMouseButton.current !== 0 && activeMouseButton.current !== 2)
+      return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -89,11 +99,13 @@ export default function Canvas({ gridSize }: CanvasProps) {
 
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     setIsDrawing(true);
+    activeMouseButton.current = e.button;
     handleAction(e);
   }
 
   function handleMouseUp() {
     setIsDrawing(false);
+    activeMouseButton.current = null;
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
@@ -146,6 +158,7 @@ export default function Canvas({ gridSize }: CanvasProps) {
       onMouseUp={handleMouseUp}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseUp}
+      onContextMenu={(e) => e.preventDefault()}
     ></canvas>
   );
 }
