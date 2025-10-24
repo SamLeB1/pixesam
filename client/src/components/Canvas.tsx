@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { hexToRgba } from "../utils/convertColor";
 
-const CANVAS_SIZE = 512;
+const MIN_PX_SIZE = 8;
+const MAX_PX_SIZE = 512;
 
 type CanvasProps = {
   gridSize: { x: number; y: number };
@@ -16,6 +17,10 @@ export default function Canvas({ gridSize }: CanvasProps) {
   );
   const [isDrawing, setIsDrawing] = useState(false);
   const { selectedTool, primaryColor, secondaryColor } = useEditorStore();
+  const canvasSize = {
+    x: getPxSize() * gridSize.x,
+    y: getPxSize() * gridSize.y,
+  };
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     const pxSize = getPxSize();
@@ -27,7 +32,10 @@ export default function Canvas({ gridSize }: CanvasProps) {
   }
 
   function getPxSize() {
-    return CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);
+    let pxSize = MAX_PX_SIZE / Math.max(gridSize.x, gridSize.y);
+    if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+    if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+    return pxSize;
   }
 
   function getIndex(x: number, y: number) {
@@ -118,7 +126,7 @@ export default function Canvas({ gridSize }: CanvasProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.clearRect(0, 0, canvasSize.x, canvasSize.y);
     drawCheckerboard(ctx);
 
     const tempCanvas = document.createElement("canvas");
@@ -141,8 +149,8 @@ export default function Canvas({ gridSize }: CanvasProps) {
         gridSize.y,
         0,
         0,
-        CANVAS_SIZE,
-        CANVAS_SIZE,
+        canvasSize.x,
+        canvasSize.y,
       );
     }
   }, [pixelData, gridSize]);
@@ -152,8 +160,8 @@ export default function Canvas({ gridSize }: CanvasProps) {
       className="bg-white"
       ref={canvasRef}
       id="canvas"
-      width={CANVAS_SIZE}
-      height={CANVAS_SIZE}
+      width={canvasSize.x}
+      height={canvasSize.y}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onMouseMove={handleMouseMove}
