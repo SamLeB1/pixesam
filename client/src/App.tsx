@@ -10,7 +10,7 @@ export default function App() {
       <div className="flex flex-grow overflow-hidden">
         <SideBarLeft />
         <div className="flex flex-grow items-center justify-center overflow-auto">
-          <Canvas gridSize={{ x: 256, y: 256 }} />
+          <Canvas />
         </div>
         <SideBarRight />
       </div>

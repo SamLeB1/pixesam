@@ -1,22 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { hexToRgba } from "../utils/convertColor";
+import { MIN_PX_SIZE, MAX_PX_SIZE } from "../constants";
 
-const MIN_PX_SIZE = 8;
-const MAX_PX_SIZE = 512;
-
-type CanvasProps = {
-  gridSize: { x: number; y: number };
-};
-
-export default function Canvas({ gridSize }: CanvasProps) {
+export default function Canvas() {
+  const {
+    pixelData,
+    gridSize,
+    selectedTool,
+    primaryColor,
+    secondaryColor,
+    setPixelData,
+  } = useEditorStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeMouseButton = useRef<number>(null);
-  const [pixelData, setPixelData] = useState<Uint8ClampedArray>(
-    new Uint8ClampedArray(gridSize.x * gridSize.y * 4),
-  );
   const [isDrawing, setIsDrawing] = useState(false);
-  const { selectedTool, primaryColor, secondaryColor } = useEditorStore();
   const canvasSize = {
     x: getPxSize() * gridSize.x,
     y: getPxSize() * gridSize.y,
@@ -59,14 +57,12 @@ export default function Canvas({ gridSize }: CanvasProps) {
         ? hexToRgba(primaryColor)
         : hexToRgba(secondaryColor);
 
-    setPixelData((prevData) => {
-      const newData = new Uint8ClampedArray(prevData);
-      newData[baseIndex] = r;
-      newData[baseIndex + 1] = g;
-      newData[baseIndex + 2] = b;
-      newData[baseIndex + 3] = a;
-      return newData;
-    });
+    const newData = new Uint8ClampedArray(pixelData);
+    newData[baseIndex] = r;
+    newData[baseIndex + 1] = g;
+    newData[baseIndex + 2] = b;
+    newData[baseIndex + 3] = a;
+    setPixelData(newData);
   }
 
   function handleEraserAction(
@@ -82,14 +78,12 @@ export default function Canvas({ gridSize }: CanvasProps) {
     const y = Math.floor((e.clientY - rect.top) / getPxSize());
     const baseIndex = getIndex(x, y);
 
-    setPixelData((prevData) => {
-      const newData = new Uint8ClampedArray(prevData);
-      newData[baseIndex] = 0;
-      newData[baseIndex + 1] = 0;
-      newData[baseIndex + 2] = 0;
-      newData[baseIndex + 3] = 0;
-      return newData;
-    });
+    const newData = new Uint8ClampedArray(pixelData);
+    newData[baseIndex] = 0;
+    newData[baseIndex + 1] = 0;
+    newData[baseIndex + 2] = 0;
+    newData[baseIndex + 3] = 0;
+    setPixelData(newData);
   }
 
   function handleAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
