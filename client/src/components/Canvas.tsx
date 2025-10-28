@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { hexToRgba } from "../utils/convertColor";
 import { MIN_PX_SIZE, MAX_PX_SIZE } from "../constants";
@@ -12,9 +12,10 @@ export default function Canvas() {
     secondaryColor,
     setPixelData,
   } = useEditorStore();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeMouseButton = useRef<number>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const prevPanMousePos = useRef({ x: 0, y: 0 });
   const canvasSize = {
     x: getPxSize() * gridSize.x,
     y: getPxSize() * gridSize.y,
@@ -43,8 +44,6 @@ export default function Canvas() {
   function handlePencilAction(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ) {
-    if (activeMouseButton.current !== 0 && activeMouseButton.current !== 2)
-      return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -68,8 +67,6 @@ export default function Canvas() {
   function handleEraserAction(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ) {
-    if (activeMouseButton.current !== 0 && activeMouseButton.current !== 2)
-      return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -86,13 +83,29 @@ export default function Canvas() {
     setPixelData(newData);
   }
 
+  function handlePanAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const dx = e.clientX - prevPanMousePos.current.x;
+    const dy = e.clientY - prevPanMousePos.current.y;
+    scrollContainer.scrollLeft -= dx;
+    scrollContainer.scrollTop -= dy;
+    prevPanMousePos.current = { x: e.clientX, y: e.clientY };
+  }
+
   function handleAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+    const btn = activeMouseButton.current;
+    if (btn === 1) {
+      handlePanAction(e);
+      return;
+    }
     switch (selectedTool) {
       case "pencil":
-        handlePencilAction(e);
+        if (btn === 0 || btn === 2) handlePencilAction(e);
         break;
       case "eraser":
-        handleEraserAction(e);
+        if (btn === 0 || btn === 2) handleEraserAction(e);
         break;
       default:
         console.error("Selected tool is invalid.");
@@ -100,18 +113,20 @@ export default function Canvas() {
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
-    setIsDrawing(true);
     activeMouseButton.current = e.button;
+    if (activeMouseButton.current === 1) {
+      e.preventDefault();
+      prevPanMousePos.current = { x: e.clientX, y: e.clientY };
+    }
     handleAction(e);
   }
 
   function handleMouseUp() {
-    setIsDrawing(false);
     activeMouseButton.current = null;
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
-    if (isDrawing) handleAction(e);
+    if (activeMouseButton.current !== null) handleAction(e);
   }
 
   useEffect(() => {
@@ -150,17 +165,22 @@ export default function Canvas() {
   }, [pixelData, gridSize]);
 
   return (
-    <canvas
-      className="bg-white"
-      ref={canvasRef}
-      id="canvas"
-      width={canvasSize.x}
-      height={canvasSize.y}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseUp}
-      onContextMenu={(e) => e.preventDefault()}
-    ></canvas>
+    <div
+      className="flex flex-grow items-center justify-center overflow-auto"
+      ref={scrollContainerRef}
+    >
+      <canvas
+        className="bg-white"
+        ref={canvasRef}
+        id="canvas"
+        width={canvasSize.x}
+        height={canvasSize.y}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseUp}
+        onContextMenu={(e) => e.preventDefault()}
+      ></canvas>
+    </div>
   );
 }

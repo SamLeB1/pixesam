@@ -9,9 +9,7 @@ export default function App() {
       <TopBar />
       <div className="flex flex-grow overflow-hidden">
         <SideBarLeft />
-        <div className="flex flex-grow items-center justify-center overflow-auto">
-          <Canvas />
-        </div>
+        <Canvas />
         <SideBarRight />
       </div>
     </div>
