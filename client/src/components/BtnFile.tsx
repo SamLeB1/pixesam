@@ -14,7 +14,7 @@ export default function BtnFile() {
         File
       </button>
       {isOpen && (
-        <div className="absolute w-40 bg-neutral-600">
+        <div className="absolute z-1 w-40 bg-neutral-600">
           <button
             className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
             type="button"

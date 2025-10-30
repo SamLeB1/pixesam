@@ -1,16 +1,23 @@
 import { useEffect, useRef } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { hexToRgba } from "../utils/convertColor";
-import { MIN_PX_SIZE, MAX_PX_SIZE } from "../constants";
+import {
+  BASE_PX_SIZE,
+  MIN_ZOOM_LEVEL,
+  MAX_ZOOM_LEVEL,
+  ZOOM_FACTOR,
+} from "../constants";
 
 export default function Canvas() {
   const {
     pixelData,
     gridSize,
+    zoomLevel,
     selectedTool,
     primaryColor,
     secondaryColor,
     setPixelData,
+    setZoomLevel,
   } = useEditorStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -20,6 +27,12 @@ export default function Canvas() {
     x: getPxSize() * gridSize.x,
     y: getPxSize() * gridSize.y,
   };
+  const parentSize = scrollContainerRef.current
+    ? {
+        x: scrollContainerRef.current.clientWidth,
+        y: scrollContainerRef.current.clientHeight,
+      }
+    : { x: Infinity, y: Infinity };
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     const pxSize = getPxSize();
@@ -31,10 +44,7 @@ export default function Canvas() {
   }
 
   function getPxSize() {
-    let pxSize = MAX_PX_SIZE / Math.max(gridSize.x, gridSize.y);
-    if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
-    if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
-    return pxSize;
+    return BASE_PX_SIZE * zoomLevel;
   }
 
   function getIndex(x: number, y: number) {
@@ -129,6 +139,17 @@ export default function Canvas() {
     if (activeMouseButton.current !== null) handleAction(e);
   }
 
+  function handleMouseWheel(e: WheelEvent) {
+    e.preventDefault();
+    let newZoomLevel = zoomLevel;
+    if (e.deltaY < 0)
+      newZoomLevel = Math.min(MAX_ZOOM_LEVEL, newZoomLevel * ZOOM_FACTOR);
+    else if (e.deltaY > 0)
+      newZoomLevel = Math.max(MIN_ZOOM_LEVEL, newZoomLevel / ZOOM_FACTOR);
+    if (newZoomLevel === zoomLevel) return;
+    setZoomLevel(newZoomLevel);
+  }
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -162,15 +183,25 @@ export default function Canvas() {
         canvasSize.y,
       );
     }
-  }, [pixelData, gridSize]);
+
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer)
+      scrollContainer.addEventListener("wheel", handleMouseWheel, {
+        passive: false,
+      });
+    return () => {
+      if (scrollContainer)
+        scrollContainer.removeEventListener("wheel", handleMouseWheel);
+    };
+  }, [pixelData, gridSize, zoomLevel]);
 
   return (
     <div
-      className="flex flex-grow items-center justify-center overflow-auto"
+      className="relative flex flex-grow items-center justify-center overflow-auto"
       ref={scrollContainerRef}
     >
       <canvas
-        className="bg-white"
+        className={`${canvasSize.x > parentSize.x && "left-0"} ${canvasSize.y > parentSize.y && "top-0"} absolute bg-white`}
         ref={canvasRef}
         id="canvas"
         width={canvasSize.x}

@@ -1,9 +1,17 @@
 import { useState } from "react";
 import { useEditorStore } from "../store/editorStore";
-import { MIN_GRID_SIZE, MAX_GRID_SIZE } from "../constants";
+import {
+  BASE_CANVAS_SIZE,
+  MIN_GRID_SIZE,
+  MAX_GRID_SIZE,
+  BASE_PX_SIZE,
+  MIN_PX_SIZE,
+  MAX_PX_SIZE,
+} from "../constants";
 
 export default function ModalResize() {
-  const { gridSize, setPixelData, setGridSize } = useEditorStore();
+  const { gridSize, setPixelData, setGridSize, setZoomLevel } =
+    useEditorStore();
   const [widthInput, setWidthInput] = useState(gridSize.x);
   const [heightInput, setHeightInput] = useState(gridSize.y);
 
@@ -28,6 +36,11 @@ export default function ModalResize() {
     else if (clampedHeight > MAX_GRID_SIZE) clampedHeight = MAX_GRID_SIZE;
     setPixelData(new Uint8ClampedArray(clampedWidth * clampedHeight * 4));
     setGridSize({ x: clampedWidth, y: clampedHeight });
+
+    let pxSize = BASE_CANVAS_SIZE / Math.max(clampedWidth, clampedHeight);
+    if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+    if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+    setZoomLevel(pxSize / BASE_PX_SIZE);
   }
 
   return (
