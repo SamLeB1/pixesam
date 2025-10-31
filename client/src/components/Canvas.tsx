@@ -141,13 +141,31 @@ export default function Canvas() {
 
   function handleMouseWheel(e: WheelEvent) {
     e.preventDefault();
+    const scrollContainer = scrollContainerRef.current;
+    const canvas = canvasRef.current;
+    if (!scrollContainer || !canvas) return;
+
+    const mouseX = e.clientX - scrollContainer.getBoundingClientRect().left;
+    const mouseY = e.clientY - scrollContainer.getBoundingClientRect().top;
+    const currentScrollLeft = scrollContainer.scrollLeft;
+    const currentScrollTop = scrollContainer.scrollTop;
+    const canvasMouseX = mouseX + currentScrollLeft - canvas.offsetLeft;
+    const canvasMouseY = mouseY + currentScrollTop - canvas.offsetTop;
+
     let newZoomLevel = zoomLevel;
     if (e.deltaY < 0)
       newZoomLevel = Math.min(MAX_ZOOM_LEVEL, newZoomLevel * ZOOM_FACTOR);
     else if (e.deltaY > 0)
       newZoomLevel = Math.max(MIN_ZOOM_LEVEL, newZoomLevel / ZOOM_FACTOR);
     if (newZoomLevel === zoomLevel) return;
+
+    const zoomRatio = newZoomLevel / zoomLevel;
+    const newScrollLeft = canvasMouseX * zoomRatio - mouseX + canvas.offsetLeft;
+    const newScrollTop = canvasMouseY * zoomRatio - mouseY + canvas.offsetTop;
+
     setZoomLevel(newZoomLevel);
+    scrollContainer.scrollLeft = newScrollLeft;
+    scrollContainer.scrollTop = newScrollTop;
   }
 
   useEffect(() => {
