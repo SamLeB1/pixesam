@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
-import { hexToRgba } from "../utils/convertColor";
 import {
   BASE_PX_SIZE,
   MIN_ZOOM_LEVEL,
@@ -22,6 +21,8 @@ export default function Canvas() {
     secondaryColor,
     setPixelData,
     setZoomLevel,
+    setPrimaryColor,
+    setSecondaryColor,
   } = useEditorStore();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -92,16 +93,16 @@ export default function Canvas() {
     const x = Math.floor((e.clientX - rect.left) / getPxSize());
     const y = Math.floor((e.clientY - rect.top) / getPxSize());
     const baseIndex = getIndex(x, y);
-    const [r, g, b, a] =
+    const { r, g, b, a } =
       activeMouseButton.current === 0
-        ? hexToRgba(primaryColor)
-        : hexToRgba(secondaryColor);
+        ? tinycolor(primaryColor).toRgb()
+        : tinycolor(secondaryColor).toRgb();
 
     const newData = new Uint8ClampedArray(pixelData);
     newData[baseIndex] = r;
     newData[baseIndex + 1] = g;
     newData[baseIndex + 2] = b;
-    newData[baseIndex + 3] = a;
+    newData[baseIndex + 3] = a * 255;
     setPixelData(newData);
   }
 
@@ -122,6 +123,27 @@ export default function Canvas() {
     newData[baseIndex + 2] = 0;
     newData[baseIndex + 3] = 0;
     setPixelData(newData);
+  }
+
+  function handleColorPickerAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize());
+    const y = Math.floor((e.clientY - rect.top) / getPxSize());
+    const baseIndex = getIndex(x, y);
+
+    const r = pixelData[baseIndex];
+    const g = pixelData[baseIndex + 1];
+    const b = pixelData[baseIndex + 2];
+    const a = pixelData[baseIndex + 3];
+    const hex = tinycolor({ r, g, b, a }).toHexString();
+    activeMouseButton.current === 0
+      ? setPrimaryColor(hex)
+      : setSecondaryColor(hex);
   }
 
   function handlePanAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
@@ -147,6 +169,9 @@ export default function Canvas() {
         break;
       case "eraser":
         if (btn === 0 || btn === 2) handleEraserAction(e);
+        break;
+      case "color-picker":
+        if (btn === 0 || btn === 2) handleColorPickerAction(e);
         break;
       default:
         console.error("Selected tool is invalid.");

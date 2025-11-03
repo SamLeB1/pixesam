@@ -11,7 +11,7 @@ export default function SideBarLeft() {
 
   return (
     <div className="min-w-28 bg-neutral-800 p-2">
-      <div className="mb-2">
+      <div className="mb-2 grid grid-cols-2">
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
@@ -25,6 +25,14 @@ export default function SideBarLeft() {
           type="button"
           title="Eraser tool"
           onClick={() => selectTool("eraser")}
+        >
+          <div className="h-8 w-8 bg-white"></div>
+        </button>
+        <button
+          className="cursor-pointer p-2 hover:bg-neutral-600"
+          type="button"
+          title="Color picker tool"
+          onClick={() => selectTool("color-picker")}
         >
           <div className="h-8 w-8 bg-white"></div>
         </button>
