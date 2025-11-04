@@ -7,6 +7,7 @@ import {
   MAX_ZOOM_LEVEL,
   ZOOM_FACTOR,
 } from "../constants";
+import type { RGBA } from "../types";
 
 const lightCheckerboardColor = "#ffffff";
 const darkCheckerboardColor = "#e5e5e5";
@@ -58,6 +59,42 @@ export default function Canvas() {
 
   function getIndex(x: number, y: number) {
     return (y * gridSize.x + x) * 4;
+  }
+
+  function isValidIndex(x: number, y: number) {
+    return x >= 0 && x < gridSize.x && y >= 0 && y < gridSize.y;
+  }
+
+  function getPixelColor(x: number, y: number, data: Uint8ClampedArray): RGBA {
+    const baseIndex = getIndex(x, y);
+    return {
+      r: data[baseIndex],
+      g: data[baseIndex + 1],
+      b: data[baseIndex + 2],
+      a: data[baseIndex + 3],
+    };
+  }
+
+  function setPixelColor(
+    x: number,
+    y: number,
+    color: RGBA,
+    data: Uint8ClampedArray,
+  ) {
+    const baseIndex = getIndex(x, y);
+    data[baseIndex] = color.r;
+    data[baseIndex + 1] = color.g;
+    data[baseIndex + 2] = color.b;
+    data[baseIndex + 3] = color.a;
+  }
+
+  function isEqualColor(color1: RGBA, color2: RGBA) {
+    return (
+      color1.r === color2.r &&
+      color1.g === color2.g &&
+      color1.b === color2.b &&
+      color1.a === color2.a
+    );
   }
 
   function updateHoveredPixel(
@@ -146,6 +183,42 @@ export default function Canvas() {
       : setSecondaryColor(hex);
   }
 
+  function handleBucketAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize());
+    const y = Math.floor((e.clientY - rect.top) / getPxSize());
+
+    const targetColor = getPixelColor(x, y, pixelData);
+    const fillColor =
+      activeMouseButton.current === 0
+        ? tinycolor(primaryColor).toRgb()
+        : tinycolor(secondaryColor).toRgb();
+    fillColor.a *= 255;
+    if (isEqualColor(targetColor, fillColor)) return;
+
+    const newData = new Uint8ClampedArray(pixelData);
+    const queue: { x: number; y: number }[] = [];
+    queue.push({ x, y });
+    while (queue.length > 0) {
+      const { x, y } = queue.shift()!;
+      const currentColor = getPixelColor(x, y, newData);
+
+      if (isEqualColor(currentColor, targetColor)) {
+        setPixelColor(x, y, fillColor, newData);
+        if (isValidIndex(x + 1, y)) queue.push({ x: x + 1, y });
+        if (isValidIndex(x - 1, y)) queue.push({ x: x - 1, y });
+        if (isValidIndex(x, y + 1)) queue.push({ x, y: y + 1 });
+        if (isValidIndex(x, y - 1)) queue.push({ x, y: y - 1 });
+      }
+    }
+    setPixelData(newData);
+  }
+
   function handlePanAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -172,6 +245,9 @@ export default function Canvas() {
         break;
       case "color-picker":
         if (btn === 0 || btn === 2) handleColorPickerAction(e);
+        break;
+      case "bucket":
+        if (btn === 0 || btn === 2) handleBucketAction(e);
         break;
       default:
         console.error("Selected tool is invalid.");

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { DEFAULT_GRID_SIZE } from "../constants";
 
-type Tool = "pencil" | "eraser" | "color-picker";
+type Tool = "pencil" | "eraser" | "color-picker" | "bucket";
 
 type EditorState = {
   pixelData: Uint8ClampedArray;
