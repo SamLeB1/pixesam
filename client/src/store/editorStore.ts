@@ -6,7 +6,13 @@ import {
   setPixelColor,
   isEqualColor,
 } from "../utils/canvas";
-import { DEFAULT_GRID_SIZE } from "../constants";
+import {
+  DEFAULT_GRID_SIZE,
+  BASE_CANVAS_SIZE,
+  BASE_PX_SIZE,
+  MIN_PX_SIZE,
+  MAX_PX_SIZE,
+} from "../constants";
 import type { RGBA } from "../types";
 
 type Tool = "pencil" | "eraser" | "color-picker" | "bucket";
@@ -28,6 +34,7 @@ type EditorState = {
   setPixelColor: (x: number, y: number, color: RGBA) => void;
   erasePixel: (x: number, y: number) => void;
   floodFill: (x: number, y: number, color: RGBA) => void;
+  resizeCanvas: (size: { x: number; y: number }) => void;
 };
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -97,5 +104,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }
       return { pixelData: newData };
+    }),
+  resizeCanvas: (size) =>
+    set((state) => {
+      const { pixelData, gridSize: oldGridSize } = state;
+      const newData = new Uint8ClampedArray(size.x * size.y * 4);
+
+      for (let y = 0; y < Math.min(oldGridSize.y, size.y); y++) {
+        for (let x = 0; x < Math.min(oldGridSize.x, size.x); x++) {
+          const oldBaseIndex = getBaseIndex(x, y, oldGridSize.x);
+          const newBaseIndex = getBaseIndex(x, y, size.x);
+
+          newData[newBaseIndex] = pixelData[oldBaseIndex];
+          newData[newBaseIndex + 1] = pixelData[oldBaseIndex + 1];
+          newData[newBaseIndex + 2] = pixelData[oldBaseIndex + 2];
+          newData[newBaseIndex + 3] = pixelData[oldBaseIndex + 3];
+        }
+      }
+
+      let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+
+      return { pixelData: newData, gridSize: size, zoomLevel };
     }),
 }));
