@@ -9,9 +9,9 @@ export type Side =
   | "top-left"
   | "top-center"
   | "top-right"
-  | "right-center"
-  | "bottom-right"
-  | "bottom-center"
+  | "middle-left"
+  | "middle-center"
+  | "middle-right"
   | "bottom-left"
-  | "left-center"
-  | "center";
+  | "bottom-center"
+  | "bottom-right";

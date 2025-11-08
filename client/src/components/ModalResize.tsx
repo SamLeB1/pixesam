@@ -28,7 +28,7 @@ export default function ModalResize() {
     let clampedHeight = heightInput;
     if (clampedHeight < MIN_GRID_SIZE) clampedHeight = MIN_GRID_SIZE;
     else if (clampedHeight > MAX_GRID_SIZE) clampedHeight = MAX_GRID_SIZE;
-    resizeCanvas({ x: clampedWidth, y: clampedHeight });
+    resizeCanvas({ x: clampedWidth, y: clampedHeight }, selectedAnchor);
   }
 
   return (
@@ -102,29 +102,29 @@ export default function ModalResize() {
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
                 style={{
-                  ...(selectedAnchor === "left-center" && {
+                  ...(selectedAnchor === "middle-left" && {
                     backgroundColor: "white",
                   }),
                 }}
-                onClick={() => setSelectedAnchor("left-center")}
+                onClick={() => setSelectedAnchor("middle-left")}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
                 style={{
-                  ...(selectedAnchor === "center" && {
+                  ...(selectedAnchor === "middle-center" && {
                     backgroundColor: "white",
                   }),
                 }}
-                onClick={() => setSelectedAnchor("center")}
+                onClick={() => setSelectedAnchor("middle-center")}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
                 style={{
-                  ...(selectedAnchor === "right-center" && {
+                  ...(selectedAnchor === "middle-right" && {
                     backgroundColor: "white",
                   }),
                 }}
-                onClick={() => setSelectedAnchor("right-center")}
+                onClick={() => setSelectedAnchor("middle-right")}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
