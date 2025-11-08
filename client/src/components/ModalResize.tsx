@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { MIN_GRID_SIZE, MAX_GRID_SIZE } from "../constants";
+import type { Side } from "../types";
 
 export default function ModalResize() {
   const { gridSize, resizeCanvas } = useEditorStore();
   const [widthInput, setWidthInput] = useState(gridSize.x);
   const [heightInput, setHeightInput] = useState(gridSize.y);
+  const [selectedAnchor, setSelectedAnchor] = useState<Side>("top-left");
 
   function handleChangeWidth(e: React.ChangeEvent<HTMLInputElement>) {
     const value = parseInt(e.target.value);
@@ -38,35 +40,121 @@ export default function ModalResize() {
           </button>
         </form>
         <h3 className="mb-4 text-2xl font-medium text-white">Resize Canvas</h3>
-        <div className="mb-2">
-          <label className="label mb-1 block" htmlFor="width-input">
-            Width
-          </label>
-          <input
-            className="input w-full"
-            type="number"
-            id="width-input"
-            min={MIN_GRID_SIZE}
-            max={MAX_GRID_SIZE}
-            placeholder="Enter width"
-            value={widthInput ? widthInput : ""}
-            onChange={handleChangeWidth}
-          />
-        </div>
-        <div className="mb-4">
-          <label className="label mb-1 block" htmlFor="height-input">
-            Height
-          </label>
-          <input
-            className="input w-full"
-            type="number"
-            id="height-input"
-            min={MIN_GRID_SIZE}
-            max={MAX_GRID_SIZE}
-            placeholder="Enter height"
-            value={heightInput ? heightInput : ""}
-            onChange={handleChangeHeight}
-          />
+        <div className="mb-4 flex">
+          <div className="mr-8 flex-grow">
+            <label className="label mb-1 block" htmlFor="width-input">
+              Width
+            </label>
+            <input
+              className="input mb-2 w-full"
+              type="number"
+              id="width-input"
+              min={MIN_GRID_SIZE}
+              max={MAX_GRID_SIZE}
+              placeholder="Enter width"
+              value={widthInput ? widthInput : ""}
+              onChange={handleChangeWidth}
+            />
+            <label className="label mb-1 block" htmlFor="height-input">
+              Height
+            </label>
+            <input
+              className="input w-full"
+              type="number"
+              id="height-input"
+              min={MIN_GRID_SIZE}
+              max={MAX_GRID_SIZE}
+              placeholder="Enter height"
+              value={heightInput ? heightInput : ""}
+              onChange={handleChangeHeight}
+            />
+          </div>
+          <div>
+            <div className="label mb-1 block select-none">Anchor</div>
+            <div className="grid grid-cols-3 gap-1">
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "top-left" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("top-left")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "top-center" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("top-center")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "top-right" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("top-right")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "left-center" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("left-center")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "center" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("center")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "right-center" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("right-center")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "bottom-left" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("bottom-left")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "bottom-center" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("bottom-center")}
+              ></div>
+              <div
+                className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
+                style={{
+                  ...(selectedAnchor === "bottom-right" && {
+                    backgroundColor: "white",
+                  }),
+                }}
+                onClick={() => setSelectedAnchor("bottom-right")}
+              ></div>
+            </div>
+          </div>
         </div>
         <div className="modal-action">
           <form method="dialog">
