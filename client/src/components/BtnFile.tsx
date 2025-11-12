@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ModalNew from "./ModalNew";
 import ModalResize from "./ModalResize";
 
 export default function BtnFile() {
@@ -21,6 +22,19 @@ export default function BtnFile() {
             onClick={() => {
               setIsOpen(false);
               const modal = document.getElementById(
+                "modal-new",
+              ) as HTMLDialogElement;
+              if (modal) modal.showModal();
+            }}
+          >
+            New
+          </button>
+          <button
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              const modal = document.getElementById(
                 "modal-resize",
               ) as HTMLDialogElement;
               if (modal) modal.showModal();
@@ -28,20 +42,9 @@ export default function BtnFile() {
           >
             Resize
           </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
-            type="button"
-          >
-            2
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
-            type="button"
-          >
-            3
-          </button>
         </div>
       )}
+      <ModalNew />
       <ModalResize />
     </div>
   );

@@ -34,6 +34,7 @@ type EditorState = {
   setPixelColor: (x: number, y: number, color: RGBA) => void;
   erasePixel: (x: number, y: number) => void;
   floodFill: (x: number, y: number, color: RGBA) => void;
+  newCanvas: (size: { x: number; y: number }) => void;
   resizeCanvas: (size: { x: number; y: number }, anchor: Side) => void;
 };
 
@@ -104,6 +105,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }
       return { pixelData: newData };
+    }),
+  newCanvas: (size) =>
+    set(() => {
+      const newData = new Uint8ClampedArray(size.x * size.y * 4);
+
+      let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+
+      return { pixelData: newData, gridSize: size, zoomLevel };
     }),
   resizeCanvas: (size, anchor) =>
     set((state) => {
