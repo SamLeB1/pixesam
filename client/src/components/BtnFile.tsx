@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useEditorStore } from "../store/editorStore";
 import ModalNew from "./ModalNew";
 import ModalResize from "./ModalResize";
 
 export default function BtnFile() {
+  const { clearCanvas } = useEditorStore();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -28,6 +30,17 @@ export default function BtnFile() {
             }}
           >
             New
+          </button>
+          <button
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              if (window.confirm("Are you sure you want to clear the canvas?"))
+                clearCanvas();
+            }}
+          >
+            Clear
           </button>
           <button
             className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
