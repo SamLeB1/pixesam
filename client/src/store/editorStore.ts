@@ -37,6 +37,7 @@ type EditorState = {
   newCanvas: (size: { x: number; y: number }) => void;
   clearCanvas: () => void;
   resizeCanvas: (size: { x: number; y: number }, anchor: Side) => void;
+  exportToPxsm: () => void;
 };
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -190,4 +191,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return { pixelData: newData, gridSize: size, zoomLevel };
     }),
+  exportToPxsm: () => {
+    const { pixelData, gridSize } = get();
+    const newPixelData = Array.from(pixelData);
+    const pxsmData = {
+      version: "1.0.0",
+      width: gridSize.x,
+      height: gridSize.y,
+      pixels: newPixelData,
+    };
+    const id = Math.random().toString(36).substring(2, 15);
+
+    const dataStr = JSON.stringify(pxsmData);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `new-pixesam-${id}.pxsm`;
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
 }));
