@@ -15,3 +15,10 @@ export type Side =
   | "bottom-left"
   | "bottom-center"
   | "bottom-right";
+
+export type PxsmData = {
+  version: string;
+  width: number;
+  height: number;
+  pixels: number[];
+};
