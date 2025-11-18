@@ -6,6 +6,7 @@ import {
   setPixelColor,
   isEqualColor,
 } from "../utils/canvas";
+import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
   BASE_CANVAS_SIZE,
@@ -13,7 +14,7 @@ import {
   MIN_PX_SIZE,
   MAX_PX_SIZE,
 } from "../constants";
-import type { RGBA, Side } from "../types";
+import type { RGBA, Side, PxsmData } from "../types";
 
 type Tool = "pencil" | "eraser" | "color-picker" | "bucket";
 
@@ -37,6 +38,7 @@ type EditorState = {
   newCanvas: (size: { x: number; y: number }) => void;
   clearCanvas: () => void;
   resizeCanvas: (size: { x: number; y: number }, anchor: Side) => void;
+  importFromPxsm: (data: PxsmData) => void;
   exportToPxsm: () => void;
 };
 
@@ -191,6 +193,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return { pixelData: newData, gridSize: size, zoomLevel };
     }),
+  importFromPxsm: (data) => {
+    if (!isValidPxsmData(data)) {
+      alert("The imported file is invalid and may have been corrupted.");
+      return;
+    }
+
+    const pixelData = new Uint8ClampedArray(data.pixels);
+    let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
+    if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+    if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+    const zoomLevel = pxSize / BASE_PX_SIZE;
+    set({
+      pixelData,
+      gridSize: { x: data.width, y: data.height },
+      zoomLevel,
+    });
+
+    alert("File imported successfully!");
+  },
   exportToPxsm: () => {
     const { pixelData, gridSize } = get();
     const newPixelData = Array.from(pixelData);
