@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { useEditorStore } from "../store/editorStore";
 import ModalNew from "./ModalNew";
 import ModalResize from "./ModalResize";
@@ -27,7 +28,9 @@ export default function BtnFile() {
         importFromPxsm(parsedData);
       } catch (err) {
         console.error(err);
-        alert("The imported file is invalid and may have been corrupted.");
+        toast.error(
+          "The imported file is invalid and may have been corrupted.",
+        );
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -35,7 +38,7 @@ export default function BtnFile() {
 
     reader.onerror = () => {
       console.error(reader.error);
-      alert("Error reading the file.");
+      toast.error("Error reading the file.");
       if (fileInputRef.current) fileInputRef.current.value = "";
     };
 

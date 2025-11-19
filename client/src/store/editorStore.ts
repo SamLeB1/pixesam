@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import {
   getBaseIndex,
   isValidIndex,
@@ -195,7 +196,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   importFromPxsm: (data) => {
     if (!isValidPxsmData(data)) {
-      alert("The imported file is invalid and may have been corrupted.");
+      toast.error("The imported file is invalid and may have been corrupted.");
       return;
     }
 
@@ -210,7 +211,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       zoomLevel,
     });
 
-    alert("File imported successfully!");
+    toast.success("File imported successfully!");
   },
   exportToPxsm: () => {
     const { pixelData, gridSize } = get();
