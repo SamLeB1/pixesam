@@ -4,7 +4,7 @@ import { useEditorStore } from "../store/editorStore";
 const MAX_IMAGE_SIZE = 4096;
 
 export default function ModalExportToImage() {
-  const { gridSize } = useEditorStore();
+  const { gridSize, exportToImage } = useEditorStore();
   const [scale, setScale] = useState(1);
   const [isEmptyScaleInput, setIsEmptyScaleInput] = useState(false);
   const maxScale = Math.floor(
@@ -73,7 +73,13 @@ export default function ModalExportToImage() {
         </p>
         <div className="modal-action">
           <form method="dialog">
-            <button className="btn btn-primary" onClick={onClose}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                exportToImage(scale);
+                onClose();
+              }}
+            >
               Download .png
             </button>
           </form>

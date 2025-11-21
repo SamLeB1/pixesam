@@ -41,6 +41,7 @@ type EditorState = {
   resizeCanvas: (size: { x: number; y: number }, anchor: Side) => void;
   importFromPxsm: (data: PxsmData) => void;
   exportToPxsm: () => void;
+  exportToImage: (scale: number) => void;
 };
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -236,5 +237,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  },
+  exportToImage: (scale) => {
+    const { pixelData, gridSize } = get();
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast.error("Failed to export the image.");
+      return;
+    }
+    canvas.width = Math.floor(gridSize.x * scale);
+    canvas.height = Math.floor(gridSize.y * scale);
+
+    const imageData = new ImageData(
+      pixelData as ImageDataArray,
+      gridSize.x,
+      gridSize.y,
+    );
+
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
+    if (!tempCtx) {
+      toast.error("Failed to export the image.");
+      return;
+    }
+    tempCanvas.width = gridSize.x;
+    tempCanvas.height = gridSize.y;
+    tempCtx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      tempCanvas,
+      0,
+      0,
+      gridSize.x,
+      gridSize.y,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+
+    const id = Math.random().toString(36).substring(2, 15);
+    const dataURL = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = dataURL;
+    link.download = `new-pixesam-${id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
 }));
