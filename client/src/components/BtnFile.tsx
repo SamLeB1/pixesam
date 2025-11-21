@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useEditorStore } from "../store/editorStore";
 import ModalNew from "./ModalNew";
 import ModalResize from "./ModalResize";
+import ModalExportToImage from "./ModalExportToImage";
 import type { PxsmData } from "../types";
 
 export default function BtnFile() {
@@ -122,6 +123,13 @@ export default function BtnFile() {
           <button
             className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
             type="button"
+            onClick={() => {
+              setIsOpen(false);
+              const modal = document.getElementById(
+                "modal-export-to-image",
+              ) as HTMLDialogElement;
+              if (modal) modal.showModal();
+            }}
           >
             Export
           </button>
@@ -136,6 +144,7 @@ export default function BtnFile() {
       />
       <ModalNew />
       <ModalResize />
+      <ModalExportToImage />
     </div>
   );
 }
