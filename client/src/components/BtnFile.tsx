@@ -7,16 +7,18 @@ import ModalExportToImage from "./ModalExportToImage";
 import type { PxsmData } from "../types";
 
 export default function BtnFile() {
-  const { clearCanvas, importFromPxsm, exportToPxsm } = useEditorStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { clearCanvas, importFromPxsm, importImage, exportToPxsm } =
+    useEditorStore();
+  const pxsmFileInputRef = useRef<HTMLInputElement>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handlePxsmFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!window.confirm("Your current work will be overwritten. Continue?")) {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (pxsmFileInputRef.current) pxsmFileInputRef.current.value = "";
       return;
     }
 
@@ -33,17 +35,49 @@ export default function BtnFile() {
           "The imported file is invalid and may have been corrupted.",
         );
       } finally {
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (pxsmFileInputRef.current) pxsmFileInputRef.current.value = "";
       }
     };
 
     reader.onerror = () => {
       console.error(reader.error);
       toast.error("Error reading the file.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (pxsmFileInputRef.current) pxsmFileInputRef.current.value = "";
     };
 
     reader.readAsText(file);
+  }
+
+  function handleImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm("Your current work will be overwritten. Continue?")) {
+      if (imageFileInputRef.current) imageFileInputRef.current.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const dataURL = e.target?.result as string;
+        importImage(dataURL);
+      } catch (err) {
+        console.error(err);
+        toast.error("Error processing the image.");
+      } finally {
+        if (imageFileInputRef.current) imageFileInputRef.current.value = "";
+      }
+    };
+
+    reader.onerror = () => {
+      console.error(reader.error);
+      toast.error("Error reading the file.");
+      if (imageFileInputRef.current) imageFileInputRef.current.value = "";
+    };
+
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -109,7 +143,7 @@ export default function BtnFile() {
             type="button"
             onClick={() => {
               setIsOpen(false);
-              fileInputRef.current?.click();
+              pxsmFileInputRef.current?.click();
             }}
           >
             Import .pxsm
@@ -117,6 +151,10 @@ export default function BtnFile() {
           <button
             className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
             type="button"
+            onClick={() => {
+              setIsOpen(false);
+              imageFileInputRef.current?.click();
+            }}
           >
             Import image
           </button>
@@ -136,11 +174,18 @@ export default function BtnFile() {
         </div>
       )}
       <input
-        ref={fileInputRef}
+        ref={pxsmFileInputRef}
         className="hidden"
         type="file"
         accept=".pxsm, application/json"
-        onChange={handleFileChange}
+        onChange={handlePxsmFileChange}
+      />
+      <input
+        ref={imageFileInputRef}
+        className="hidden"
+        type="file"
+        accept="image/*"
+        onChange={handleImageFileChange}
       />
       <ModalNew />
       <ModalResize />

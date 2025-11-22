@@ -10,6 +10,7 @@ import {
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
+  MAX_GRID_SIZE,
   BASE_CANVAS_SIZE,
   BASE_PX_SIZE,
   MIN_PX_SIZE,
@@ -40,6 +41,7 @@ type EditorState = {
   clearCanvas: () => void;
   resizeCanvas: (size: { x: number; y: number }, anchor: Side) => void;
   importFromPxsm: (data: PxsmData) => void;
+  importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
   exportToImage: (scale: number) => void;
 };
@@ -213,6 +215,54 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
 
     toast.success("File imported successfully!");
+  },
+  importImage: (dataURL) => {
+    const img = new Image();
+    img.src = dataURL;
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > MAX_GRID_SIZE || height > MAX_GRID_SIZE) {
+        const aspectRatio = width / height;
+        if (width > height) {
+          width = MAX_GRID_SIZE;
+          height = Math.round(width / aspectRatio);
+        } else {
+          height = MAX_GRID_SIZE;
+          width = Math.round(height * aspectRatio);
+        }
+      }
+
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+      if (!tempCtx) {
+        toast.error("Failed to import the image.");
+        return;
+      }
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      tempCtx.imageSmoothingEnabled = false;
+      tempCtx.drawImage(img, 0, 0, width, height);
+      const imageData = tempCtx.getImageData(0, 0, width, height);
+      const pixelData = new Uint8ClampedArray(imageData.data);
+
+      let pxSize = BASE_CANVAS_SIZE / Math.max(width, height);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+
+      set({
+        pixelData,
+        gridSize: { x: width, y: height },
+        zoomLevel,
+      });
+      toast.success("Image imported successfully!");
+    };
+
+    img.onerror = () => {
+      toast.error("Failed to import the image.");
+    };
   },
   exportToPxsm: () => {
     const { pixelData, gridSize } = get();
