@@ -16,10 +16,12 @@ export default function Canvas() {
   const {
     pixelData,
     gridSize,
+    panOffset,
     zoomLevel,
     selectedTool,
     primaryColor,
     secondaryColor,
+    setPanOffset,
     setZoomLevel,
     setPrimaryColor,
     setSecondaryColor,
@@ -28,7 +30,7 @@ export default function Canvas() {
     erasePixel,
     floodFill,
   } = useEditorStore();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const parentContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeMouseButton = useRef<number>(null);
   const prevPanMousePos = useRef({ x: 0, y: 0 });
@@ -36,24 +38,44 @@ export default function Canvas() {
     x: number;
     y: number;
   } | null>(null);
-  const canvasSize = {
-    x: getPxSize() * gridSize.x,
-    y: getPxSize() * gridSize.y,
-  };
-  const parentSize = scrollContainerRef.current
+  const parentSize = parentContainerRef.current
     ? {
-        x: scrollContainerRef.current.clientWidth,
-        y: scrollContainerRef.current.clientHeight,
+        x: parentContainerRef.current.clientWidth,
+        y: parentContainerRef.current.clientHeight,
       }
     : { x: Infinity, y: Infinity };
+  const canvasSize = {
+    x: Math.min(getPxSize() * gridSize.x, parentSize.x),
+    y: Math.min(getPxSize() * gridSize.y, parentSize.y),
+  };
+  const visibleGridSize = {
+    x: canvasSize.x / getPxSize(),
+    y: canvasSize.y / getPxSize(),
+  };
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
-    const pxSize = getPxSize();
     ctx.fillStyle = darkCheckerboardColor;
-    for (let i = 0; i < gridSize.y; i++)
-      for (let j = 0; j < gridSize.x; j++)
+    const pxSize = getPxSize();
+
+    const startX = Math.floor(panOffset.x);
+    const startY = Math.floor(panOffset.y);
+    const endX = Math.min(
+      gridSize.x,
+      startX + Math.ceil(visibleGridSize.x) + 1,
+    );
+    const endY = Math.min(
+      gridSize.y,
+      startY + Math.ceil(visibleGridSize.y) + 1,
+    );
+    for (let i = startY; i < endY; i++)
+      for (let j = startX; j < endX; j++)
         if (i % 2 === j % 2)
-          ctx.fillRect(j * pxSize, i * pxSize, pxSize, pxSize);
+          ctx.fillRect(
+            (j - panOffset.x) * pxSize,
+            (i - panOffset.y) * pxSize,
+            pxSize,
+            pxSize,
+          );
   }
 
   function getPxSize() {
@@ -67,8 +89,8 @@ export default function Canvas() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / getPxSize());
-    const y = Math.floor((e.clientY - rect.top) / getPxSize());
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
 
     if (!hoveredPixel || hoveredPixel.x !== x || hoveredPixel.y !== y)
       setHoveredPixel({ x, y });
@@ -90,8 +112,8 @@ export default function Canvas() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / getPxSize());
-    const y = Math.floor((e.clientY - rect.top) / getPxSize());
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     const color =
       activeMouseButton.current === 0
         ? tinycolor(primaryColor).toRgb()
@@ -107,8 +129,8 @@ export default function Canvas() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / getPxSize());
-    const y = Math.floor((e.clientY - rect.top) / getPxSize());
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     erasePixel(x, y);
   }
 
@@ -119,8 +141,8 @@ export default function Canvas() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / getPxSize());
-    const y = Math.floor((e.clientY - rect.top) / getPxSize());
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     const rgba = getPixelColor(x, y);
     const hex = tinycolor(rgba).toHexString();
     activeMouseButton.current === 0
@@ -135,8 +157,8 @@ export default function Canvas() {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / getPxSize());
-    const y = Math.floor((e.clientY - rect.top) / getPxSize());
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     const color =
       activeMouseButton.current === 0
         ? tinycolor(primaryColor).toRgb()
@@ -146,13 +168,23 @@ export default function Canvas() {
   }
 
   function handlePanAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
+    const dx = (e.clientX - prevPanMousePos.current.x) / zoomLevel;
+    const dy = (e.clientY - prevPanMousePos.current.y) / zoomLevel;
 
-    const dx = e.clientX - prevPanMousePos.current.x;
-    const dy = e.clientY - prevPanMousePos.current.y;
-    scrollContainer.scrollLeft -= dx;
-    scrollContainer.scrollTop -= dy;
+    const maxPanOffset = {
+      x: gridSize.x - visibleGridSize.x,
+      y: gridSize.y - visibleGridSize.y,
+    };
+    const newPanOffset = {
+      x: panOffset.x - dx,
+      y: panOffset.y - dy,
+    };
+    if (newPanOffset.x < 0) newPanOffset.x = 0;
+    if (newPanOffset.y < 0) newPanOffset.y = 0;
+    if (newPanOffset.x > maxPanOffset.x) newPanOffset.x = maxPanOffset.x;
+    if (newPanOffset.y > maxPanOffset.y) newPanOffset.y = maxPanOffset.y;
+
+    setPanOffset(newPanOffset);
     prevPanMousePos.current = { x: e.clientX, y: e.clientY };
   }
 
@@ -207,16 +239,8 @@ export default function Canvas() {
 
   function handleMouseWheel(e: WheelEvent) {
     e.preventDefault();
-    const scrollContainer = scrollContainerRef.current;
     const canvas = canvasRef.current;
-    if (!scrollContainer || !canvas) return;
-
-    const mouseX = e.clientX - scrollContainer.getBoundingClientRect().left;
-    const mouseY = e.clientY - scrollContainer.getBoundingClientRect().top;
-    const currentScrollLeft = scrollContainer.scrollLeft;
-    const currentScrollTop = scrollContainer.scrollTop;
-    const canvasMouseX = mouseX + currentScrollLeft - canvas.offsetLeft;
-    const canvasMouseY = mouseY + currentScrollTop - canvas.offsetTop;
+    if (!canvas) return;
 
     let newZoomLevel = zoomLevel;
     if (e.deltaY < 0)
@@ -225,13 +249,29 @@ export default function Canvas() {
       newZoomLevel = Math.max(MIN_ZOOM_LEVEL, newZoomLevel / ZOOM_FACTOR);
     if (newZoomLevel === zoomLevel) return;
 
-    const zoomRatio = newZoomLevel / zoomLevel;
-    const newScrollLeft = canvasMouseX * zoomRatio - mouseX + canvas.offsetLeft;
-    const newScrollTop = canvasMouseY * zoomRatio - mouseY + canvas.offsetTop;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const mouseWorldX = mouseX / getPxSize() + panOffset.x;
+    const mouseWorldY = mouseY / getPxSize() + panOffset.y;
 
+    const newPanOffset = {
+      x: mouseWorldX - mouseX / (BASE_PX_SIZE * newZoomLevel),
+      y: mouseWorldY - mouseY / (BASE_PX_SIZE * newZoomLevel),
+    };
+    const newVisibleGridSize = {
+      x: Math.min(gridSize.x, parentSize.x / (BASE_PX_SIZE * newZoomLevel)),
+      y: Math.min(gridSize.y, parentSize.y / (BASE_PX_SIZE * newZoomLevel)),
+    };
+    const maxPanOffset = {
+      x: Math.max(0, gridSize.x - newVisibleGridSize.x),
+      y: Math.max(0, gridSize.y - newVisibleGridSize.y),
+    };
+    newPanOffset.x = Math.max(0, Math.min(newPanOffset.x, maxPanOffset.x));
+    newPanOffset.y = Math.max(0, Math.min(newPanOffset.y, maxPanOffset.y));
+
+    setPanOffset(newPanOffset);
     setZoomLevel(newZoomLevel);
-    scrollContainer.scrollLeft = newScrollLeft;
-    scrollContainer.scrollTop = newScrollTop;
   }
 
   useEffect(() => {
@@ -257,10 +297,10 @@ export default function Canvas() {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(
         tempCanvas,
-        0,
-        0,
-        gridSize.x,
-        gridSize.y,
+        panOffset.x,
+        panOffset.y,
+        visibleGridSize.x,
+        visibleGridSize.y,
         0,
         0,
         canvasSize.x,
@@ -294,31 +334,31 @@ export default function Canvas() {
 
       ctx.fillStyle = hoverColor;
       ctx.fillRect(
-        hoveredPixel.x * pxSize,
-        hoveredPixel.y * pxSize,
+        (hoveredPixel.x - panOffset.x) * pxSize,
+        (hoveredPixel.y - panOffset.y) * pxSize,
         pxSize,
         pxSize,
       );
     }
 
-    const scrollContainer = scrollContainerRef.current;
-    if (scrollContainer)
-      scrollContainer.addEventListener("wheel", handleMouseWheel, {
+    const parentContainer = parentContainerRef.current;
+    if (parentContainer)
+      parentContainer.addEventListener("wheel", handleMouseWheel, {
         passive: false,
       });
     return () => {
-      if (scrollContainer)
-        scrollContainer.removeEventListener("wheel", handleMouseWheel);
+      if (parentContainer)
+        parentContainer.removeEventListener("wheel", handleMouseWheel);
     };
-  }, [pixelData, gridSize, zoomLevel, hoveredPixel]);
+  }, [pixelData, gridSize, zoomLevel, hoveredPixel, panOffset]);
 
   return (
     <div
-      className="relative flex flex-grow items-center justify-center overflow-auto"
-      ref={scrollContainerRef}
+      className="flex flex-grow items-center justify-center"
+      ref={parentContainerRef}
     >
       <canvas
-        className={`${canvasSize.x > parentSize.x && "left-0"} ${canvasSize.y > parentSize.y && "top-0"} absolute bg-white`}
+        className="bg-white"
         ref={canvasRef}
         id="canvas"
         width={canvasSize.x}

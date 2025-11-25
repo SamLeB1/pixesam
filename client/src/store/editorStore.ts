@@ -23,12 +23,14 @@ type Tool = "pencil" | "eraser" | "color-picker" | "bucket";
 type EditorState = {
   pixelData: Uint8ClampedArray;
   gridSize: { x: number; y: number };
+  panOffset: { x: number; y: number };
   zoomLevel: number;
   selectedTool: Tool;
   primaryColor: string;
   secondaryColor: string;
   setPixelData: (pixelData: Uint8ClampedArray) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
+  setPanOffset: (panOffset: { x: number; y: number }) => void;
   setZoomLevel: (n: number) => void;
   selectTool: (tool: Tool) => void;
   setPrimaryColor: (hex: string) => void;
@@ -51,12 +53,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     DEFAULT_GRID_SIZE.x * DEFAULT_GRID_SIZE.y * 4,
   ),
   gridSize: DEFAULT_GRID_SIZE,
+  panOffset: { x: 0, y: 0 },
   zoomLevel: 1,
   selectedTool: "pencil",
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
   setPixelData: (pixelData) => set({ pixelData }),
   setGridSize: (gridSize) => set({ gridSize }),
+  setPanOffset: (panOffset) => set({ panOffset }),
   setZoomLevel: (n) => set({ zoomLevel: n }),
   selectTool: (tool) => set({ selectedTool: tool }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
@@ -123,7 +127,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      return { pixelData: newData, gridSize: size, zoomLevel };
+      return {
+        pixelData: newData,
+        gridSize: size,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      };
     }),
   clearCanvas: () =>
     set((state) => {
@@ -195,7 +204,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      return { pixelData: newData, gridSize: size, zoomLevel };
+      return {
+        pixelData: newData,
+        gridSize: size,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      };
     }),
   importFromPxsm: (data) => {
     if (!isValidPxsmData(data)) {
@@ -211,6 +225,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       pixelData,
       gridSize: { x: data.width, y: data.height },
+      panOffset: { x: 0, y: 0 },
       zoomLevel,
     });
 
@@ -255,6 +270,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         pixelData,
         gridSize: { x: width, y: height },
+        panOffset: { x: 0, y: 0 },
         zoomLevel,
       });
       toast.success("Image imported successfully!");
