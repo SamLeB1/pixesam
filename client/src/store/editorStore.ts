@@ -41,7 +41,11 @@ type EditorState = {
   floodFill: (x: number, y: number, color: RGBA) => void;
   newCanvas: (size: { x: number; y: number }) => void;
   clearCanvas: () => void;
-  resizeCanvas: (size: { x: number; y: number }, anchor: Side) => void;
+  resizeCanvas: (
+    size: { x: number; y: number },
+    anchor: Side,
+    resizeContent?: boolean,
+  ) => void;
   importFromPxsm: (data: PxsmData) => void;
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
@@ -140,61 +144,82 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       return { pixelData: newData };
     }),
-  resizeCanvas: (size, anchor) =>
+  resizeCanvas: (size, anchor, resizeContent = false) =>
     set((state) => {
       const { pixelData, gridSize: oldGridSize } = state;
       const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
-      let offsetX = 0;
-      let offsetY = 0;
-      switch (anchor) {
-        case "top-left":
-          break;
-        case "top-center":
-          offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-          offsetY = 0;
-          break;
-        case "top-right":
-          offsetX = size.x - oldGridSize.x;
-          offsetY = 0;
-          break;
-        case "middle-left":
-          offsetX = 0;
-          offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-          break;
-        case "middle-center":
-          offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-          offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-          break;
-        case "middle-right":
-          offsetX = size.x - oldGridSize.x;
-          offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-          break;
-        case "bottom-left":
-          offsetX = 0;
-          offsetY = size.y - oldGridSize.y;
-          break;
-        case "bottom-center":
-          offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-          offsetY = size.y - oldGridSize.y;
-          break;
-        case "bottom-right":
-          offsetX = size.x - oldGridSize.x;
-          offsetY = size.y - oldGridSize.y;
-      }
+      if (resizeContent) {
+        const scaleX = size.x / oldGridSize.x;
+        const scaleY = size.y / oldGridSize.y;
 
-      for (let y = 0; y < oldGridSize.y; y++) {
-        for (let x = 0; x < oldGridSize.x; x++) {
-          const oldBaseIndex = getBaseIndex(x, y, oldGridSize.x);
-          const newX = x + offsetX;
-          const newY = y + offsetY;
+        for (let newY = 0; newY < size.y; newY++) {
+          for (let newX = 0; newX < size.x; newX++) {
+            const oldX = Math.floor(newX / scaleX);
+            const oldY = Math.floor(newY / scaleY);
 
-          if (newX >= 0 && newX < size.x && newY >= 0 && newY < size.y) {
-            const newBaseIndex = getBaseIndex(newX, newY, size.x);
-            newData[newBaseIndex] = pixelData[oldBaseIndex];
-            newData[newBaseIndex + 1] = pixelData[oldBaseIndex + 1];
-            newData[newBaseIndex + 2] = pixelData[oldBaseIndex + 2];
-            newData[newBaseIndex + 3] = pixelData[oldBaseIndex + 3];
+            if (isValidIndex(oldX, oldY, oldGridSize)) {
+              const oldBaseIndex = getBaseIndex(oldX, oldY, oldGridSize.x);
+              const newBaseIndex = getBaseIndex(newX, newY, size.x);
+              newData[newBaseIndex] = pixelData[oldBaseIndex];
+              newData[newBaseIndex + 1] = pixelData[oldBaseIndex + 1];
+              newData[newBaseIndex + 2] = pixelData[oldBaseIndex + 2];
+              newData[newBaseIndex + 3] = pixelData[oldBaseIndex + 3];
+            }
+          }
+        }
+      } else {
+        let offsetX = 0;
+        let offsetY = 0;
+        switch (anchor) {
+          case "top-left":
+            break;
+          case "top-center":
+            offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+            offsetY = 0;
+            break;
+          case "top-right":
+            offsetX = size.x - oldGridSize.x;
+            offsetY = 0;
+            break;
+          case "middle-left":
+            offsetX = 0;
+            offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+            break;
+          case "middle-center":
+            offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+            offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+            break;
+          case "middle-right":
+            offsetX = size.x - oldGridSize.x;
+            offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+            break;
+          case "bottom-left":
+            offsetX = 0;
+            offsetY = size.y - oldGridSize.y;
+            break;
+          case "bottom-center":
+            offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+            offsetY = size.y - oldGridSize.y;
+            break;
+          case "bottom-right":
+            offsetX = size.x - oldGridSize.x;
+            offsetY = size.y - oldGridSize.y;
+        }
+
+        for (let y = 0; y < oldGridSize.y; y++) {
+          for (let x = 0; x < oldGridSize.x; x++) {
+            const oldBaseIndex = getBaseIndex(x, y, oldGridSize.x);
+            const newX = x + offsetX;
+            const newY = y + offsetY;
+
+            if (newX >= 0 && newX < size.x && newY >= 0 && newY < size.y) {
+              const newBaseIndex = getBaseIndex(newX, newY, size.x);
+              newData[newBaseIndex] = pixelData[oldBaseIndex];
+              newData[newBaseIndex + 1] = pixelData[oldBaseIndex + 1];
+              newData[newBaseIndex + 2] = pixelData[oldBaseIndex + 2];
+              newData[newBaseIndex + 3] = pixelData[oldBaseIndex + 3];
+            }
           }
         }
       }

@@ -8,6 +8,7 @@ export default function ModalResize() {
   const [widthInput, setWidthInput] = useState(gridSize.x);
   const [heightInput, setHeightInput] = useState(gridSize.y);
   const [selectedAnchor, setSelectedAnchor] = useState<Side>("top-left");
+  const [isCheckedResizeContent, setIsCheckedResizeContent] = useState(false);
 
   function handleChangeWidth(e: React.ChangeEvent<HTMLInputElement>) {
     const value = parseInt(e.target.value);
@@ -28,7 +29,11 @@ export default function ModalResize() {
     let clampedHeight = heightInput;
     if (clampedHeight < MIN_GRID_SIZE) clampedHeight = MIN_GRID_SIZE;
     else if (clampedHeight > MAX_GRID_SIZE) clampedHeight = MAX_GRID_SIZE;
-    resizeCanvas({ x: clampedWidth, y: clampedHeight }, selectedAnchor);
+    resizeCanvas(
+      { x: clampedWidth, y: clampedHeight },
+      selectedAnchor,
+      isCheckedResizeContent,
+    );
   }
 
   return (
@@ -59,7 +64,7 @@ export default function ModalResize() {
               Height
             </label>
             <input
-              className="input w-full"
+              className="input mb-4 w-full"
               type="number"
               id="height-input"
               min={MIN_GRID_SIZE}
@@ -68,6 +73,16 @@ export default function ModalResize() {
               value={heightInput ? heightInput : ""}
               onChange={handleChangeHeight}
             />
+            <label className="label" htmlFor="resize-content">
+              <input
+                className={`checkbox checkbox-primary mr-2 ${!isCheckedResizeContent && "border-none bg-white"}`}
+                type="checkbox"
+                id="resize-content"
+                checked={isCheckedResizeContent}
+                onChange={(e) => setIsCheckedResizeContent(e.target.checked)}
+              />
+              Resize content
+            </label>
           </div>
           <div>
             <div className="label mb-1 block select-none">Anchor</div>
@@ -78,8 +93,14 @@ export default function ModalResize() {
                   ...(selectedAnchor === "top-left" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("top-left")}
+                onClick={() => {
+                  if (!isCheckedResizeContent) setSelectedAnchor("top-left");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -87,8 +108,14 @@ export default function ModalResize() {
                   ...(selectedAnchor === "top-center" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("top-center")}
+                onClick={() => {
+                  if (!isCheckedResizeContent) setSelectedAnchor("top-center");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -96,8 +123,14 @@ export default function ModalResize() {
                   ...(selectedAnchor === "top-right" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("top-right")}
+                onClick={() => {
+                  if (!isCheckedResizeContent) setSelectedAnchor("top-right");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -105,8 +138,14 @@ export default function ModalResize() {
                   ...(selectedAnchor === "middle-left" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("middle-left")}
+                onClick={() => {
+                  if (!isCheckedResizeContent) setSelectedAnchor("middle-left");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -114,8 +153,15 @@ export default function ModalResize() {
                   ...(selectedAnchor === "middle-center" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("middle-center")}
+                onClick={() => {
+                  if (!isCheckedResizeContent)
+                    setSelectedAnchor("middle-center");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -123,8 +169,15 @@ export default function ModalResize() {
                   ...(selectedAnchor === "middle-right" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("middle-right")}
+                onClick={() => {
+                  if (!isCheckedResizeContent)
+                    setSelectedAnchor("middle-right");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -132,8 +185,14 @@ export default function ModalResize() {
                   ...(selectedAnchor === "bottom-left" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("bottom-left")}
+                onClick={() => {
+                  if (!isCheckedResizeContent) setSelectedAnchor("bottom-left");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -141,8 +200,15 @@ export default function ModalResize() {
                   ...(selectedAnchor === "bottom-center" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("bottom-center")}
+                onClick={() => {
+                  if (!isCheckedResizeContent)
+                    setSelectedAnchor("bottom-center");
+                }}
               ></div>
               <div
                 className="h-8 w-8 cursor-pointer bg-neutral-600 hover:bg-neutral-500"
@@ -150,8 +216,15 @@ export default function ModalResize() {
                   ...(selectedAnchor === "bottom-right" && {
                     backgroundColor: "white",
                   }),
+                  ...(isCheckedResizeContent && {
+                    backgroundColor: "oklch(37.1% 0 0)",
+                    cursor: "default",
+                  }),
                 }}
-                onClick={() => setSelectedAnchor("bottom-right")}
+                onClick={() => {
+                  if (!isCheckedResizeContent)
+                    setSelectedAnchor("bottom-right");
+                }}
               ></div>
             </div>
           </div>
