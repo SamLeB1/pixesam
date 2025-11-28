@@ -15,8 +15,36 @@ import {
   BASE_PX_SIZE,
   MIN_PX_SIZE,
   MAX_PX_SIZE,
+  MAX_HISTORY_SIZE,
 } from "../constants";
 import type { RGBA, Side, PxsmData } from "../types";
+
+type Action = DrawAction | NewAction | ClearAction;
+
+type DrawAction = {
+  action: "draw";
+  pixels: DrawActionPixel[];
+};
+
+type NewAction = {
+  action: "new";
+  pixelData: Uint8ClampedArray;
+  prevPixelData: Uint8ClampedArray;
+  gridSize: { x: number; y: number };
+  prevGridSize: { x: number; y: number };
+};
+
+type ClearAction = {
+  action: "clear";
+  prevPixelData: Uint8ClampedArray;
+};
+
+type DrawActionPixel = {
+  x: number;
+  y: number;
+  color: RGBA;
+  prevColor: RGBA;
+};
 
 type Tool = "pencil" | "eraser" | "color-picker" | "bucket";
 
@@ -28,6 +56,9 @@ type EditorState = {
   selectedTool: Tool;
   primaryColor: string;
   secondaryColor: string;
+  undoHistory: Action[];
+  redoHistory: Action[];
+  drawBuffer: DrawActionPixel[];
   setPixelData: (pixelData: Uint8ClampedArray) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
@@ -50,6 +81,10 @@ type EditorState = {
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
   exportToImage: (scale: number) => void;
+  undo: () => void;
+  redo: () => void;
+  updateHistory: (action: Action) => void;
+  clearDrawBuffer: () => void;
 };
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -62,6 +97,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedTool: "pencil",
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
+  undoHistory: [],
+  redoHistory: [],
+  drawBuffer: [],
   setPixelData: (pixelData) => set({ pixelData }),
   setGridSize: (gridSize) => set({ gridSize }),
   setPanOffset: (panOffset) => set({ panOffset }),
@@ -379,4 +417,117 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     link.click();
     document.body.removeChild(link);
   },
+  undo: () =>
+    set((state) => {
+      const { pixelData, gridSize, undoHistory, redoHistory } = state;
+      if (undoHistory.length === 0) return {};
+
+      const newUndoHistory = [...undoHistory];
+      const action = newUndoHistory.shift()!;
+      const newRedoHistory = [action, ...redoHistory];
+
+      if (action.action === "draw") {
+        const newData = new Uint8ClampedArray(pixelData);
+        for (let i = 0; i < action.pixels.length; i++) {
+          const { x, y, prevColor } = action.pixels[i];
+          const baseIndex = getBaseIndex(x, y, gridSize.x);
+          newData[baseIndex] = prevColor.r;
+          newData[baseIndex + 1] = prevColor.g;
+          newData[baseIndex + 2] = prevColor.b;
+          newData[baseIndex + 3] = prevColor.a;
+        }
+        return {
+          pixelData: newData,
+          undoHistory: newUndoHistory,
+          redoHistory: newRedoHistory,
+        };
+      } else if (action.action === "new") {
+        const { prevPixelData, prevGridSize } = action;
+        let pxSize =
+          BASE_CANVAS_SIZE / Math.max(prevGridSize.x, prevGridSize.y);
+        if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+        if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+        const zoomLevel = pxSize / BASE_PX_SIZE;
+        return {
+          pixelData: prevPixelData,
+          gridSize: prevGridSize,
+          panOffset: { x: 0, y: 0 },
+          zoomLevel,
+          undoHistory: newUndoHistory,
+          redoHistory: newRedoHistory,
+        };
+      } else if (action.action === "clear") {
+        return {
+          pixelData: action.prevPixelData,
+          undoHistory: newUndoHistory,
+          redoHistory: newRedoHistory,
+        };
+      } else return {};
+    }),
+  redo: () =>
+    set((state) => {
+      const { pixelData, gridSize, undoHistory, redoHistory } = state;
+      if (redoHistory.length === 0) return {};
+
+      const newRedoHistory = [...redoHistory];
+      const action = newRedoHistory.shift()!;
+      const newUndoHistory = [action, ...undoHistory];
+
+      if (action.action === "draw") {
+        const newData = new Uint8ClampedArray(pixelData);
+        for (let i = action.pixels.length - 1; i >= 0; i--) {
+          const { x, y, color } = action.pixels[i];
+          const baseIndex = getBaseIndex(x, y, gridSize.x);
+          newData[baseIndex] = color.r;
+          newData[baseIndex + 1] = color.g;
+          newData[baseIndex + 2] = color.b;
+          newData[baseIndex + 3] = color.a;
+        }
+        return {
+          pixelData: newData,
+          undoHistory: newUndoHistory,
+          redoHistory: newRedoHistory,
+        };
+      } else if (action.action === "new") {
+        const { pixelData, gridSize } = action;
+        let pxSize = BASE_CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);
+        if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+        if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+        const zoomLevel = pxSize / BASE_PX_SIZE;
+        return {
+          pixelData,
+          gridSize,
+          panOffset: { x: 0, y: 0 },
+          zoomLevel,
+          undoHistory: newUndoHistory,
+          redoHistory: newRedoHistory,
+        };
+      } else if (action.action === "clear") {
+        const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+        return {
+          pixelData: newData,
+          undoHistory: newUndoHistory,
+          redoHistory: newRedoHistory,
+        };
+      } else return {};
+    }),
+  updateHistory: (action) =>
+    set((state) => {
+      const { undoHistory } = state;
+      const newUndoHistory = [action, ...undoHistory];
+      if (newUndoHistory.length > MAX_HISTORY_SIZE)
+        newUndoHistory.splice(MAX_HISTORY_SIZE);
+      return { undoHistory: newUndoHistory, redoHistory: [] };
+    }),
+  clearDrawBuffer: () =>
+    set((state) => {
+      const { drawBuffer, updateHistory } = state;
+      if (drawBuffer.length === 0) return {};
+      const action: DrawAction = {
+        action: "draw",
+        pixels: drawBuffer,
+      };
+      updateHistory(action);
+      return { drawBuffer: [] };
+    }),
 }));

@@ -29,6 +29,9 @@ export default function Canvas() {
     setPixelColor,
     erasePixel,
     floodFill,
+    undo,
+    redo,
+    clearDrawBuffer,
   } = useEditorStore();
   const parentContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -225,6 +228,7 @@ export default function Canvas() {
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     activeMouseButton.current = null;
     updateHoveredPixel(e);
+    clearDrawBuffer();
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
@@ -235,6 +239,7 @@ export default function Canvas() {
   function handleMouseLeave() {
     activeMouseButton.current = null;
     setHoveredPixel(null);
+    clearDrawBuffer();
   }
 
   function handleMouseWheel(e: WheelEvent) {
@@ -351,6 +356,27 @@ export default function Canvas() {
         parentContainer.removeEventListener("wheel", handleMouseWheel);
     };
   }, [pixelData, gridSize, zoomLevel, hoveredPixel, panOffset]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+
+      if (isCmdOrCtrl && !e.shiftKey && key === "z") {
+        e.preventDefault();
+        undo();
+      } else if (isCmdOrCtrl && e.shiftKey && key === "z") {
+        e.preventDefault();
+        redo();
+      } else if (isCmdOrCtrl && key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div
