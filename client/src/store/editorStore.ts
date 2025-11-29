@@ -19,11 +19,19 @@ import {
 } from "../constants";
 import type { RGBA, Side, PxsmData } from "../types";
 
-type Action = DrawAction | NewAction | ClearAction;
+type Action = DrawAction | BucketAction | NewAction | ClearAction;
 
 type DrawAction = {
   action: "draw";
   pixels: DrawActionPixel[];
+};
+
+type BucketAction = {
+  action: "bucket";
+  x: number;
+  y: number;
+  color: RGBA;
+  prevPixelData: Uint8ClampedArray;
 };
 
 type NewAction = {
@@ -69,7 +77,12 @@ type EditorState = {
   getPixelColor: (x: number, y: number) => RGBA;
   setPixelColor: (x: number, y: number, color: RGBA) => void;
   erasePixel: (x: number, y: number) => void;
-  floodFill: (x: number, y: number, color: RGBA) => void;
+  floodFill: (
+    x: number,
+    y: number,
+    color: RGBA,
+    isUpdateHistory?: boolean,
+  ) => void;
   newCanvas: (size: { x: number; y: number }) => void;
   clearCanvas: () => void;
   resizeCanvas: (
@@ -119,27 +132,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   setPixelColor: (x, y, color) =>
     set((state) => {
-      const newData = new Uint8ClampedArray(state.pixelData);
-      const baseIndex = getBaseIndex(x, y, state.gridSize.x);
+      const { pixelData, gridSize, drawBuffer, getPixelColor } = state;
+      const newData = new Uint8ClampedArray(pixelData);
+      const baseIndex = getBaseIndex(x, y, gridSize.x);
       newData[baseIndex] = color.r;
       newData[baseIndex + 1] = color.g;
       newData[baseIndex + 2] = color.b;
       newData[baseIndex + 3] = color.a;
-      return { pixelData: newData };
+
+      const drawActionPixel: DrawActionPixel = {
+        x,
+        y,
+        color,
+        prevColor: getPixelColor(x, y),
+      };
+      const newDrawBuffer = [drawActionPixel, ...drawBuffer];
+
+      return { pixelData: newData, drawBuffer: newDrawBuffer };
     }),
   erasePixel: (x, y) =>
     set((state) => {
-      const newData = new Uint8ClampedArray(state.pixelData);
-      const baseIndex = getBaseIndex(x, y, state.gridSize.x);
+      const { pixelData, gridSize, drawBuffer, getPixelColor } = state;
+      const newData = new Uint8ClampedArray(pixelData);
+      const baseIndex = getBaseIndex(x, y, gridSize.x);
       newData[baseIndex] = 0;
       newData[baseIndex + 1] = 0;
       newData[baseIndex + 2] = 0;
       newData[baseIndex + 3] = 0;
-      return { pixelData: newData };
+
+      const drawActionPixel: DrawActionPixel = {
+        x,
+        y,
+        color: { r: 0, g: 0, b: 0, a: 0 },
+        prevColor: getPixelColor(x, y),
+      };
+      const newDrawBuffer = [drawActionPixel, ...drawBuffer];
+
+      return { pixelData: newData, drawBuffer: newDrawBuffer };
     }),
-  floodFill: (x, y, color) =>
+  floodFill: (x, y, color, isUpdateHistory = true) =>
     set((state) => {
-      const { pixelData, gridSize } = state;
+      const { pixelData, gridSize, updateHistory } = state;
       const targetColor = getPixelColor(x, y, gridSize.x, pixelData);
       if (isEqualColor(targetColor, color)) return {};
 
@@ -158,16 +191,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           if (isValidIndex(x, y - 1, gridSize)) queue.push({ x, y: y - 1 });
         }
       }
+
+      if (isUpdateHistory) {
+        const action: BucketAction = {
+          action: "bucket",
+          x,
+          y,
+          color,
+          prevPixelData: pixelData,
+        };
+        updateHistory(action);
+      }
       return { pixelData: newData };
     }),
   newCanvas: (size) =>
-    set(() => {
+    set((state) => {
+      const { pixelData, gridSize, updateHistory } = state;
       const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
       let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
+
+      const action: NewAction = {
+        action: "new",
+        pixelData: newData,
+        prevPixelData: pixelData,
+        gridSize: size,
+        prevGridSize: gridSize,
+      };
+      updateHistory(action);
 
       return {
         pixelData: newData,
@@ -178,13 +232,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   clearCanvas: () =>
     set((state) => {
-      const { gridSize } = state;
+      const { pixelData, gridSize, updateHistory } = state;
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+      const action: ClearAction = {
+        action: "clear",
+        prevPixelData: pixelData,
+      };
+      updateHistory(action);
       return { pixelData: newData };
     }),
   resizeCanvas: (size, anchor, resizeContent = false) =>
     set((state) => {
-      const { pixelData, gridSize: oldGridSize } = state;
+      const { pixelData, gridSize: oldGridSize, updateHistory } = state;
       const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
       if (resizeContent) {
@@ -267,6 +326,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
+      const action: NewAction = {
+        action: "new",
+        pixelData: newData,
+        prevPixelData: pixelData,
+        gridSize: size,
+        prevGridSize: oldGridSize,
+      };
+      updateHistory(action);
+
       return {
         pixelData: newData,
         gridSize: size,
@@ -274,26 +342,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         zoomLevel,
       };
     }),
-  importFromPxsm: (data) => {
-    if (!isValidPxsmData(data)) {
-      toast.error("The imported file is invalid and may have been corrupted.");
-      return;
-    }
+  importFromPxsm: (data) =>
+    set((state) => {
+      if (!isValidPxsmData(data)) {
+        toast.error(
+          "The imported file is invalid and may have been corrupted.",
+        );
+        return {};
+      }
+      const { pixelData, gridSize, updateHistory } = state;
+      const newData = new Uint8ClampedArray(data.pixels);
+      let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
 
-    const pixelData = new Uint8ClampedArray(data.pixels);
-    let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
-    if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
-    if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
-    const zoomLevel = pxSize / BASE_PX_SIZE;
-    set({
-      pixelData,
-      gridSize: { x: data.width, y: data.height },
-      panOffset: { x: 0, y: 0 },
-      zoomLevel,
-    });
+      const action: NewAction = {
+        action: "new",
+        pixelData: newData,
+        prevPixelData: pixelData,
+        gridSize: { x: data.width, y: data.height },
+        prevGridSize: gridSize,
+      };
+      updateHistory(action);
 
-    toast.success("File imported successfully!");
-  },
+      toast.success("File imported successfully!");
+      return {
+        pixelData: newData,
+        gridSize: { x: data.width, y: data.height },
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      };
+    }),
   importImage: (dataURL) => {
     const img = new Image();
     img.src = dataURL;
@@ -323,15 +403,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       tempCtx.imageSmoothingEnabled = false;
       tempCtx.drawImage(img, 0, 0, width, height);
       const imageData = tempCtx.getImageData(0, 0, width, height);
-      const pixelData = new Uint8ClampedArray(imageData.data);
+      const newData = new Uint8ClampedArray(imageData.data);
 
       let pxSize = BASE_CANVAS_SIZE / Math.max(width, height);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
+      const { pixelData, gridSize, updateHistory } = get();
+      const action: NewAction = {
+        action: "new",
+        pixelData: newData,
+        prevPixelData: pixelData,
+        gridSize: { x: width, y: height },
+        prevGridSize: gridSize,
+      };
+      updateHistory(action);
+
       set({
-        pixelData,
+        pixelData: newData,
         gridSize: { x: width, y: height },
         panOffset: { x: 0, y: 0 },
         zoomLevel,
@@ -441,6 +531,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           undoHistory: newUndoHistory,
           redoHistory: newRedoHistory,
         };
+      } else if (action.action === "bucket") {
+        return {
+          pixelData: action.prevPixelData,
+          undoHistory: newUndoHistory,
+          redoHistory: newRedoHistory,
+        };
       } else if (action.action === "new") {
         const { prevPixelData, prevGridSize } = action;
         let pxSize =
@@ -466,7 +562,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   redo: () =>
     set((state) => {
-      const { pixelData, gridSize, undoHistory, redoHistory } = state;
+      const { pixelData, gridSize, undoHistory, redoHistory, floodFill } =
+        state;
       if (redoHistory.length === 0) return {};
 
       const newRedoHistory = [...redoHistory];
@@ -488,6 +585,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           undoHistory: newUndoHistory,
           redoHistory: newRedoHistory,
         };
+      } else if (action.action === "bucket") {
+        const { x, y, color } = action;
+        floodFill(x, y, color, false);
+        return { undoHistory: newUndoHistory, redoHistory: newRedoHistory };
       } else if (action.action === "new") {
         const { pixelData, gridSize } = action;
         let pxSize = BASE_CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);

@@ -1,7 +1,7 @@
 export const BASE_CANVAS_SIZE = 512;
 export const DEFAULT_GRID_SIZE = { x: 16, y: 16 };
 export const MIN_GRID_SIZE = 1;
-export const MAX_GRID_SIZE = 2048;
+export const MAX_GRID_SIZE = 1024;
 export const BASE_PX_SIZE = 32;
 export const MIN_PX_SIZE = 4;
 export const MAX_PX_SIZE = 128;
