@@ -83,16 +83,16 @@ export default function BtnFile() {
   return (
     <div>
       <button
-        className={`${isOpen && "bg-neutral-600"} cursor-pointer p-2 hover:bg-neutral-600`}
+        className={`${isOpen && "bg-gray-600"} cursor-pointer p-2 hover:bg-gray-600`}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
       >
         File
       </button>
       {isOpen && (
-        <div className="absolute z-1 w-40 bg-neutral-600">
+        <div className="absolute z-1 w-40 bg-gray-600">
           <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
             type="button"
             onClick={() => {
               setIsOpen(false);
@@ -105,7 +105,7 @@ export default function BtnFile() {
             New
           </button>
           <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
             type="button"
             onClick={() => {
               setIsOpen(false);
@@ -116,7 +116,7 @@ export default function BtnFile() {
             Clear
           </button>
           <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
             type="button"
             onClick={() => {
               setIsOpen(false);
@@ -129,7 +129,7 @@ export default function BtnFile() {
             Resize
           </button>
           <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
             type="button"
             onClick={() => {
               setIsOpen(false);
@@ -139,7 +139,7 @@ export default function BtnFile() {
             Save as .pxsm
           </button>
           <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
             type="button"
             onClick={() => {
               setIsOpen(false);
@@ -149,7 +149,7 @@ export default function BtnFile() {
             Import .pxsm
           </button>
           <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
             type="button"
             onClick={() => {
               setIsOpen(false);
@@ -159,7 +159,7 @@ export default function BtnFile() {
             Import image
           </button>
           <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-neutral-500"
+            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
             type="button"
             onClick={() => {
               setIsOpen(false);
