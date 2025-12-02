@@ -64,6 +64,7 @@ type EditorState = {
   selectedTool: Tool;
   primaryColor: string;
   secondaryColor: string;
+  brushSize: number;
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
@@ -74,6 +75,7 @@ type EditorState = {
   selectTool: (tool: Tool) => void;
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
+  setBrushSize: (n: number) => void;
   getPixelColor: (x: number, y: number) => RGBA;
   setPixelColor: (x: number, y: number, color: RGBA) => void;
   erasePixel: (x: number, y: number) => void;
@@ -110,6 +112,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedTool: "pencil",
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
+  brushSize: 1,
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
@@ -120,6 +123,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectTool: (tool) => set({ selectedTool: tool }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
+  setBrushSize: (n) => set({ brushSize: n }),
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();
     const baseIndex = getBaseIndex(x, y, gridSize.x);

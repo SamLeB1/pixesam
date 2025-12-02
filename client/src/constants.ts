@@ -9,3 +9,4 @@ export const MIN_ZOOM_LEVEL = MIN_PX_SIZE / BASE_PX_SIZE;
 export const MAX_ZOOM_LEVEL = MAX_PX_SIZE / BASE_PX_SIZE;
 export const ZOOM_FACTOR = 1.25;
 export const MAX_HISTORY_SIZE = 50;
+export const MAX_BRUSH_SIZE = 64;

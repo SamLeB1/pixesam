@@ -8,7 +8,7 @@ export default function ToolOptionsBar() {
   const { selectedTool } = useEditorStore();
 
   return (
-    <div className="h-10 bg-neutral-800">
+    <div className="h-10 bg-neutral-800 px-8">
       {selectedTool === "pencil" && <PencilToolOptions />}
       {selectedTool === "eraser" && <EraserToolOptions />}
       {selectedTool === "color-picker" && <ColorPickerToolOptions />}
