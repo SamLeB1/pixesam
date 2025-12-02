@@ -77,8 +77,8 @@ type EditorState = {
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
   getPixelColor: (x: number, y: number) => RGBA;
-  setPixelColor: (x: number, y: number, color: RGBA) => void;
-  erasePixel: (x: number, y: number) => void;
+  draw: (x: number, y: number, color: RGBA) => void;
+  erase: (x: number, y: number) => void;
   floodFill: (
     x: number,
     y: number,
@@ -134,46 +134,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       a: pixelData[baseIndex + 3],
     };
   },
-  setPixelColor: (x, y, color) =>
+  draw: (x, y, color) =>
     set((state) => {
-      const { pixelData, gridSize, drawBuffer, getPixelColor } = state;
+      const { pixelData, gridSize, brushSize, drawBuffer, getPixelColor } =
+        state;
       const newData = new Uint8ClampedArray(pixelData);
-      const baseIndex = getBaseIndex(x, y, gridSize.x);
-      newData[baseIndex] = color.r;
-      newData[baseIndex + 1] = color.g;
-      newData[baseIndex + 2] = color.b;
-      newData[baseIndex + 3] = color.a;
+      const newDrawBuffer = [...drawBuffer];
+      const offset = -Math.floor(brushSize / 2);
 
-      const drawActionPixel: DrawActionPixel = {
-        x,
-        y,
-        color,
-        prevColor: getPixelColor(x, y),
-      };
-      const newDrawBuffer = [drawActionPixel, ...drawBuffer];
-
+      for (let i = 0; i < brushSize; i++) {
+        for (let j = 0; j < brushSize; j++) {
+          const pixelX = x + j + offset;
+          const pixelY = y + i + offset;
+          if (isValidIndex(pixelX, pixelY, gridSize)) {
+            newDrawBuffer.unshift({
+              x: pixelX,
+              y: pixelY,
+              color,
+              prevColor: getPixelColor(pixelX, pixelY),
+            });
+            setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
+          }
+        }
+      }
       return { pixelData: newData, drawBuffer: newDrawBuffer };
     }),
-  erasePixel: (x, y) =>
-    set((state) => {
-      const { pixelData, gridSize, drawBuffer, getPixelColor } = state;
-      const newData = new Uint8ClampedArray(pixelData);
-      const baseIndex = getBaseIndex(x, y, gridSize.x);
-      newData[baseIndex] = 0;
-      newData[baseIndex + 1] = 0;
-      newData[baseIndex + 2] = 0;
-      newData[baseIndex + 3] = 0;
-
-      const drawActionPixel: DrawActionPixel = {
-        x,
-        y,
-        color: { r: 0, g: 0, b: 0, a: 0 },
-        prevColor: getPixelColor(x, y),
-      };
-      const newDrawBuffer = [drawActionPixel, ...drawBuffer];
-
-      return { pixelData: newData, drawBuffer: newDrawBuffer };
-    }),
+  erase: (x, y) => get().draw(x, y, { r: 0, g: 0, b: 0, a: 0 }),
   floodFill: (x, y, color, isUpdateHistory = true) =>
     set((state) => {
       const { pixelData, gridSize, updateHistory } = state;

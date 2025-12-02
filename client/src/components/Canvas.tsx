@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
-import { getBaseIndex } from "../utils/canvas";
+import { getBaseIndex, isValidIndex } from "../utils/canvas";
 import {
   BASE_PX_SIZE,
   MIN_ZOOM_LEVEL,
@@ -21,13 +21,14 @@ export default function Canvas() {
     selectedTool,
     primaryColor,
     secondaryColor,
+    brushSize,
     setPanOffset,
     setZoomLevel,
     setPrimaryColor,
     setSecondaryColor,
     getPixelColor,
-    setPixelColor,
-    erasePixel,
+    draw,
+    erase,
     floodFill,
     undo,
     redo,
@@ -122,7 +123,7 @@ export default function Canvas() {
         ? tinycolor(primaryColor).toRgb()
         : tinycolor(secondaryColor).toRgb();
     color.a *= 255;
-    setPixelColor(x, y, color);
+    draw(x, y, color);
   }
 
   function handleEraserAction(
@@ -134,7 +135,7 @@ export default function Canvas() {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
-    erasePixel(x, y);
+    erase(x, y);
   }
 
   function handleColorPickerAction(
@@ -315,35 +316,42 @@ export default function Canvas() {
 
     if (hoveredPixel) {
       const pxSize = getPxSize();
-      const baseIndex = getBaseIndex(
-        hoveredPixel.x,
-        hoveredPixel.y,
-        gridSize.x,
-      );
-      const r = pixelData[baseIndex];
-      const g = pixelData[baseIndex + 1];
-      const b = pixelData[baseIndex + 2];
-      const a = pixelData[baseIndex + 3];
+      const offset = -Math.floor(brushSize / 2);
 
-      let hoverColor;
-      if (a === 0) {
-        if (hoveredPixel.y % 2 === hoveredPixel.x % 2)
-          hoverColor = tinycolor(darkCheckerboardColor)
-            .darken(15)
-            .toHexString();
-        else
-          hoverColor = tinycolor(lightCheckerboardColor)
-            .darken(15)
-            .toHexString();
-      } else hoverColor = getHoverColor(r, g, b, a);
+      for (let i = 0; i < brushSize; i++) {
+        for (let j = 0; j < brushSize; j++) {
+          const pixelX = hoveredPixel.x + j + offset;
+          const pixelY = hoveredPixel.y + i + offset;
 
-      ctx.fillStyle = hoverColor;
-      ctx.fillRect(
-        (hoveredPixel.x - panOffset.x) * pxSize,
-        (hoveredPixel.y - panOffset.y) * pxSize,
-        pxSize,
-        pxSize,
-      );
+          if (isValidIndex(pixelX, pixelY, gridSize)) {
+            const baseIndex = getBaseIndex(pixelX, pixelY, gridSize.x);
+            const r = pixelData[baseIndex];
+            const g = pixelData[baseIndex + 1];
+            const b = pixelData[baseIndex + 2];
+            const a = pixelData[baseIndex + 3];
+
+            let hoverColor;
+            if (a === 0) {
+              if (pixelY % 2 === pixelX % 2)
+                hoverColor = tinycolor(darkCheckerboardColor)
+                  .darken(15)
+                  .toHexString();
+              else
+                hoverColor = tinycolor(lightCheckerboardColor)
+                  .darken(15)
+                  .toHexString();
+            } else hoverColor = getHoverColor(r, g, b, a);
+
+            ctx.fillStyle = hoverColor;
+            ctx.fillRect(
+              (pixelX - panOffset.x) * pxSize,
+              (pixelY - panOffset.y) * pxSize,
+              pxSize,
+              pxSize,
+            );
+          }
+        }
+      }
     }
 
     const parentContainer = parentContainerRef.current;
@@ -355,7 +363,7 @@ export default function Canvas() {
       if (parentContainer)
         parentContainer.removeEventListener("wheel", handleMouseWheel);
     };
-  }, [pixelData, gridSize, zoomLevel, hoveredPixel, panOffset]);
+  }, [pixelData, gridSize, zoomLevel, hoveredPixel, panOffset, brushSize]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
