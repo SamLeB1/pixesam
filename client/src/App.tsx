@@ -3,6 +3,7 @@ import Canvas from "./components/Canvas";
 import TopBar from "./components/TopBar";
 import SideBarLeft from "./components/SideBarLeft";
 import SideBarRight from "./components/SideBarRight";
+import BottomBar from "./components/BottomBar";
 import ToolOptionsBar from "./components/ToolOptionsBar";
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
           </div>
           <SideBarRight />
         </div>
+        <BottomBar />
       </div>
       <Toaster richColors position={"top-center"} />
     </>
