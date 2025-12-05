@@ -3,7 +3,10 @@ import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import { getBaseIndex, isValidIndex } from "../utils/canvas";
 import {
+  BASE_CANVAS_SIZE,
   BASE_PX_SIZE,
+  MIN_PX_SIZE,
+  MAX_PX_SIZE,
   MIN_ZOOM_LEVEL,
   MAX_ZOOM_LEVEL,
   ZOOM_FACTOR,
@@ -107,6 +110,80 @@ export default function Canvas() {
         ? originalColor.lighten(15)
         : originalColor.darken(15);
     return hoverColor.toHexString();
+  }
+
+  function updateZoom(
+    clientX: number,
+    clientY: number,
+    zoomIn: boolean,
+    zoomCenter = false,
+  ) {
+    let newZoomLevel = zoomLevel;
+    if (zoomIn)
+      newZoomLevel = Math.min(MAX_ZOOM_LEVEL, newZoomLevel * ZOOM_FACTOR);
+    else newZoomLevel = Math.max(MIN_ZOOM_LEVEL, newZoomLevel / ZOOM_FACTOR);
+    if (newZoomLevel === zoomLevel) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    let mouseX = clientX - rect.left;
+    let mouseY = clientY - rect.top;
+    if (zoomCenter) {
+      mouseX = canvas.width / 2;
+      mouseY = canvas.height / 2;
+    }
+    const mouseWorldX = mouseX / getPxSize() + panOffset.x;
+    const mouseWorldY = mouseY / getPxSize() + panOffset.y;
+
+    const newPanOffset = {
+      x: mouseWorldX - mouseX / (BASE_PX_SIZE * newZoomLevel),
+      y: mouseWorldY - mouseY / (BASE_PX_SIZE * newZoomLevel),
+    };
+    const newVisibleGridSize = {
+      x: Math.min(gridSize.x, parentSize.x / (BASE_PX_SIZE * newZoomLevel)),
+      y: Math.min(gridSize.y, parentSize.y / (BASE_PX_SIZE * newZoomLevel)),
+    };
+    const maxPanOffset = {
+      x: Math.max(0, gridSize.x - newVisibleGridSize.x),
+      y: Math.max(0, gridSize.y - newVisibleGridSize.y),
+    };
+    newPanOffset.x = Math.max(0, Math.min(newPanOffset.x, maxPanOffset.x));
+    newPanOffset.y = Math.max(0, Math.min(newPanOffset.y, maxPanOffset.y));
+
+    setPanOffset(newPanOffset);
+    setZoomLevel(newZoomLevel);
+  }
+
+  function resetZoom() {
+    let newPxSize = BASE_CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);
+    if (newPxSize < MIN_PX_SIZE) newPxSize = MIN_PX_SIZE;
+    if (newPxSize > MAX_PX_SIZE) newPxSize = MAX_PX_SIZE;
+    const newZoomLevel = newPxSize / BASE_PX_SIZE;
+    if (newZoomLevel === zoomLevel) return;
+
+    const mouseX = canvasSize.x / 2;
+    const mouseY = canvasSize.y / 2;
+    const mouseWorldX = mouseX / getPxSize() + panOffset.x;
+    const mouseWorldY = mouseY / getPxSize() + panOffset.y;
+
+    const newPanOffset = {
+      x: mouseWorldX - mouseX / (BASE_PX_SIZE * newZoomLevel),
+      y: mouseWorldY - mouseY / (BASE_PX_SIZE * newZoomLevel),
+    };
+    const newVisibleGridSize = {
+      x: Math.min(gridSize.x, parentSize.x / (BASE_PX_SIZE * newZoomLevel)),
+      y: Math.min(gridSize.y, parentSize.y / (BASE_PX_SIZE * newZoomLevel)),
+    };
+    const maxPanOffset = {
+      x: Math.max(0, gridSize.x - newVisibleGridSize.x),
+      y: Math.max(0, gridSize.y - newVisibleGridSize.y),
+    };
+    newPanOffset.x = Math.max(0, Math.min(newPanOffset.x, maxPanOffset.x));
+    newPanOffset.y = Math.max(0, Math.min(newPanOffset.y, maxPanOffset.y));
+
+    setPanOffset(newPanOffset);
+    setZoomLevel(newZoomLevel);
   }
 
   function handlePencilAction(
@@ -245,39 +322,8 @@ export default function Canvas() {
 
   function handleMouseWheel(e: WheelEvent) {
     e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    let newZoomLevel = zoomLevel;
-    if (e.deltaY < 0)
-      newZoomLevel = Math.min(MAX_ZOOM_LEVEL, newZoomLevel * ZOOM_FACTOR);
-    else if (e.deltaY > 0)
-      newZoomLevel = Math.max(MIN_ZOOM_LEVEL, newZoomLevel / ZOOM_FACTOR);
-    if (newZoomLevel === zoomLevel) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const mouseWorldX = mouseX / getPxSize() + panOffset.x;
-    const mouseWorldY = mouseY / getPxSize() + panOffset.y;
-
-    const newPanOffset = {
-      x: mouseWorldX - mouseX / (BASE_PX_SIZE * newZoomLevel),
-      y: mouseWorldY - mouseY / (BASE_PX_SIZE * newZoomLevel),
-    };
-    const newVisibleGridSize = {
-      x: Math.min(gridSize.x, parentSize.x / (BASE_PX_SIZE * newZoomLevel)),
-      y: Math.min(gridSize.y, parentSize.y / (BASE_PX_SIZE * newZoomLevel)),
-    };
-    const maxPanOffset = {
-      x: Math.max(0, gridSize.x - newVisibleGridSize.x),
-      y: Math.max(0, gridSize.y - newVisibleGridSize.y),
-    };
-    newPanOffset.x = Math.max(0, Math.min(newPanOffset.x, maxPanOffset.x));
-    newPanOffset.y = Math.max(0, Math.min(newPanOffset.y, maxPanOffset.y));
-
-    setPanOffset(newPanOffset);
-    setZoomLevel(newZoomLevel);
+    if (e.deltaY < 0) updateZoom(e.clientX, e.clientY, true);
+    else if (e.deltaY > 0) updateZoom(e.clientX, e.clientY, false);
   }
 
   useEffect(() => {
@@ -379,12 +425,21 @@ export default function Canvas() {
       } else if (isCmdOrCtrl && key === "y") {
         e.preventDefault();
         redo();
+      } else if (key === "+" || key === "=") {
+        e.preventDefault();
+        updateZoom(0, 0, true, true);
+      } else if (key === "-") {
+        e.preventDefault();
+        updateZoom(0, 0, false, true);
+      } else if (isCmdOrCtrl && key === "0") {
+        e.preventDefault();
+        resetZoom();
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [zoomLevel, panOffset, gridSize]);
 
   return (
     <div
