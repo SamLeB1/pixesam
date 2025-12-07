@@ -9,15 +9,7 @@ import {
   ZOOM_FACTOR,
 } from "../constants";
 
-type useCanvasZoomProps = {
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  parentSize: { x: number; y: number };
-};
-
-export default function useCanvasZoom({
-  canvasRef,
-  parentSize,
-}: useCanvasZoomProps) {
+export default function useCanvasZoom() {
   const { gridSize, panOffset, zoomLevel, setPanOffset, setZoomLevel } =
     useEditorStore();
 
@@ -30,8 +22,12 @@ export default function useCanvasZoom({
     clientY: number,
     newZoomLevel: number,
   ) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+    const parentContainer = document.getElementById(
+      "parent-container",
+    ) as HTMLDivElement;
+    if (!canvas || !parentContainer) return;
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
@@ -43,8 +39,14 @@ export default function useCanvasZoom({
       y: mouseWorldY - mouseY / (BASE_PX_SIZE * newZoomLevel),
     };
     const newVisibleGridSize = {
-      x: Math.min(gridSize.x, parentSize.x / (BASE_PX_SIZE * newZoomLevel)),
-      y: Math.min(gridSize.y, parentSize.y / (BASE_PX_SIZE * newZoomLevel)),
+      x: Math.min(
+        gridSize.x,
+        parentContainer.clientWidth / (BASE_PX_SIZE * newZoomLevel),
+      ),
+      y: Math.min(
+        gridSize.y,
+        parentContainer.clientHeight / (BASE_PX_SIZE * newZoomLevel),
+      ),
     };
     const maxPanOffset = {
       x: Math.max(0, gridSize.x - newVisibleGridSize.x),
@@ -58,8 +60,12 @@ export default function useCanvasZoom({
   }
 
   function zoomTowardsCenter(newZoomLevel: number) {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+    const parentContainer = document.getElementById(
+      "parent-container",
+    ) as HTMLDivElement;
+    if (!canvas || !parentContainer) return;
+
     const mouseX = canvas.width / 2;
     const mouseY = canvas.height / 2;
     const mouseWorldX = mouseX / getPxSize() + panOffset.x;
@@ -70,8 +76,14 @@ export default function useCanvasZoom({
       y: mouseWorldY - mouseY / (BASE_PX_SIZE * newZoomLevel),
     };
     const newVisibleGridSize = {
-      x: Math.min(gridSize.x, parentSize.x / (BASE_PX_SIZE * newZoomLevel)),
-      y: Math.min(gridSize.y, parentSize.y / (BASE_PX_SIZE * newZoomLevel)),
+      x: Math.min(
+        gridSize.x,
+        parentContainer.clientWidth / (BASE_PX_SIZE * newZoomLevel),
+      ),
+      y: Math.min(
+        gridSize.y,
+        parentContainer.clientHeight / (BASE_PX_SIZE * newZoomLevel),
+      ),
     };
     const maxPanOffset = {
       x: Math.max(0, gridSize.x - newVisibleGridSize.x),

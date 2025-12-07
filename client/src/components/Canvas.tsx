@@ -52,7 +52,7 @@ export default function Canvas() {
     y: canvasSize.y / getPxSize(),
   };
   const { zoomStepTowardsCursor, zoomStepTowardsCenter, resetZoom } =
-    useCanvasZoom({ canvasRef, parentSize });
+    useCanvasZoom();
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = darkCheckerboardColor;
@@ -365,6 +365,7 @@ export default function Canvas() {
     <div
       className="flex flex-grow items-center justify-center"
       ref={parentContainerRef}
+      id="parent-container"
     >
       <canvas
         className="bg-white"
