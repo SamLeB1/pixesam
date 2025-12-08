@@ -1,17 +1,37 @@
-import { MdUndo, MdRedo } from "react-icons/md";
 import { FaMinus, FaPlus } from "react-icons/fa";
+import { MdUndo, MdRedo } from "react-icons/md";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import { MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL } from "../constants";
 
 export default function BottomBar() {
-  const { zoomLevel, undoHistory, redoHistory, undo, redo } = useEditorStore();
+  const {
+    gridSize,
+    zoomLevel,
+    undoHistory,
+    redoHistory,
+    mousePos,
+    undo,
+    redo,
+  } = useEditorStore();
   const { zoomStepTowardsCenter, resetZoom } = useCanvasZoom();
   const isEmptyUndoHistory = undoHistory.length === 0;
   const isEmptyRedoHistory = redoHistory.length === 0;
 
   return (
     <div className="flex h-10 items-center bg-neutral-800 p-2">
+      <div className="mr-4 flex items-center">
+        <div className="mr-2 h-5 w-5 bg-neutral-300" />
+        <span className="text-sm text-neutral-300 select-none">
+          {mousePos.x}, {mousePos.y}
+        </span>
+      </div>
+      <div className="flex items-center">
+        <div className="mr-2 h-5 w-5 bg-neutral-300" />
+        <span className="text-sm text-neutral-300 select-none">
+          {gridSize.x} x {gridSize.y}
+        </span>
+      </div>
       <div className="mr-2 ml-auto flex items-center">
         {zoomLevel > MIN_ZOOM_LEVEL ? (
           <button

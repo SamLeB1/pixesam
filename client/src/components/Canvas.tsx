@@ -21,6 +21,7 @@ export default function Canvas() {
     setPanOffset,
     setPrimaryColor,
     setSecondaryColor,
+    setMousePos,
     getPixelColor,
     draw,
     erase,
@@ -95,6 +96,15 @@ export default function Canvas() {
 
     if (!hoveredPixel || hoveredPixel.x !== x || hoveredPixel.y !== y)
       setHoveredPixel({ x, y });
+  }
+
+  function updateMousePos(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+    setMousePos({ x, y });
   }
 
   function getHoverColor(r: number, g: number, b: number, a: number) {
@@ -366,6 +376,7 @@ export default function Canvas() {
       className="flex flex-grow items-center justify-center"
       ref={parentContainerRef}
       id="parent-container"
+      onMouseMove={updateMousePos}
     >
       <canvas
         className="bg-white"

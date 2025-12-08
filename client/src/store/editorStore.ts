@@ -68,6 +68,7 @@ type EditorState = {
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
+  mousePos: { x: number; y: number };
   setPixelData: (pixelData: Uint8ClampedArray) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
@@ -76,6 +77,7 @@ type EditorState = {
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
+  setMousePos: (mousePos: { x: number; y: number }) => void;
   getPixelColor: (x: number, y: number) => RGBA;
   draw: (x: number, y: number, color: RGBA) => void;
   erase: (x: number, y: number) => void;
@@ -116,6 +118,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
+  mousePos: { x: 0, y: 0 },
   setPixelData: (pixelData) => set({ pixelData }),
   setGridSize: (gridSize) => set({ gridSize }),
   setPanOffset: (panOffset) => set({ panOffset }),
@@ -124,6 +127,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setBrushSize: (n) => set({ brushSize: n }),
+  setMousePos: (mousePos) => set({ mousePos }),
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();
     const baseIndex = getBaseIndex(x, y, gridSize.x);
