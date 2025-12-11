@@ -17,7 +17,7 @@ import {
   MAX_PX_SIZE,
   MAX_HISTORY_SIZE,
 } from "../constants";
-import type { RGBA, Side, PxsmData } from "../types";
+import type { RGBA, Side, Rect, PxsmData } from "../types";
 
 type Action = DrawAction | BucketAction | NewAction | ClearAction;
 
@@ -54,7 +54,7 @@ type DrawActionPixel = {
   prevColor: RGBA;
 };
 
-type Tool = "pencil" | "eraser" | "color-picker" | "bucket";
+type Tool = "pencil" | "eraser" | "color-picker" | "bucket" | "select";
 
 type EditorState = {
   pixelData: Uint8ClampedArray;
@@ -65,6 +65,8 @@ type EditorState = {
   primaryColor: string;
   secondaryColor: string;
   brushSize: number;
+  selectionStartPos: { x: number; y: number } | null;
+  selectedArea: Rect | null;
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
@@ -77,6 +79,8 @@ type EditorState = {
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
+  setSelectionStartPos: (pos: { x: number; y: number } | null) => void;
+  setSelectedArea: (area: Rect | null) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
   getPixelColor: (x: number, y: number) => RGBA;
   draw: (x: number, y: number, color: RGBA) => void;
@@ -115,6 +119,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
   brushSize: 1,
+  selectionStartPos: null,
+  selectedArea: null,
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
@@ -127,6 +133,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setBrushSize: (n) => set({ brushSize: n }),
+  setSelectionStartPos: (pos) => set({ selectionStartPos: pos }),
+  setSelectedArea: (area) => set({ selectedArea: area }),
   setMousePos: (mousePos) => set({ mousePos }),
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();

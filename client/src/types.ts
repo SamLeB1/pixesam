@@ -16,6 +16,13 @@ export type Side =
   | "bottom-center"
   | "bottom-right";
 
+export type Rect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type PxsmData = {
   version: string;
   width: number;

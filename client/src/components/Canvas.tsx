@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
-import { getBaseIndex, isValidIndex } from "../utils/canvas";
+import { isValidIndex } from "../utils/canvas";
 import { BASE_PX_SIZE } from "../constants";
 
 const lightCheckerboardColor = "#ffffff";
@@ -18,9 +18,13 @@ export default function Canvas() {
     primaryColor,
     secondaryColor,
     brushSize,
+    selectionStartPos,
+    selectedArea,
     setPanOffset,
     setPrimaryColor,
     setSecondaryColor,
+    setSelectionStartPos,
+    setSelectedArea,
     setMousePos,
     getPixelColor,
     draw,
@@ -78,6 +82,45 @@ export default function Canvas() {
             pxSize,
             pxSize,
           );
+  }
+
+  function drawFilterRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
+    const pxSize = getPxSize();
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        const pixelX = x + j;
+        const pixelY = y + i;
+
+        if (isValidIndex(pixelX, pixelY, gridSize)) {
+          const { r, g, b, a } = getPixelColor(pixelX, pixelY);
+          let hoverColor;
+          if (a === 0) {
+            if (pixelY % 2 === pixelX % 2)
+              hoverColor = tinycolor(darkCheckerboardColor)
+                .darken(15)
+                .toHexString();
+            else
+              hoverColor = tinycolor(lightCheckerboardColor)
+                .darken(15)
+                .toHexString();
+          } else hoverColor = getHoverColor(r, g, b, a);
+
+          ctx.fillStyle = hoverColor;
+          ctx.fillRect(
+            (pixelX - panOffset.x) * pxSize,
+            (pixelY - panOffset.y) * pxSize,
+            pxSize,
+            pxSize,
+          );
+        }
+      }
+    }
   }
 
   function getPxSize() {
@@ -178,7 +221,43 @@ export default function Canvas() {
     floodFill(x, y, color);
   }
 
-  function handlePanAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+  function handleSelectAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+    isInitialClick: boolean,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+    if (isInitialClick || !selectionStartPos) {
+      setSelectionStartPos({ x, y });
+      setSelectedArea(null);
+      return;
+    }
+
+    const dx = x - selectionStartPos.x;
+    const dy = y - selectionStartPos.y;
+    const areaX = dx >= 0 ? selectionStartPos.x : selectionStartPos.x + dx;
+    const areaY = dy >= 0 ? selectionStartPos.y : selectionStartPos.y + dy;
+    const areaWidth = Math.abs(dx) + 1;
+    const areaHeight = Math.abs(dy) + 1;
+    setSelectedArea({
+      x: areaX,
+      y: areaY,
+      width: areaWidth,
+      height: areaHeight,
+    });
+  }
+
+  function handlePanAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+    isInitialClick: boolean,
+  ) {
+    if (isInitialClick) {
+      prevPanMousePos.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
     const dx = (e.clientX - prevPanMousePos.current.x) / zoomLevel;
     const dy = (e.clientY - prevPanMousePos.current.y) / zoomLevel;
 
@@ -199,10 +278,13 @@ export default function Canvas() {
     prevPanMousePos.current = { x: e.clientX, y: e.clientY };
   }
 
-  function handleAction(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+  function handleAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+    isInitialClick = false,
+  ) {
     const btn = activeMouseButton.current;
     if (btn === 1) {
-      handlePanAction(e);
+      handlePanAction(e, isInitialClick);
       return;
     }
     switch (selectedTool) {
@@ -218,6 +300,9 @@ export default function Canvas() {
       case "bucket":
         if (btn === 0 || btn === 2) handleBucketAction(e);
         break;
+      case "select":
+        if (btn === 0 || btn === 2) handleSelectAction(e, isInitialClick);
+        break;
       default:
         console.error("Selected tool is invalid.");
     }
@@ -225,16 +310,13 @@ export default function Canvas() {
 
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     activeMouseButton.current = e.button;
-    if (activeMouseButton.current === 1) {
-      e.preventDefault();
-      prevPanMousePos.current = { x: e.clientX, y: e.clientY };
-    }
-    handleAction(e);
+    handleAction(e, true);
     setHoveredPixel(null);
   }
 
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     activeMouseButton.current = null;
+    setSelectionStartPos(null);
     updateHoveredPixel(e);
     clearDrawBuffer();
   }
@@ -246,6 +328,7 @@ export default function Canvas() {
 
   function handleMouseLeave() {
     activeMouseButton.current = null;
+    setSelectionStartPos(null);
     setHoveredPixel(null);
     clearDrawBuffer();
   }
@@ -290,44 +373,14 @@ export default function Canvas() {
       );
     }
 
-    if (hoveredPixel) {
-      const pxSize = getPxSize();
+    if (selectedArea) {
+      const { x, y, width, height } = selectedArea;
+      drawFilterRect(ctx, x, y, width, height);
+    } else if (hoveredPixel) {
       const offset = -Math.floor(brushSize / 2);
-
-      for (let i = 0; i < brushSize; i++) {
-        for (let j = 0; j < brushSize; j++) {
-          const pixelX = hoveredPixel.x + j + offset;
-          const pixelY = hoveredPixel.y + i + offset;
-
-          if (isValidIndex(pixelX, pixelY, gridSize)) {
-            const baseIndex = getBaseIndex(pixelX, pixelY, gridSize.x);
-            const r = pixelData[baseIndex];
-            const g = pixelData[baseIndex + 1];
-            const b = pixelData[baseIndex + 2];
-            const a = pixelData[baseIndex + 3];
-
-            let hoverColor;
-            if (a === 0) {
-              if (pixelY % 2 === pixelX % 2)
-                hoverColor = tinycolor(darkCheckerboardColor)
-                  .darken(15)
-                  .toHexString();
-              else
-                hoverColor = tinycolor(lightCheckerboardColor)
-                  .darken(15)
-                  .toHexString();
-            } else hoverColor = getHoverColor(r, g, b, a);
-
-            ctx.fillStyle = hoverColor;
-            ctx.fillRect(
-              (pixelX - panOffset.x) * pxSize,
-              (pixelY - panOffset.y) * pxSize,
-              pxSize,
-              pxSize,
-            );
-          }
-        }
-      }
+      const x = hoveredPixel.x + offset;
+      const y = hoveredPixel.y + offset;
+      drawFilterRect(ctx, x, y, brushSize, brushSize);
     }
 
     const parentContainer = parentContainerRef.current;
@@ -339,7 +392,15 @@ export default function Canvas() {
       if (parentContainer)
         parentContainer.removeEventListener("wheel", handleMouseWheel);
     };
-  }, [pixelData, gridSize, zoomLevel, hoveredPixel, panOffset, brushSize]);
+  }, [
+    pixelData,
+    gridSize,
+    zoomLevel,
+    hoveredPixel,
+    panOffset,
+    brushSize,
+    selectedArea,
+  ]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
