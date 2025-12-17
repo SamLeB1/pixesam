@@ -18,18 +18,24 @@ export default function Canvas() {
     primaryColor,
     secondaryColor,
     brushSize,
+    selectionAction,
     selectionStartPos,
+    selectionMoveOffset,
     selectedArea,
+    selectedPixels,
     setPanOffset,
     setPrimaryColor,
     setSecondaryColor,
+    setSelectionAction,
     setSelectionStartPos,
+    setSelectionMoveOffset,
     setSelectedArea,
     setMousePos,
     getPixelColor,
     draw,
     erase,
     floodFill,
+    endSelectionAction,
     undo,
     redo,
     clearDrawBuffer,
@@ -123,6 +129,62 @@ export default function Canvas() {
     }
   }
 
+  function drawSelectionMovePreview(ctx: CanvasRenderingContext2D) {
+    if (!selectedArea || !selectionMoveOffset) return;
+
+    const pxSize = getPxSize();
+    for (let i = 0; i < selectedArea.height; i++) {
+      for (let j = 0; j < selectedArea.width; j++) {
+        const sourceX = selectedArea.x + j;
+        const sourceY = selectedArea.y + i;
+
+        if (isValidIndex(sourceX, sourceY, gridSize)) {
+          ctx.fillStyle =
+            sourceY % 2 === sourceX % 2
+              ? darkCheckerboardColor
+              : lightCheckerboardColor;
+          ctx.fillRect(
+            (sourceX - panOffset.x) * pxSize,
+            (sourceY - panOffset.y) * pxSize,
+            pxSize,
+            pxSize,
+          );
+        }
+      }
+    }
+    let iteration = 0;
+    for (let i = 0; i < selectedArea.height; i++) {
+      for (let j = 0; j < selectedArea.width; j++) {
+        const destX = selectedArea.x + j + selectionMoveOffset.x;
+        const destY = selectedArea.y + i + selectionMoveOffset.y;
+
+        if (isValidIndex(destX, destY, gridSize)) {
+          const { r, g, b, a } = selectedPixels[iteration];
+          let hoverColor;
+          if (a === 0) {
+            if (destY % 2 === destX % 2)
+              hoverColor = tinycolor(darkCheckerboardColor)
+                .darken(15)
+                .toHexString();
+            else
+              hoverColor = tinycolor(lightCheckerboardColor)
+                .darken(15)
+                .toHexString();
+          } else hoverColor = getHoverColor(r, g, b, a);
+
+          ctx.fillStyle = hoverColor;
+          ctx.fillRect(
+            (destX - panOffset.x) * pxSize,
+            (destY - panOffset.y) * pxSize,
+            pxSize,
+            pxSize,
+          );
+        }
+        iteration++;
+      }
+    }
+  }
+
   function getPxSize() {
     return BASE_PX_SIZE * zoomLevel;
   }
@@ -157,6 +219,16 @@ export default function Canvas() {
         ? originalColor.lighten(15)
         : originalColor.darken(15);
     return hoverColor.toHexString();
+  }
+
+  function isInSelectedArea(x: number, y: number) {
+    if (!selectedArea) return false;
+    return (
+      x >= selectedArea.x &&
+      y >= selectedArea.y &&
+      x < selectedArea.x + selectedArea.width &&
+      y < selectedArea.y + selectedArea.height
+    );
   }
 
   function handlePencilAction(
@@ -231,23 +303,37 @@ export default function Canvas() {
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     if (isInitialClick || !selectionStartPos) {
-      setSelectionStartPos({ x, y });
-      setSelectedArea(null);
-      return;
+      if (isInSelectedArea(x, y)) {
+        setSelectionAction("move");
+        setSelectionStartPos({ x, y });
+        return;
+      } else {
+        setSelectionAction("select");
+        setSelectionStartPos({ x, y });
+        setSelectedArea(null);
+        return;
+      }
     }
 
-    const dx = x - selectionStartPos.x;
-    const dy = y - selectionStartPos.y;
-    const areaX = dx >= 0 ? selectionStartPos.x : selectionStartPos.x + dx;
-    const areaY = dy >= 0 ? selectionStartPos.y : selectionStartPos.y + dy;
-    const areaWidth = Math.abs(dx) + 1;
-    const areaHeight = Math.abs(dy) + 1;
-    setSelectedArea({
-      x: areaX,
-      y: areaY,
-      width: areaWidth,
-      height: areaHeight,
-    });
+    if (selectionAction === "select") {
+      const dx = x - selectionStartPos.x;
+      const dy = y - selectionStartPos.y;
+      const areaX = dx >= 0 ? selectionStartPos.x : selectionStartPos.x + dx;
+      const areaY = dy >= 0 ? selectionStartPos.y : selectionStartPos.y + dy;
+      const areaWidth = Math.abs(dx) + 1;
+      const areaHeight = Math.abs(dy) + 1;
+      setSelectedArea({
+        x: areaX,
+        y: areaY,
+        width: areaWidth,
+        height: areaHeight,
+      });
+    } else if (selectionAction === "move") {
+      setSelectionMoveOffset({
+        x: x - selectionStartPos.x,
+        y: y - selectionStartPos.y,
+      });
+    }
   }
 
   function handlePanAction(
@@ -316,7 +402,7 @@ export default function Canvas() {
 
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     activeMouseButton.current = null;
-    setSelectionStartPos(null);
+    if (selectionAction) endSelectionAction();
     updateHoveredPixel(e);
     clearDrawBuffer();
   }
@@ -328,7 +414,7 @@ export default function Canvas() {
 
   function handleMouseLeave() {
     activeMouseButton.current = null;
-    setSelectionStartPos(null);
+    if (selectionAction) endSelectionAction();
     setHoveredPixel(null);
     clearDrawBuffer();
   }
@@ -373,7 +459,9 @@ export default function Canvas() {
       );
     }
 
-    if (selectedArea) {
+    if (selectionAction === "move" && selectionMoveOffset)
+      drawSelectionMovePreview(ctx);
+    else if (selectedArea) {
       const { x, y, width, height } = selectedArea;
       drawFilterRect(ctx, x, y, width, height);
     } else if (hoveredPixel) {
@@ -399,6 +487,7 @@ export default function Canvas() {
     hoveredPixel,
     panOffset,
     brushSize,
+    selectionMoveOffset,
     selectedArea,
   ]);
 

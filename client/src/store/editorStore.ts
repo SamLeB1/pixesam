@@ -65,8 +65,11 @@ type EditorState = {
   primaryColor: string;
   secondaryColor: string;
   brushSize: number;
+  selectionAction: "select" | "move" | null;
   selectionStartPos: { x: number; y: number } | null;
+  selectionMoveOffset: { x: number; y: number } | null;
   selectedArea: Rect | null;
+  selectedPixels: RGBA[];
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
@@ -79,8 +82,11 @@ type EditorState = {
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
+  setSelectionAction: (action: "select" | "move" | null) => void;
   setSelectionStartPos: (pos: { x: number; y: number } | null) => void;
+  setSelectionMoveOffset: (offset: { x: number; y: number } | null) => void;
   setSelectedArea: (area: Rect | null) => void;
+  setSelectedPixels: (pixels: RGBA[]) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
   getPixelColor: (x: number, y: number) => RGBA;
   draw: (x: number, y: number, color: RGBA) => void;
@@ -102,6 +108,7 @@ type EditorState = {
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
   exportToImage: (scale: number) => void;
+  endSelectionAction: () => void;
   undo: () => void;
   redo: () => void;
   updateHistory: (action: Action) => void;
@@ -119,8 +126,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
   brushSize: 1,
+  selectionAction: null,
   selectionStartPos: null,
+  selectionMoveOffset: null,
   selectedArea: null,
+  selectedPixels: [],
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
@@ -133,8 +143,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setBrushSize: (n) => set({ brushSize: n }),
+  setSelectionAction: (action) => set({ selectionAction: action }),
   setSelectionStartPos: (pos) => set({ selectionStartPos: pos }),
+  setSelectionMoveOffset: (offset) => set({ selectionMoveOffset: offset }),
   setSelectedArea: (area) => set({ selectedArea: area }),
+  setSelectedPixels: (pixels) => set({ selectedPixels: pixels }),
   setMousePos: (mousePos) => set({ mousePos }),
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();
@@ -508,6 +521,81 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  },
+  endSelectionAction: () => {
+    const {
+      pixelData,
+      gridSize,
+      selectionAction,
+      selectionMoveOffset,
+      selectedArea,
+      selectedPixels,
+      getPixelColor,
+    } = get();
+    if (!selectionAction) return;
+
+    if (selectionAction === "select") {
+      const newSelectedPixels: RGBA[] = [];
+      if (selectedArea) {
+        for (let i = 0; i < selectedArea.height; i++) {
+          for (let j = 0; j < selectedArea.width; j++) {
+            const pixelX = selectedArea.x + j;
+            const pixelY = selectedArea.y + i;
+            if (isValidIndex(pixelX, pixelY, gridSize))
+              newSelectedPixels.push(getPixelColor(pixelX, pixelY));
+          }
+        }
+      }
+      set({ selectedPixels: newSelectedPixels });
+    } else if (selectionAction === "move") {
+      if (selectionMoveOffset && selectedArea) {
+        if (selectionMoveOffset.x !== 0 || selectionMoveOffset.y !== 0) {
+          const newData = new Uint8ClampedArray(pixelData);
+          for (let i = 0; i < selectedArea.height; i++) {
+            for (let j = 0; j < selectedArea.width; j++) {
+              const sourceX = selectedArea.x + j;
+              const sourceY = selectedArea.y + i;
+              if (isValidIndex(sourceX, sourceY, gridSize))
+                setPixelColor(
+                  sourceX,
+                  sourceY,
+                  gridSize.x,
+                  { r: 0, g: 0, b: 0, a: 0 },
+                  newData,
+                );
+            }
+          }
+          let iteration = 0;
+          for (let i = 0; i < selectedArea.height; i++) {
+            for (let j = 0; j < selectedArea.width; j++) {
+              const destX = selectedArea.x + j + selectionMoveOffset.x;
+              const destY = selectedArea.y + i + selectionMoveOffset.y;
+              if (isValidIndex(destX, destY, gridSize))
+                setPixelColor(
+                  destX,
+                  destY,
+                  gridSize.x,
+                  selectedPixels[iteration],
+                  newData,
+                );
+              iteration++;
+            }
+          }
+          const newSelectedArea: Rect = {
+            x: selectedArea.x + selectionMoveOffset.x,
+            y: selectedArea.y + selectionMoveOffset.y,
+            width: selectedArea.width,
+            height: selectedArea.height,
+          };
+          set({ pixelData: newData, selectedArea: newSelectedArea });
+        }
+      }
+    }
+    set({
+      selectionAction: null,
+      selectionStartPos: null,
+      selectionMoveOffset: null,
+    });
   },
   undo: () =>
     set((state) => {
