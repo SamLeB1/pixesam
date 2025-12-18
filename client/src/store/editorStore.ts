@@ -597,111 +597,97 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionMoveOffset: null,
     });
   },
-  undo: () =>
-    set((state) => {
-      const { pixelData, gridSize, undoHistory, redoHistory } = state;
-      if (undoHistory.length === 0) return {};
+  undo: () => {
+    const { pixelData, gridSize, undoHistory, redoHistory } = get();
+    if (undoHistory.length === 0) return;
 
-      const newUndoHistory = [...undoHistory];
-      const action = newUndoHistory.shift()!;
-      const newRedoHistory = [action, ...redoHistory];
+    const newUndoHistory = [...undoHistory];
+    const action = newUndoHistory.shift()!;
+    const newRedoHistory = [action, ...redoHistory];
 
-      if (action.action === "draw") {
-        const newData = new Uint8ClampedArray(pixelData);
-        for (let i = 0; i < action.pixels.length; i++) {
-          const { x, y, prevColor } = action.pixels[i];
-          const baseIndex = getBaseIndex(x, y, gridSize.x);
-          newData[baseIndex] = prevColor.r;
-          newData[baseIndex + 1] = prevColor.g;
-          newData[baseIndex + 2] = prevColor.b;
-          newData[baseIndex + 3] = prevColor.a;
-        }
-        return {
-          pixelData: newData,
-          undoHistory: newUndoHistory,
-          redoHistory: newRedoHistory,
-        };
-      } else if (action.action === "bucket") {
-        return {
-          pixelData: action.prevPixelData,
-          undoHistory: newUndoHistory,
-          redoHistory: newRedoHistory,
-        };
-      } else if (action.action === "new") {
-        const { prevPixelData, prevGridSize } = action;
-        let pxSize =
-          BASE_CANVAS_SIZE / Math.max(prevGridSize.x, prevGridSize.y);
-        if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
-        if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
-        const zoomLevel = pxSize / BASE_PX_SIZE;
-        return {
-          pixelData: prevPixelData,
-          gridSize: prevGridSize,
-          panOffset: { x: 0, y: 0 },
-          zoomLevel,
-          undoHistory: newUndoHistory,
-          redoHistory: newRedoHistory,
-        };
-      } else if (action.action === "clear") {
-        return {
-          pixelData: action.prevPixelData,
-          undoHistory: newUndoHistory,
-          redoHistory: newRedoHistory,
-        };
-      } else return {};
-    }),
-  redo: () =>
-    set((state) => {
-      const { pixelData, gridSize, undoHistory, redoHistory, floodFill } =
-        state;
-      if (redoHistory.length === 0) return {};
+    if (action.action === "draw") {
+      const newData = new Uint8ClampedArray(pixelData);
+      for (let i = 0; i < action.pixels.length; i++) {
+        const { x, y, prevColor } = action.pixels[i];
+        const baseIndex = getBaseIndex(x, y, gridSize.x);
+        newData[baseIndex] = prevColor.r;
+        newData[baseIndex + 1] = prevColor.g;
+        newData[baseIndex + 2] = prevColor.b;
+        newData[baseIndex + 3] = prevColor.a;
+      }
+      set({ pixelData: newData });
+    } else if (action.action === "bucket") {
+      set({ pixelData: action.prevPixelData });
+    } else if (action.action === "new") {
+      const { prevPixelData, prevGridSize } = action;
+      let pxSize = BASE_CANVAS_SIZE / Math.max(prevGridSize.x, prevGridSize.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+      set({
+        pixelData: prevPixelData,
+        gridSize: prevGridSize,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      });
+    } else if (action.action === "clear") {
+      set({ pixelData: action.prevPixelData });
+    }
 
-      const newRedoHistory = [...redoHistory];
-      const action = newRedoHistory.shift()!;
-      const newUndoHistory = [action, ...undoHistory];
+    set({
+      selectionAction: null,
+      selectionStartPos: null,
+      selectionMoveOffset: null,
+      selectedArea: null,
+      selectedPixels: [],
+      undoHistory: newUndoHistory,
+      redoHistory: newRedoHistory,
+    });
+  },
+  redo: () => {
+    const { pixelData, gridSize, undoHistory, redoHistory, floodFill } = get();
+    if (redoHistory.length === 0) return;
 
-      if (action.action === "draw") {
-        const newData = new Uint8ClampedArray(pixelData);
-        for (let i = action.pixels.length - 1; i >= 0; i--) {
-          const { x, y, color } = action.pixels[i];
-          const baseIndex = getBaseIndex(x, y, gridSize.x);
-          newData[baseIndex] = color.r;
-          newData[baseIndex + 1] = color.g;
-          newData[baseIndex + 2] = color.b;
-          newData[baseIndex + 3] = color.a;
-        }
-        return {
-          pixelData: newData,
-          undoHistory: newUndoHistory,
-          redoHistory: newRedoHistory,
-        };
-      } else if (action.action === "bucket") {
-        const { x, y, color } = action;
-        floodFill(x, y, color, false);
-        return { undoHistory: newUndoHistory, redoHistory: newRedoHistory };
-      } else if (action.action === "new") {
-        const { pixelData, gridSize } = action;
-        let pxSize = BASE_CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);
-        if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
-        if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
-        const zoomLevel = pxSize / BASE_PX_SIZE;
-        return {
-          pixelData,
-          gridSize,
-          panOffset: { x: 0, y: 0 },
-          zoomLevel,
-          undoHistory: newUndoHistory,
-          redoHistory: newRedoHistory,
-        };
-      } else if (action.action === "clear") {
-        const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
-        return {
-          pixelData: newData,
-          undoHistory: newUndoHistory,
-          redoHistory: newRedoHistory,
-        };
-      } else return {};
-    }),
+    const newRedoHistory = [...redoHistory];
+    const action = newRedoHistory.shift()!;
+    const newUndoHistory = [action, ...undoHistory];
+
+    if (action.action === "draw") {
+      const newData = new Uint8ClampedArray(pixelData);
+      for (let i = action.pixels.length - 1; i >= 0; i--) {
+        const { x, y, color } = action.pixels[i];
+        const baseIndex = getBaseIndex(x, y, gridSize.x);
+        newData[baseIndex] = color.r;
+        newData[baseIndex + 1] = color.g;
+        newData[baseIndex + 2] = color.b;
+        newData[baseIndex + 3] = color.a;
+      }
+      set({ pixelData: newData });
+    } else if (action.action === "bucket") {
+      const { x, y, color } = action;
+      floodFill(x, y, color, false);
+    } else if (action.action === "new") {
+      const { pixelData, gridSize } = action;
+      let pxSize = BASE_CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+      set({ pixelData, gridSize, panOffset: { x: 0, y: 0 }, zoomLevel });
+    } else if (action.action === "clear") {
+      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+      set({ pixelData: newData });
+    }
+
+    set({
+      selectionAction: null,
+      selectionStartPos: null,
+      selectionMoveOffset: null,
+      selectedArea: null,
+      selectedPixels: [],
+      undoHistory: newUndoHistory,
+      redoHistory: newRedoHistory,
+    });
+  },
   updateHistory: (action) =>
     set((state) => {
       const { undoHistory } = state;
