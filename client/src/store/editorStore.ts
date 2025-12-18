@@ -19,7 +19,7 @@ import {
 } from "../constants";
 import type { RGBA, Side, Rect, PxsmData } from "../types";
 
-type Action = DrawAction | BucketAction | NewAction | ClearAction;
+type Action = DrawAction | BucketAction | MoveAction | NewAction | ClearAction;
 
 type DrawAction = {
   action: "draw";
@@ -32,6 +32,14 @@ type BucketAction = {
   y: number;
   color: RGBA;
   prevPixelData: Uint8ClampedArray;
+};
+
+type MoveAction = {
+  action: "move";
+  area: Rect;
+  offset: { x: number; y: number };
+  sourcePixels: RGBA[];
+  destPixels: RGBA[];
 };
 
 type NewAction = {
@@ -89,6 +97,7 @@ type EditorState = {
   setSelectedPixels: (pixels: RGBA[]) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
   getPixelColor: (x: number, y: number) => RGBA;
+  getPixelsInRect: (rect: Rect) => RGBA[];
   draw: (x: number, y: number, color: RGBA) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
@@ -158,6 +167,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       b: pixelData[baseIndex + 2],
       a: pixelData[baseIndex + 3],
     };
+  },
+  getPixelsInRect: (rect) => {
+    const { gridSize, getPixelColor } = get();
+    const pixels: RGBA[] = [];
+    for (let i = 0; i < rect.height; i++) {
+      for (let j = 0; j < rect.width; j++) {
+        const pixelX = rect.x + j;
+        const pixelY = rect.y + i;
+        if (isValidIndex(pixelX, pixelY, gridSize))
+          pixels.push(getPixelColor(pixelX, pixelY));
+      }
+    }
+    return pixels;
   },
   draw: (x, y, color) =>
     set((state) => {
@@ -531,6 +553,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedArea,
       selectedPixels,
       getPixelColor,
+      getPixelsInRect,
+      updateHistory,
     } = get();
     if (!selectionAction) return;
 
@@ -587,6 +611,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             width: selectedArea.width,
             height: selectedArea.height,
           };
+
+          const action: MoveAction = {
+            action: "move",
+            area: selectedArea,
+            offset: selectionMoveOffset,
+            sourcePixels: selectedPixels,
+            destPixels: getPixelsInRect(newSelectedArea),
+          };
+          updateHistory(action);
+
           set({ pixelData: newData, selectedArea: newSelectedArea });
         }
       }
@@ -618,6 +652,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ pixelData: newData });
     } else if (action.action === "bucket") {
       set({ pixelData: action.prevPixelData });
+    } else if (action.action === "move") {
+      const { area, offset, sourcePixels, destPixels } = action;
+      const newData = new Uint8ClampedArray(pixelData);
+      let currPixelIndex = 0;
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const destX = area.x + j + offset.x;
+          const destY = area.y + i + offset.y;
+          if (isValidIndex(destX, destY, gridSize)) {
+            setPixelColor(
+              destX,
+              destY,
+              gridSize.x,
+              destPixels[currPixelIndex],
+              newData,
+            );
+            currPixelIndex++;
+          }
+        }
+      }
+      currPixelIndex = 0;
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const sourceX = area.x + j;
+          const sourceY = area.y + i;
+          if (isValidIndex(sourceX, sourceY, gridSize))
+            setPixelColor(
+              sourceX,
+              sourceY,
+              gridSize.x,
+              sourcePixels[currPixelIndex],
+              newData,
+            );
+          currPixelIndex++;
+        }
+      }
+      set({ pixelData: newData });
     } else if (action.action === "new") {
       const { prevPixelData, prevGridSize } = action;
       let pxSize = BASE_CANVAS_SIZE / Math.max(prevGridSize.x, prevGridSize.y);
@@ -666,6 +737,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "bucket") {
       const { x, y, color } = action;
       floodFill(x, y, color, false);
+    } else if (action.action === "move") {
+      const { area, offset, sourcePixels } = action;
+      const newData = new Uint8ClampedArray(pixelData);
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const sourceX = area.x + j;
+          const sourceY = area.y + i;
+          if (isValidIndex(sourceX, sourceY, gridSize))
+            setPixelColor(
+              sourceX,
+              sourceY,
+              gridSize.x,
+              { r: 0, g: 0, b: 0, a: 0 },
+              newData,
+            );
+        }
+      }
+      let currPixelIndex = 0;
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const destX = area.x + j + offset.x;
+          const destY = area.y + i + offset.y;
+          if (isValidIndex(destX, destY, gridSize))
+            setPixelColor(
+              destX,
+              destY,
+              gridSize.x,
+              sourcePixels[currPixelIndex],
+              newData,
+            );
+          currPixelIndex++;
+        }
+      }
+      set({ pixelData: newData });
     } else if (action.action === "new") {
       const { pixelData, gridSize } = action;
       let pxSize = BASE_CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);
