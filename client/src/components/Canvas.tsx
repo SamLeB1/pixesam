@@ -24,6 +24,7 @@ export default function Canvas() {
     selectedArea,
     selectedPixels,
     setPanOffset,
+    selectTool,
     setPrimaryColor,
     setSecondaryColor,
     setSelectionAction,
@@ -496,7 +497,22 @@ export default function Canvas() {
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
 
-      if (isCmdOrCtrl && !e.shiftKey && key === "z") {
+      if (key === "p") {
+        e.preventDefault();
+        selectTool("pencil");
+      } else if (key === "e") {
+        e.preventDefault();
+        selectTool("eraser");
+      } else if (key === "c") {
+        e.preventDefault();
+        selectTool("color-picker");
+      } else if (key === "b") {
+        e.preventDefault();
+        selectTool("bucket");
+      } else if (key === "s") {
+        e.preventDefault();
+        selectTool("select");
+      } else if (isCmdOrCtrl && !e.shiftKey && key === "z") {
         e.preventDefault();
         undo();
       } else if (isCmdOrCtrl && e.shiftKey && key === "z") {
@@ -519,7 +535,7 @@ export default function Canvas() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo, zoomStepTowardsCenter, resetZoom]);
+  }, [selectTool, undo, redo, zoomStepTowardsCenter, resetZoom]);
 
   return (
     <div

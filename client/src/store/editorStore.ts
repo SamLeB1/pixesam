@@ -86,7 +86,6 @@ type EditorState = {
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
   setZoomLevel: (n: number) => void;
-  selectTool: (tool: Tool) => void;
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
@@ -96,6 +95,7 @@ type EditorState = {
   setSelectedArea: (area: Rect | null) => void;
   setSelectedPixels: (pixels: RGBA[]) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
+  selectTool: (tool: Tool) => void;
   getPixelColor: (x: number, y: number) => RGBA;
   getPixelsInRect: (rect: Rect) => RGBA[];
   draw: (x: number, y: number, color: RGBA) => void;
@@ -117,6 +117,7 @@ type EditorState = {
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
   exportToImage: (scale: number) => void;
+  initSelection: () => void;
   endSelectionAction: () => void;
   undo: () => void;
   redo: () => void;
@@ -148,7 +149,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setGridSize: (gridSize) => set({ gridSize }),
   setPanOffset: (panOffset) => set({ panOffset }),
   setZoomLevel: (n) => set({ zoomLevel: n }),
-  selectTool: (tool) => set({ selectedTool: tool }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setBrushSize: (n) => set({ brushSize: n }),
@@ -158,6 +158,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedArea: (area) => set({ selectedArea: area }),
   setSelectedPixels: (pixels) => set({ selectedPixels: pixels }),
   setMousePos: (mousePos) => set({ mousePos }),
+  selectTool: (tool) =>
+    set((state) => {
+      const {
+        selectedTool,
+        selectionAction,
+        initSelection,
+        endSelectionAction,
+      } = state;
+      if (selectedTool === tool) return {};
+      if (selectionAction === "move") endSelectionAction();
+      initSelection();
+      return { selectedTool: tool };
+    }),
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();
     const baseIndex = getBaseIndex(x, y, gridSize.x);
@@ -544,6 +557,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     link.click();
     document.body.removeChild(link);
   },
+  initSelection: () =>
+    set({
+      selectionAction: null,
+      selectionStartPos: null,
+      selectionMoveOffset: null,
+      selectedArea: null,
+      selectedPixels: [],
+    }),
   endSelectionAction: () => {
     const {
       pixelData,
@@ -632,7 +653,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   undo: () => {
-    const { pixelData, gridSize, undoHistory, redoHistory } = get();
+    const { pixelData, gridSize, undoHistory, redoHistory, initSelection } =
+      get();
     if (undoHistory.length === 0) return;
 
     const newUndoHistory = [...undoHistory];
@@ -705,18 +727,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ pixelData: action.prevPixelData });
     }
 
-    set({
-      selectionAction: null,
-      selectionStartPos: null,
-      selectionMoveOffset: null,
-      selectedArea: null,
-      selectedPixels: [],
-      undoHistory: newUndoHistory,
-      redoHistory: newRedoHistory,
-    });
+    initSelection();
+    set({ undoHistory: newUndoHistory, redoHistory: newRedoHistory });
   },
   redo: () => {
-    const { pixelData, gridSize, undoHistory, redoHistory, floodFill } = get();
+    const {
+      pixelData,
+      gridSize,
+      undoHistory,
+      redoHistory,
+      floodFill,
+      initSelection,
+    } = get();
     if (redoHistory.length === 0) return;
 
     const newRedoHistory = [...redoHistory];
@@ -783,15 +805,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ pixelData: newData });
     }
 
-    set({
-      selectionAction: null,
-      selectionStartPos: null,
-      selectionMoveOffset: null,
-      selectedArea: null,
-      selectedPixels: [],
-      undoHistory: newUndoHistory,
-      redoHistory: newRedoHistory,
-    });
+    initSelection();
+    set({ undoHistory: newUndoHistory, redoHistory: newRedoHistory });
   },
   updateHistory: (action) =>
     set((state) => {

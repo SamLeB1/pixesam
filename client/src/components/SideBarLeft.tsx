@@ -15,7 +15,7 @@ export default function SideBarLeft() {
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
-          title="Pencil tool"
+          title="Pencil tool (P)"
           onClick={() => selectTool("pencil")}
         >
           <div className="h-8 w-8 bg-white"></div>
@@ -23,7 +23,7 @@ export default function SideBarLeft() {
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
-          title="Eraser tool"
+          title="Eraser tool (E)"
           onClick={() => selectTool("eraser")}
         >
           <div className="h-8 w-8 bg-white"></div>
@@ -31,7 +31,7 @@ export default function SideBarLeft() {
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
-          title="Color picker tool"
+          title="Color picker tool (C)"
           onClick={() => selectTool("color-picker")}
         >
           <div className="h-8 w-8 bg-white"></div>
@@ -39,7 +39,7 @@ export default function SideBarLeft() {
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
-          title="Bucket tool"
+          title="Bucket tool (B)"
           onClick={() => selectTool("bucket")}
         >
           <div className="h-8 w-8 bg-white"></div>
@@ -47,7 +47,7 @@ export default function SideBarLeft() {
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
-          title="Select tool"
+          title="Select tool (S)"
           onClick={() => selectTool("select")}
         >
           <div className="h-8 w-8 bg-white"></div>
