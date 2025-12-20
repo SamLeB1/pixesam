@@ -256,7 +256,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   newCanvas: (size) =>
     set((state) => {
-      const { pixelData, gridSize, updateHistory } = state;
+      const { pixelData, gridSize, initSelection, updateHistory } = state;
       const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
       let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
@@ -273,6 +273,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
+      initSelection();
       return {
         pixelData: newData,
         gridSize: size,
@@ -282,18 +283,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   clearCanvas: () =>
     set((state) => {
-      const { pixelData, gridSize, updateHistory } = state;
+      const { pixelData, gridSize, initSelection, updateHistory } = state;
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+
       const action: ClearAction = {
         action: "clear",
         prevPixelData: pixelData,
       };
       updateHistory(action);
+
+      initSelection();
       return { pixelData: newData };
     }),
   resizeCanvas: (size, anchor, resizeContent = false) =>
     set((state) => {
-      const { pixelData, gridSize: oldGridSize, updateHistory } = state;
+      const {
+        pixelData,
+        gridSize: oldGridSize,
+        initSelection,
+        updateHistory,
+      } = state;
       const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
       if (resizeContent) {
@@ -385,6 +394,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
+      initSelection();
       return {
         pixelData: newData,
         gridSize: size,
@@ -400,7 +410,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         );
         return {};
       }
-      const { pixelData, gridSize, updateHistory } = state;
+      const { pixelData, gridSize, initSelection, updateHistory } = state;
       const newData = new Uint8ClampedArray(data.pixels);
       let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
@@ -417,6 +427,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory(action);
 
       toast.success("File imported successfully!");
+      initSelection();
       return {
         pixelData: newData,
         gridSize: { x: data.width, y: data.height },
@@ -460,7 +471,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      const { pixelData, gridSize, updateHistory } = get();
+      const { pixelData, gridSize, initSelection, updateHistory } = get();
       const action: NewAction = {
         action: "new",
         pixelData: newData,
@@ -470,6 +481,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
+      initSelection();
       set({
         pixelData: newData,
         gridSize: { x: width, y: height },
