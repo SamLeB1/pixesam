@@ -304,7 +304,8 @@ export default function Canvas() {
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     if (isInitialClick || !selectionStartPos) {
-      if (isInSelectedArea(x, y)) {
+      if (selectionAction) return;
+      else if (isInSelectedArea(x, y)) {
         setSelectionAction("move");
         setSelectionStartPos({ x, y });
         return;
@@ -402,6 +403,10 @@ export default function Canvas() {
   }
 
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+    if (selectionAction && activeMouseButton.current === 1) {
+      activeMouseButton.current = 0;
+      return;
+    }
     activeMouseButton.current = null;
     if (selectionAction) endSelectionAction();
     updateHoveredPixel(e);
