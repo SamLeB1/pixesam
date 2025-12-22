@@ -63,6 +63,11 @@ export default function Canvas() {
     x: canvasSize.x / getPxSize(),
     y: canvasSize.y / getPxSize(),
   };
+  const showMoveCursor =
+    (!selectionAction &&
+      hoveredPixel &&
+      isInSelectedArea(hoveredPixel.x, hoveredPixel.y)) ||
+    selectionAction === "move";
   const { zoomStepTowardsCursor, zoomStepTowardsCenter, resetZoom } =
     useCanvasZoom();
 
@@ -550,7 +555,7 @@ export default function Canvas() {
       onMouseMove={updateMousePos}
     >
       <canvas
-        className="bg-white"
+        className={`bg-white ${showMoveCursor && "cursor-move"}`}
         ref={canvasRef}
         id="canvas"
         width={canvasSize.x}
