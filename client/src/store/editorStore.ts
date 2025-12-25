@@ -78,6 +78,7 @@ type EditorState = {
   selectionMoveOffset: { x: number; y: number } | null;
   selectedArea: Rect | null;
   selectedPixels: RGBA[];
+  showSelectionPreview: boolean;
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
@@ -94,6 +95,7 @@ type EditorState = {
   setSelectionMoveOffset: (offset: { x: number; y: number } | null) => void;
   setSelectedArea: (area: Rect | null) => void;
   setSelectedPixels: (pixels: RGBA[]) => void;
+  setShowSelectionPreview: (show: boolean) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
   selectTool: (tool: Tool) => void;
   getPixelColor: (x: number, y: number) => RGBA;
@@ -119,6 +121,7 @@ type EditorState = {
   exportToImage: (scale: number) => void;
   initSelection: () => void;
   endSelectionAction: () => void;
+  applySelectionAction: () => void;
   undo: () => void;
   redo: () => void;
   updateHistory: (action: Action) => void;
@@ -141,6 +144,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectionMoveOffset: null,
   selectedArea: null,
   selectedPixels: [],
+  showSelectionPreview: false,
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
@@ -157,18 +161,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectionMoveOffset: (offset) => set({ selectionMoveOffset: offset }),
   setSelectedArea: (area) => set({ selectedArea: area }),
   setSelectedPixels: (pixels) => set({ selectedPixels: pixels }),
+  setShowSelectionPreview: (show) => set({ showSelectionPreview: show }),
   setMousePos: (mousePos) => set({ mousePos }),
   selectTool: (tool) =>
     set((state) => {
       const {
         selectedTool,
-        selectionAction,
+        showSelectionPreview,
         initSelection,
-        endSelectionAction,
+        applySelectionAction,
       } = state;
       if (selectedTool === tool) return {};
-      if (selectionAction === "move") endSelectionAction();
-      initSelection();
+      if (showSelectionPreview) applySelectionAction();
+      else initSelection();
       return { selectedTool: tool };
     }),
   getPixelColor: (x, y) => {
@@ -576,94 +581,96 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionMoveOffset: null,
       selectedArea: null,
       selectedPixels: [],
+      showSelectionPreview: false,
     }),
-  endSelectionAction: () => {
-    const {
-      pixelData,
-      gridSize,
-      selectionAction,
-      selectionMoveOffset,
-      selectedArea,
-      selectedPixels,
-      getPixelColor,
-      getPixelsInRect,
-      updateHistory,
-    } = get();
-    if (!selectionAction) return;
+  endSelectionAction: () =>
+    set((state) => {
+      const { selectionAction, selectedArea, getPixelsInRect } = state;
 
-    if (selectionAction === "select") {
-      const newSelectedPixels: RGBA[] = [];
-      if (selectedArea) {
-        for (let i = 0; i < selectedArea.height; i++) {
-          for (let j = 0; j < selectedArea.width; j++) {
-            const pixelX = selectedArea.x + j;
-            const pixelY = selectedArea.y + i;
-            if (isValidIndex(pixelX, pixelY, gridSize))
-              newSelectedPixels.push(getPixelColor(pixelX, pixelY));
-          }
+      if (selectionAction === "select") {
+        const newSelectedPixels = selectedArea
+          ? getPixelsInRect(selectedArea)
+          : [];
+        return {
+          selectionAction: null,
+          selectionStartPos: null,
+          selectedPixels: newSelectedPixels,
+        };
+      } else if (selectionAction === "move")
+        return { selectionAction: null, selectionStartPos: null };
+      else return {};
+    }),
+  applySelectionAction: () =>
+    set((state) => {
+      const {
+        pixelData,
+        gridSize,
+        selectionMoveOffset,
+        selectedArea,
+        selectedPixels,
+        getPixelsInRect,
+        initSelection,
+        updateHistory,
+      } = state;
+      if (
+        !selectionMoveOffset ||
+        !selectedArea ||
+        (selectionMoveOffset.x === 0 && selectionMoveOffset.y === 0)
+      ) {
+        initSelection();
+        return {};
+      }
+
+      const newData = new Uint8ClampedArray(pixelData);
+      for (let i = 0; i < selectedArea.height; i++) {
+        for (let j = 0; j < selectedArea.width; j++) {
+          const sourceX = selectedArea.x + j;
+          const sourceY = selectedArea.y + i;
+          if (isValidIndex(sourceX, sourceY, gridSize))
+            setPixelColor(
+              sourceX,
+              sourceY,
+              gridSize.x,
+              { r: 0, g: 0, b: 0, a: 0 },
+              newData,
+            );
         }
       }
-      set({ selectedPixels: newSelectedPixels });
-    } else if (selectionAction === "move") {
-      if (selectionMoveOffset && selectedArea) {
-        if (selectionMoveOffset.x !== 0 || selectionMoveOffset.y !== 0) {
-          const newData = new Uint8ClampedArray(pixelData);
-          for (let i = 0; i < selectedArea.height; i++) {
-            for (let j = 0; j < selectedArea.width; j++) {
-              const sourceX = selectedArea.x + j;
-              const sourceY = selectedArea.y + i;
-              if (isValidIndex(sourceX, sourceY, gridSize))
-                setPixelColor(
-                  sourceX,
-                  sourceY,
-                  gridSize.x,
-                  { r: 0, g: 0, b: 0, a: 0 },
-                  newData,
-                );
-            }
-          }
-          let iteration = 0;
-          for (let i = 0; i < selectedArea.height; i++) {
-            for (let j = 0; j < selectedArea.width; j++) {
-              const destX = selectedArea.x + j + selectionMoveOffset.x;
-              const destY = selectedArea.y + i + selectionMoveOffset.y;
-              if (isValidIndex(destX, destY, gridSize))
-                setPixelColor(
-                  destX,
-                  destY,
-                  gridSize.x,
-                  selectedPixels[iteration],
-                  newData,
-                );
-              iteration++;
-            }
-          }
-          const newSelectedArea: Rect = {
-            x: selectedArea.x + selectionMoveOffset.x,
-            y: selectedArea.y + selectionMoveOffset.y,
-            width: selectedArea.width,
-            height: selectedArea.height,
-          };
-
-          const action: MoveAction = {
-            action: "move",
-            area: selectedArea,
-            offset: selectionMoveOffset,
-            sourcePixels: selectedPixels,
-            destPixels: getPixelsInRect(newSelectedArea),
-          };
-          updateHistory(action);
-
-          set({ pixelData: newData, selectedArea: newSelectedArea });
+      let iteration = 0;
+      for (let i = 0; i < selectedArea.height; i++) {
+        for (let j = 0; j < selectedArea.width; j++) {
+          const destX = selectedArea.x + j + selectionMoveOffset.x;
+          const destY = selectedArea.y + i + selectionMoveOffset.y;
+          if (isValidIndex(destX, destY, gridSize))
+            setPixelColor(
+              destX,
+              destY,
+              gridSize.x,
+              selectedPixels[iteration],
+              newData,
+            );
+          iteration++;
         }
       }
-    }
-    set({
-      selectionAction: null,
-      selectionStartPos: null,
-      selectionMoveOffset: null,
-    });
-  },
+      const newSelectedArea: Rect = {
+        x: selectedArea.x + selectionMoveOffset.x,
+        y: selectedArea.y + selectionMoveOffset.y,
+        width: selectedArea.width,
+        height: selectedArea.height,
+      };
+
+      const action: MoveAction = {
+        action: "move",
+        area: selectedArea,
+        offset: selectionMoveOffset,
+        sourcePixels: selectedPixels,
+        destPixels: getPixelsInRect(newSelectedArea),
+      };
+      updateHistory(action);
+
+      initSelection();
+      return { pixelData: newData };
+    }),
   undo: () => {
     const { pixelData, gridSize, undoHistory, redoHistory, initSelection } =
       get();

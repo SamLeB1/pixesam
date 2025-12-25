@@ -23,6 +23,7 @@ export default function Canvas() {
     selectionMoveOffset,
     selectedArea,
     selectedPixels,
+    showSelectionPreview,
     setPanOffset,
     selectTool,
     setPrimaryColor,
@@ -31,12 +32,14 @@ export default function Canvas() {
     setSelectionStartPos,
     setSelectionMoveOffset,
     setSelectedArea,
+    setShowSelectionPreview,
     setMousePos,
     getPixelColor,
     draw,
     erase,
     floodFill,
     endSelectionAction,
+    applySelectionAction,
     undo,
     redo,
     clearDrawBuffer,
@@ -229,11 +232,12 @@ export default function Canvas() {
 
   function isInSelectedArea(x: number, y: number) {
     if (!selectedArea) return false;
+    const offset = selectionMoveOffset ? selectionMoveOffset : { x: 0, y: 0 };
     return (
-      x >= selectedArea.x &&
-      y >= selectedArea.y &&
-      x < selectedArea.x + selectedArea.width &&
-      y < selectedArea.y + selectedArea.height
+      x >= selectedArea.x + offset.x &&
+      y >= selectedArea.y + offset.y &&
+      x < selectedArea.x + selectedArea.width + offset.x &&
+      y < selectedArea.y + selectedArea.height + offset.y
     );
   }
 
@@ -310,11 +314,16 @@ export default function Canvas() {
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     if (isInitialClick || !selectionStartPos) {
       if (selectionAction) return;
-      else if (isInSelectedArea(x, y)) {
+      if (isInSelectedArea(x, y)) {
         setSelectionAction("move");
-        setSelectionStartPos({ x, y });
+        const offset = selectionMoveOffset
+          ? selectionMoveOffset
+          : { x: 0, y: 0 };
+        setSelectionStartPos({ x: x - offset.x, y: y - offset.y });
+        setShowSelectionPreview(true);
         return;
       } else {
+        if (showSelectionPreview) applySelectionAction();
         setSelectionAction("select");
         setSelectionStartPos({ x, y });
         setSelectedArea(null);
@@ -470,8 +479,7 @@ export default function Canvas() {
       );
     }
 
-    if (selectionAction === "move" && selectionMoveOffset)
-      drawSelectionMovePreview(ctx);
+    if (selectionMoveOffset) drawSelectionMovePreview(ctx);
     else if (selectedArea) {
       const { x, y, width, height } = selectedArea;
       drawFilterRect(ctx, x, y, width, height);
