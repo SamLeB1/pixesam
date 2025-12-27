@@ -122,6 +122,7 @@ type EditorState = {
   initSelection: () => void;
   endSelectionAction: () => void;
   applySelectionAction: () => void;
+  deleteSelection: () => void;
   undo: () => void;
   redo: () => void;
   updateHistory: (action: Action) => void;
@@ -668,6 +669,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
+      initSelection();
+      return { pixelData: newData };
+    }),
+  deleteSelection: () =>
+    set((state) => {
+      const { pixelData, gridSize, selectedArea, initSelection } = state;
+      if (!selectedArea) return {};
+
+      const newData = new Uint8ClampedArray(pixelData);
+      for (let i = 0; i < selectedArea.height; i++) {
+        for (let j = 0; j < selectedArea.width; j++) {
+          const pixelX = selectedArea.x + j;
+          const pixelY = selectedArea.y + i;
+          if (isValidIndex(pixelX, pixelY, gridSize))
+            setPixelColor(
+              pixelX,
+              pixelY,
+              gridSize.x,
+              { r: 0, g: 0, b: 0, a: 0 },
+              newData,
+            );
+        }
+      }
       initSelection();
       return { pixelData: newData };
     }),

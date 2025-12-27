@@ -40,6 +40,7 @@ export default function Canvas() {
     floodFill,
     endSelectionAction,
     applySelectionAction,
+    deleteSelection,
     undo,
     redo,
     clearDrawBuffer,
@@ -512,9 +513,16 @@ export default function Canvas() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const tag = target.tagName.toLowerCase();
+      const editable =
+        tag === "input" ||
+        tag === "textarea" ||
+        target.contentEditable === "true";
+      if (editable) return;
+
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
-
       if (key === "p") {
         e.preventDefault();
         selectTool("pencil");
@@ -548,6 +556,9 @@ export default function Canvas() {
       } else if (isCmdOrCtrl && key === "0") {
         e.preventDefault();
         resetZoom();
+      } else if (key === "delete" || key === "backspace") {
+        e.preventDefault();
+        deleteSelection();
       }
     }
 
