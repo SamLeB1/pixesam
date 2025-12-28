@@ -19,7 +19,13 @@ import {
 } from "../constants";
 import type { RGBA, Side, Rect, PxsmData } from "../types";
 
-type Action = DrawAction | BucketAction | MoveAction | NewAction | ClearAction;
+type Action =
+  | DrawAction
+  | BucketAction
+  | MoveAction
+  | DeleteAction
+  | NewAction
+  | ClearAction;
 
 type DrawAction = {
   action: "draw";
@@ -40,6 +46,12 @@ type MoveAction = {
   offset: { x: number; y: number };
   sourcePixels: RGBA[];
   destPixels: RGBA[];
+};
+
+type DeleteAction = {
+  action: "delete";
+  area: Rect;
+  pixels: RGBA[];
 };
 
 type NewAction = {
@@ -674,7 +686,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   deleteSelection: () =>
     set((state) => {
-      const { pixelData, gridSize, selectedArea, initSelection } = state;
+      const {
+        pixelData,
+        gridSize,
+        selectedArea,
+        getPixelsInRect,
+        initSelection,
+        updateHistory,
+      } = state;
       if (!selectedArea) return {};
 
       const newData = new Uint8ClampedArray(pixelData);
@@ -692,6 +711,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             );
         }
       }
+
+      const action: DeleteAction = {
+        action: "delete",
+        area: selectedArea,
+        pixels: getPixelsInRect(selectedArea),
+      };
+      updateHistory(action);
+
       initSelection();
       return { pixelData: newData };
     }),
@@ -751,6 +778,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               newData,
             );
           currPixelIndex++;
+        }
+      }
+      set({ pixelData: newData });
+    } else if (action.action === "delete") {
+      const { area, pixels } = action;
+      const newData = new Uint8ClampedArray(pixelData);
+
+      let currPixelIndex = 0;
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const pixelX = area.x + j;
+          const pixelY = area.y + i;
+          if (isValidIndex(pixelX, pixelY, gridSize)) {
+            setPixelColor(
+              pixelX,
+              pixelY,
+              gridSize.x,
+              pixels[currPixelIndex],
+              newData,
+            );
+            currPixelIndex++;
+          }
         }
       }
       set({ pixelData: newData });
@@ -833,6 +882,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               newData,
             );
           currPixelIndex++;
+        }
+      }
+      set({ pixelData: newData });
+    } else if (action.action === "delete") {
+      const { area } = action;
+      const newData = new Uint8ClampedArray(pixelData);
+
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const pixelX = area.x + j;
+          const pixelY = area.y + i;
+          if (isValidIndex(pixelX, pixelY, gridSize))
+            setPixelColor(
+              pixelX,
+              pixelY,
+              gridSize.x,
+              { r: 0, g: 0, b: 0, a: 0 },
+              newData,
+            );
         }
       }
       set({ pixelData: newData });
