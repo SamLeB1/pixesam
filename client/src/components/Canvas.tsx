@@ -44,6 +44,8 @@ export default function Canvas() {
     undo,
     redo,
     clearDrawBuffer,
+    copy,
+    paste,
   } = useEditorStore();
   const parentContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -523,7 +525,22 @@ export default function Canvas() {
 
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
-      if (key === "p") {
+      if (isCmdOrCtrl && !e.shiftKey && key === "z") {
+        e.preventDefault();
+        undo();
+      } else if (isCmdOrCtrl && e.shiftKey && key === "z") {
+        e.preventDefault();
+        redo();
+      } else if (isCmdOrCtrl && key === "y") {
+        e.preventDefault();
+        redo();
+      } else if (isCmdOrCtrl && key === "c") {
+        e.preventDefault();
+        copy();
+      } else if (isCmdOrCtrl && key === "v") {
+        e.preventDefault();
+        paste();
+      } else if (key === "p") {
         e.preventDefault();
         selectTool("pencil");
       } else if (key === "e") {
@@ -538,22 +555,13 @@ export default function Canvas() {
       } else if (key === "s") {
         e.preventDefault();
         selectTool("select");
-      } else if (isCmdOrCtrl && !e.shiftKey && key === "z") {
-        e.preventDefault();
-        undo();
-      } else if (isCmdOrCtrl && e.shiftKey && key === "z") {
-        e.preventDefault();
-        redo();
-      } else if (isCmdOrCtrl && key === "y") {
-        e.preventDefault();
-        redo();
       } else if (key === "+" || key === "=") {
         e.preventDefault();
         zoomStepTowardsCenter(true);
       } else if (key === "-") {
         e.preventDefault();
         zoomStepTowardsCenter(false);
-      } else if (isCmdOrCtrl && key === "0") {
+      } else if (key === "0") {
         e.preventDefault();
         resetZoom();
       } else if (key === "delete" || key === "backspace") {
@@ -564,7 +572,7 @@ export default function Canvas() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectTool, undo, redo, zoomStepTowardsCenter, resetZoom]);
+  }, [selectTool, undo, redo, copy, paste, zoomStepTowardsCenter, resetZoom]);
 
   return (
     <div

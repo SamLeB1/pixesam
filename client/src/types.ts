@@ -23,6 +23,12 @@ export type Rect = {
   height: number;
 };
 
+export type Clipboard = {
+  pixels: RGBA[];
+  width: number;
+  height: number;
+};
+
 export type PxsmData = {
   version: string;
   width: number;

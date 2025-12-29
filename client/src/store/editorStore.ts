@@ -17,7 +17,7 @@ import {
   MAX_PX_SIZE,
   MAX_HISTORY_SIZE,
 } from "../constants";
-import type { RGBA, Side, Rect, PxsmData } from "../types";
+import type { RGBA, Side, Rect, Clipboard, PxsmData } from "../types";
 
 type Action =
   | DrawAction
@@ -95,6 +95,7 @@ type EditorState = {
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
   mousePos: { x: number; y: number };
+  clipboard: Clipboard | null;
   setPixelData: (pixelData: Uint8ClampedArray) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
@@ -139,6 +140,8 @@ type EditorState = {
   redo: () => void;
   updateHistory: (action: Action) => void;
   clearDrawBuffer: () => void;
+  copy: () => void;
+  paste: () => void;
 };
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -162,6 +165,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   redoHistory: [],
   drawBuffer: [],
   mousePos: { x: 0, y: 0 },
+  clipboard: null,
   setPixelData: (pixelData) => set({ pixelData }),
   setGridSize: (gridSize) => set({ gridSize }),
   setPanOffset: (panOffset) => set({ panOffset }),
@@ -938,4 +942,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory(action);
       return { drawBuffer: [] };
     }),
+  copy: () =>
+    set((state) => {
+      const { selectedArea, getPixelsInRect } = state;
+      if (!selectedArea) return {};
+      return {
+        clipboard: {
+          pixels: getPixelsInRect(selectedArea),
+          width: selectedArea.width,
+          height: selectedArea.height,
+        },
+      };
+    }),
+  paste: () => {},
 }));
