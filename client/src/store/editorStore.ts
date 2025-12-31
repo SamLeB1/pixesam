@@ -24,6 +24,7 @@ type Action =
   | BucketAction
   | MoveAction
   | DeleteAction
+  | PasteAction
   | NewAction
   | ClearAction;
 
@@ -52,6 +53,13 @@ type DeleteAction = {
   action: "delete";
   area: Rect;
   pixels: RGBA[];
+};
+
+type PasteAction = {
+  action: "paste";
+  area: Rect;
+  pixels: RGBA[];
+  prevPixels: RGBA[];
 };
 
 type NewAction = {
@@ -658,6 +666,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             iteration++;
           }
         }
+        const newSelectedArea: Rect = {
+          x: selectedArea.x + selectionMoveOffset.x,
+          y: selectedArea.y + selectionMoveOffset.y,
+          width: selectedArea.width,
+          height: selectedArea.height,
+        };
+
+        const action: PasteAction = {
+          action: "paste",
+          area: newSelectedArea,
+          pixels: selectedPixels,
+          prevPixels: getPixelsInRect(newSelectedArea),
+        };
+        updateHistory(action);
+
         initSelection();
         return { pixelData: newData };
       } else {
@@ -836,6 +859,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }
       set({ pixelData: newData });
+    } else if (action.action === "paste") {
+      const { area, prevPixels } = action;
+      const newData = new Uint8ClampedArray(pixelData);
+      let currPixelIndex = 0;
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const pixelX = area.x + j;
+          const pixelY = area.y + i;
+          if (isValidIndex(pixelX, pixelY, gridSize)) {
+            setPixelColor(
+              pixelX,
+              pixelY,
+              gridSize.x,
+              prevPixels[currPixelIndex],
+              newData,
+            );
+            currPixelIndex++;
+          }
+        }
+      }
+      set({ pixelData: newData });
     } else if (action.action === "new") {
       const { prevPixelData, prevGridSize } = action;
       let pxSize = BASE_CANVAS_SIZE / Math.max(prevGridSize.x, prevGridSize.y);
@@ -934,6 +978,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               { r: 0, g: 0, b: 0, a: 0 },
               newData,
             );
+        }
+      }
+      set({ pixelData: newData });
+    } else if (action.action === "paste") {
+      const { area, pixels } = action;
+      const newData = new Uint8ClampedArray(pixelData);
+      let currPixelIndex = 0;
+      for (let i = 0; i < area.height; i++) {
+        for (let j = 0; j < area.width; j++) {
+          const pixelX = area.x + j;
+          const pixelY = area.y + i;
+          if (isValidIndex(pixelX, pixelY, gridSize))
+            setPixelColor(
+              pixelX,
+              pixelY,
+              gridSize.x,
+              pixels[currPixelIndex],
+              newData,
+            );
+          currPixelIndex++;
         }
       }
       set({ pixelData: newData });
