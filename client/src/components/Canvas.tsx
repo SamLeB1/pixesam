@@ -24,6 +24,7 @@ export default function Canvas() {
     selectedArea,
     selectedPixels,
     showSelectionPreview,
+    isPasting,
     setPanOffset,
     selectTool,
     setPrimaryColor,
@@ -141,26 +142,31 @@ export default function Canvas() {
     }
   }
 
-  function drawSelectionMovePreview(ctx: CanvasRenderingContext2D) {
+  function drawSelectionMovePreview(
+    ctx: CanvasRenderingContext2D,
+    clearSource: boolean,
+  ) {
     if (!selectedArea || !selectionMoveOffset) return;
 
     const pxSize = getPxSize();
-    for (let i = 0; i < selectedArea.height; i++) {
-      for (let j = 0; j < selectedArea.width; j++) {
-        const sourceX = selectedArea.x + j;
-        const sourceY = selectedArea.y + i;
+    if (clearSource) {
+      for (let i = 0; i < selectedArea.height; i++) {
+        for (let j = 0; j < selectedArea.width; j++) {
+          const sourceX = selectedArea.x + j;
+          const sourceY = selectedArea.y + i;
 
-        if (isValidIndex(sourceX, sourceY, gridSize)) {
-          ctx.fillStyle =
-            sourceY % 2 === sourceX % 2
-              ? darkCheckerboardColor
-              : lightCheckerboardColor;
-          ctx.fillRect(
-            (sourceX - panOffset.x) * pxSize,
-            (sourceY - panOffset.y) * pxSize,
-            pxSize,
-            pxSize,
-          );
+          if (isValidIndex(sourceX, sourceY, gridSize)) {
+            ctx.fillStyle =
+              sourceY % 2 === sourceX % 2
+                ? darkCheckerboardColor
+                : lightCheckerboardColor;
+            ctx.fillRect(
+              (sourceX - panOffset.x) * pxSize,
+              (sourceY - panOffset.y) * pxSize,
+              pxSize,
+              pxSize,
+            );
+          }
         }
       }
     }
@@ -482,7 +488,7 @@ export default function Canvas() {
       );
     }
 
-    if (selectionMoveOffset) drawSelectionMovePreview(ctx);
+    if (selectionMoveOffset) drawSelectionMovePreview(ctx, !isPasting);
     else if (selectedArea) {
       const { x, y, width, height } = selectedArea;
       drawFilterRect(ctx, x, y, width, height);
