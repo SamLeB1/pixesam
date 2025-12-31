@@ -986,6 +986,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   paste: () =>
     set((state) => {
       const {
+        gridSize,
         showSelectionPreview,
         mousePos,
         clipboard,
@@ -1000,8 +1001,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       const { pixels, width, height } = clipboard;
-      const clipboardX = mousePos.x - Math.floor(width / 2);
-      const clipboardY = mousePos.y - Math.floor(height / 2);
+      const clipboardX = Math.max(
+        0,
+        Math.min(gridSize.x - width, mousePos.x - Math.floor(width / 2)),
+      );
+      const clipboardY = Math.max(
+        0,
+        Math.min(gridSize.y - height, mousePos.y - Math.floor(height / 2)),
+      );
       const newSelectedArea: Rect = {
         x: clipboardX,
         y: clipboardY,
