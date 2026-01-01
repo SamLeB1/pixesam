@@ -6,6 +6,8 @@ import {
   getPixelColor,
   setPixelColor,
   isEqualColor,
+  drawRectContent,
+  clearRectContent,
 } from "../utils/canvas";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
@@ -648,30 +650,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {};
       }
 
+      const newData = new Uint8ClampedArray(pixelData);
+      const newSelectedArea: Rect = {
+        x: selectedArea.x + selectionMoveOffset.x,
+        y: selectedArea.y + selectionMoveOffset.y,
+        width: selectedArea.width,
+        height: selectedArea.height,
+      };
+
       if (isPasting) {
-        const newData = new Uint8ClampedArray(pixelData);
-        let iteration = 0;
-        for (let i = 0; i < selectedArea.height; i++) {
-          for (let j = 0; j < selectedArea.width; j++) {
-            const destX = selectedArea.x + j + selectionMoveOffset.x;
-            const destY = selectedArea.y + i + selectionMoveOffset.y;
-            if (isValidIndex(destX, destY, gridSize))
-              setPixelColor(
-                destX,
-                destY,
-                gridSize.x,
-                selectedPixels[iteration],
-                newData,
-              );
-            iteration++;
-          }
-        }
-        const newSelectedArea: Rect = {
-          x: selectedArea.x + selectionMoveOffset.x,
-          y: selectedArea.y + selectionMoveOffset.y,
-          width: selectedArea.width,
-          height: selectedArea.height,
-        };
+        drawRectContent(
+          newSelectedArea,
+          selectedPixels,
+          newData,
+          gridSize,
+          true,
+        );
 
         const action: PasteAction = {
           action: "paste",
@@ -680,47 +674,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           prevPixels: getPixelsInRect(newSelectedArea),
         };
         updateHistory(action);
-
-        initSelection();
-        return { pixelData: newData };
       } else {
-        const newData = new Uint8ClampedArray(pixelData);
-        for (let i = 0; i < selectedArea.height; i++) {
-          for (let j = 0; j < selectedArea.width; j++) {
-            const sourceX = selectedArea.x + j;
-            const sourceY = selectedArea.y + i;
-            if (isValidIndex(sourceX, sourceY, gridSize))
-              setPixelColor(
-                sourceX,
-                sourceY,
-                gridSize.x,
-                { r: 0, g: 0, b: 0, a: 0 },
-                newData,
-              );
-          }
-        }
-        let iteration = 0;
-        for (let i = 0; i < selectedArea.height; i++) {
-          for (let j = 0; j < selectedArea.width; j++) {
-            const destX = selectedArea.x + j + selectionMoveOffset.x;
-            const destY = selectedArea.y + i + selectionMoveOffset.y;
-            if (isValidIndex(destX, destY, gridSize))
-              setPixelColor(
-                destX,
-                destY,
-                gridSize.x,
-                selectedPixels[iteration],
-                newData,
-              );
-            iteration++;
-          }
-        }
-        const newSelectedArea: Rect = {
-          x: selectedArea.x + selectionMoveOffset.x,
-          y: selectedArea.y + selectionMoveOffset.y,
-          width: selectedArea.width,
-          height: selectedArea.height,
-        };
+        clearRectContent(selectedArea, newData, gridSize);
+        drawRectContent(
+          newSelectedArea,
+          selectedPixels,
+          newData,
+          gridSize,
+          true,
+        );
 
         const action: MoveAction = {
           action: "move",
@@ -730,10 +692,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           destPixels: getPixelsInRect(newSelectedArea),
         };
         updateHistory(action);
-
-        initSelection();
-        return { pixelData: newData };
       }
+
+      initSelection();
+      return { pixelData: newData };
     }),
   deleteSelection: () =>
     set((state) => {
@@ -753,20 +715,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       const newData = new Uint8ClampedArray(pixelData);
-      for (let i = 0; i < selectedArea.height; i++) {
-        for (let j = 0; j < selectedArea.width; j++) {
-          const pixelX = selectedArea.x + j;
-          const pixelY = selectedArea.y + i;
-          if (isValidIndex(pixelX, pixelY, gridSize))
-            setPixelColor(
-              pixelX,
-              pixelY,
-              gridSize.x,
-              { r: 0, g: 0, b: 0, a: 0 },
-              newData,
-            );
-        }
-      }
+      clearRectContent(selectedArea, newData, gridSize);
 
       const action: DeleteAction = {
         action: "delete",
@@ -803,82 +752,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "move") {
       const { area, offset, sourcePixels, destPixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      let currPixelIndex = 0;
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const destX = area.x + j + offset.x;
-          const destY = area.y + i + offset.y;
-          if (isValidIndex(destX, destY, gridSize)) {
-            setPixelColor(
-              destX,
-              destY,
-              gridSize.x,
-              destPixels[currPixelIndex],
-              newData,
-            );
-            currPixelIndex++;
-          }
-        }
-      }
-      currPixelIndex = 0;
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const sourceX = area.x + j;
-          const sourceY = area.y + i;
-          if (isValidIndex(sourceX, sourceY, gridSize))
-            setPixelColor(
-              sourceX,
-              sourceY,
-              gridSize.x,
-              sourcePixels[currPixelIndex],
-              newData,
-            );
-          currPixelIndex++;
-        }
-      }
+      const newArea: Rect = {
+        x: area.x + offset.x,
+        y: area.y + offset.y,
+        width: area.width,
+        height: area.height,
+      };
+      drawRectContent(newArea, destPixels, newData, gridSize, false);
+      drawRectContent(area, sourcePixels, newData, gridSize, true);
       set({ pixelData: newData });
     } else if (action.action === "delete") {
       const { area, pixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-
-      let currPixelIndex = 0;
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const pixelX = area.x + j;
-          const pixelY = area.y + i;
-          if (isValidIndex(pixelX, pixelY, gridSize)) {
-            setPixelColor(
-              pixelX,
-              pixelY,
-              gridSize.x,
-              pixels[currPixelIndex],
-              newData,
-            );
-            currPixelIndex++;
-          }
-        }
-      }
+      drawRectContent(area, pixels, newData, gridSize, false);
       set({ pixelData: newData });
     } else if (action.action === "paste") {
       const { area, prevPixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      let currPixelIndex = 0;
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const pixelX = area.x + j;
-          const pixelY = area.y + i;
-          if (isValidIndex(pixelX, pixelY, gridSize)) {
-            setPixelColor(
-              pixelX,
-              pixelY,
-              gridSize.x,
-              prevPixels[currPixelIndex],
-              newData,
-            );
-            currPixelIndex++;
-          }
-        }
-      }
+      drawRectContent(area, prevPixels, newData, gridSize, false);
       set({ pixelData: newData });
     } else if (action.action === "new") {
       const { prevPixelData, prevGridSize } = action;
@@ -931,75 +822,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "move") {
       const { area, offset, sourcePixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const sourceX = area.x + j;
-          const sourceY = area.y + i;
-          if (isValidIndex(sourceX, sourceY, gridSize))
-            setPixelColor(
-              sourceX,
-              sourceY,
-              gridSize.x,
-              { r: 0, g: 0, b: 0, a: 0 },
-              newData,
-            );
-        }
-      }
-      let currPixelIndex = 0;
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const destX = area.x + j + offset.x;
-          const destY = area.y + i + offset.y;
-          if (isValidIndex(destX, destY, gridSize))
-            setPixelColor(
-              destX,
-              destY,
-              gridSize.x,
-              sourcePixels[currPixelIndex],
-              newData,
-            );
-          currPixelIndex++;
-        }
-      }
+      const newArea: Rect = {
+        x: area.x + offset.x,
+        y: area.y + offset.y,
+        width: area.width,
+        height: area.height,
+      };
+      clearRectContent(area, newData, gridSize);
+      drawRectContent(newArea, sourcePixels, newData, gridSize, true);
       set({ pixelData: newData });
     } else if (action.action === "delete") {
       const { area } = action;
       const newData = new Uint8ClampedArray(pixelData);
-
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const pixelX = area.x + j;
-          const pixelY = area.y + i;
-          if (isValidIndex(pixelX, pixelY, gridSize))
-            setPixelColor(
-              pixelX,
-              pixelY,
-              gridSize.x,
-              { r: 0, g: 0, b: 0, a: 0 },
-              newData,
-            );
-        }
-      }
+      clearRectContent(area, newData, gridSize);
       set({ pixelData: newData });
     } else if (action.action === "paste") {
       const { area, pixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      let currPixelIndex = 0;
-      for (let i = 0; i < area.height; i++) {
-        for (let j = 0; j < area.width; j++) {
-          const pixelX = area.x + j;
-          const pixelY = area.y + i;
-          if (isValidIndex(pixelX, pixelY, gridSize))
-            setPixelColor(
-              pixelX,
-              pixelY,
-              gridSize.x,
-              pixels[currPixelIndex],
-              newData,
-            );
-          currPixelIndex++;
-        }
-      }
+      drawRectContent(area, pixels, newData, gridSize, true);
       set({ pixelData: newData });
     } else if (action.action === "new") {
       const { pixelData, gridSize } = action;

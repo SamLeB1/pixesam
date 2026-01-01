@@ -1,4 +1,4 @@
-import type { RGBA } from "../types";
+import type { RGBA, Rect } from "../types";
 
 export function getBaseIndex(x: number, y: number, width: number) {
   return (y * width + x) * 4;
@@ -48,4 +48,41 @@ export function isEqualColor(color1: RGBA, color2: RGBA) {
     color1.b === color2.b &&
     color1.a === color2.a
   );
+}
+
+export function drawRectContent(
+  rect: Rect,
+  pixels: RGBA[],
+  data: Uint8ClampedArray,
+  dataSize: { x: number; y: number },
+  full = true,
+) {
+  let currPixelIndex = 0;
+  for (let i = 0; i < rect.height; i++) {
+    for (let j = 0; j < rect.width; j++) {
+      const px = rect.x + j;
+      const py = rect.y + i;
+      if (isValidIndex(px, py, dataSize)) {
+        if (currPixelIndex >= pixels.length) return;
+        setPixelColor(px, py, dataSize.x, pixels[currPixelIndex], data);
+        if (!full) currPixelIndex++;
+      }
+      if (full) currPixelIndex++;
+    }
+  }
+}
+
+export function clearRectContent(
+  rect: Rect,
+  data: Uint8ClampedArray,
+  dataSize: { x: number; y: number },
+) {
+  for (let i = 0; i < rect.height; i++) {
+    for (let j = 0; j < rect.width; j++) {
+      const px = rect.x + j;
+      const py = rect.y + i;
+      if (isValidIndex(px, py, dataSize))
+        setPixelColor(px, py, dataSize.x, { r: 0, g: 0, b: 0, a: 0 }, data);
+    }
+  }
 }

@@ -177,6 +177,7 @@ export default function Canvas() {
         const destY = selectedArea.y + i + selectionMoveOffset.y;
 
         if (isValidIndex(destX, destY, gridSize)) {
+          if (iteration >= selectedPixels.length) return;
           const { r, g, b, a } = selectedPixels[iteration];
           let hoverColor;
           if (a === 0) {
