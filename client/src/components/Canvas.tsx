@@ -146,9 +146,10 @@ export default function Canvas() {
     ctx: CanvasRenderingContext2D,
     clearSource: boolean,
   ) {
-    if (!selectedArea || !selectionMoveOffset) return;
-
+    if (!selectedArea) return;
     const pxSize = getPxSize();
+    const offset = selectionMoveOffset || { x: 0, y: 0 };
+
     if (clearSource) {
       for (let i = 0; i < selectedArea.height; i++) {
         for (let j = 0; j < selectedArea.width; j++) {
@@ -173,8 +174,8 @@ export default function Canvas() {
     let iteration = 0;
     for (let i = 0; i < selectedArea.height; i++) {
       for (let j = 0; j < selectedArea.width; j++) {
-        const destX = selectedArea.x + j + selectionMoveOffset.x;
-        const destY = selectedArea.y + i + selectionMoveOffset.y;
+        const destX = selectedArea.x + j + offset.x;
+        const destY = selectedArea.y + i + offset.y;
 
         if (isValidIndex(destX, destY, gridSize)) {
           if (iteration >= selectedPixels.length) return;
@@ -202,6 +203,42 @@ export default function Canvas() {
         iteration++;
       }
     }
+  }
+
+  function drawResizeHandles(ctx: CanvasRenderingContext2D) {
+    if (!selectedArea) return;
+
+    const pxSize = getPxSize();
+    const offset = selectionMoveOffset || { x: 0, y: 0 };
+
+    const left = (selectedArea.x + offset.x - panOffset.x) * pxSize;
+    const top = (selectedArea.y + offset.y - panOffset.y) * pxSize;
+    const right = left + selectedArea.width * pxSize;
+    const bottom = top + selectedArea.height * pxSize;
+    const centerX = left + (selectedArea.width * pxSize) / 2;
+    const centerY = top + (selectedArea.height * pxSize) / 2;
+
+    const handles = [
+      { x: left, y: top },
+      { x: centerX, y: top },
+      { x: right, y: top },
+      { x: left, y: centerY },
+      { x: right, y: centerY },
+      { x: left, y: bottom },
+      { x: centerX, y: bottom },
+      { x: right, y: bottom },
+    ];
+    const handleRadius = 8;
+
+    handles.forEach((h) => {
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, handleRadius, 0, Math.PI * 2);
+      ctx.fillStyle = "white";
+      ctx.fill();
+      ctx.strokeStyle = "black";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
   }
 
   function getPxSize() {
@@ -489,8 +526,10 @@ export default function Canvas() {
       );
     }
 
-    if (selectionMoveOffset) drawSelectionMovePreview(ctx, !isPasting);
-    else if (selectedArea) {
+    if (showSelectionPreview) {
+      drawSelectionMovePreview(ctx, !isPasting);
+      drawResizeHandles(ctx);
+    } else if (selectedArea) {
       const { x, y, width, height } = selectedArea;
       drawFilterRect(ctx, x, y, width, height);
     } else if (hoveredPixel) {

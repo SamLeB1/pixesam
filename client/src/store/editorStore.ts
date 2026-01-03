@@ -620,13 +620,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const { selectionAction, selectedArea, getPixelsInRect } = state;
 
       if (selectionAction === "select") {
-        const newSelectedPixels = selectedArea
+        const selectedPixels = selectedArea
           ? getPixelsInRect(selectedArea)
           : [];
+        const showSelectionPreview = selectedArea ? true : false;
         return {
           selectionAction: null,
           selectionStartPos: null,
-          selectedPixels: newSelectedPixels,
+          selectedPixels,
+          showSelectionPreview,
         };
       } else if (selectionAction === "move")
         return { selectionAction: null, selectionStartPos: null };
