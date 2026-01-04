@@ -578,6 +578,8 @@ export default function Canvas() {
       drawFilterRect(ctx, x, y, brushSize, brushSize);
     }
 
+    if (!showSelectionPreview) setHoveredResizeHandle(null);
+
     const parentContainer = parentContainerRef.current;
     if (parentContainer)
       parentContainer.addEventListener("wheel", handleMouseWheel, {
@@ -597,6 +599,7 @@ export default function Canvas() {
     brushSize,
     selectionMoveOffset,
     selectedArea,
+    showSelectionPreview,
   ]);
 
   useEffect(() => {
