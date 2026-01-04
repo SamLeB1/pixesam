@@ -4,9 +4,21 @@ import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import { isValidIndex } from "../utils/canvas";
 import { BASE_PX_SIZE } from "../constants";
+import type { Direction } from "../types";
 
 const lightCheckerboardColor = "#ffffff";
 const darkCheckerboardColor = "#e5e5e5";
+const RESIZE_HANDLES: { name: Direction; x: number; y: number }[] = [
+  { name: "nw", x: 0, y: 0 },
+  { name: "n", x: 0.5, y: 0 },
+  { name: "ne", x: 1, y: 0 },
+  { name: "w", x: 0, y: 0.5 },
+  { name: "e", x: 1, y: 0.5 },
+  { name: "sw", x: 0, y: 1 },
+  { name: "s", x: 0.5, y: 1 },
+  { name: "se", x: 1, y: 1 },
+];
+const RESIZE_HANDLE_RADIUS = 8;
 
 export default function Canvas() {
   const {
@@ -56,6 +68,8 @@ export default function Canvas() {
     x: number;
     y: number;
   } | null>(null);
+  const [hoveredResizeHandle, setHoveredResizeHandle] =
+    useState<Direction | null>(null);
   const parentSize = parentContainerRef.current
     ? {
         x: parentContainerRef.current.clientWidth,
@@ -210,30 +224,19 @@ export default function Canvas() {
 
     const pxSize = getPxSize();
     const offset = selectionMoveOffset || { x: 0, y: 0 };
-
     const left = (selectedArea.x + offset.x - panOffset.x) * pxSize;
     const top = (selectedArea.y + offset.y - panOffset.y) * pxSize;
-    const right = left + selectedArea.width * pxSize;
-    const bottom = top + selectedArea.height * pxSize;
-    const centerX = left + (selectedArea.width * pxSize) / 2;
-    const centerY = top + (selectedArea.height * pxSize) / 2;
+    const w = selectedArea.width * pxSize;
+    const h = selectedArea.height * pxSize;
 
-    const handles = [
-      { x: left, y: top },
-      { x: centerX, y: top },
-      { x: right, y: top },
-      { x: left, y: centerY },
-      { x: right, y: centerY },
-      { x: left, y: bottom },
-      { x: centerX, y: bottom },
-      { x: right, y: bottom },
-    ];
-    const handleRadius = 8;
+    RESIZE_HANDLES.forEach((handle) => {
+      const hX = left + w * handle.x;
+      const hY = top + h * handle.y;
+      const isHovered = hoveredResizeHandle === handle.name;
 
-    handles.forEach((h) => {
       ctx.beginPath();
-      ctx.arc(h.x, h.y, handleRadius, 0, Math.PI * 2);
-      ctx.fillStyle = "white";
+      ctx.arc(hX, hY, RESIZE_HANDLE_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = isHovered ? "#e5e5e5" : "white";
       ctx.fill();
       ctx.strokeStyle = "black";
       ctx.lineWidth = 1;
@@ -257,6 +260,40 @@ export default function Canvas() {
 
     if (!hoveredPixel || hoveredPixel.x !== x || hoveredPixel.y !== y)
       setHoveredPixel({ x, y });
+  }
+
+  function updateHoveredResizeHandle(mouseX: number, mouseY: number) {
+    if (!canvasRef.current || !selectedArea || !showSelectionPreview) {
+      setHoveredResizeHandle(null);
+      return;
+    }
+
+    const pxSize = getPxSize();
+    const offset = selectionMoveOffset || { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+
+    // Selection boundaries in screen pixels relative to canvas top-left
+    const left = (selectedArea.x + offset.x - panOffset.x) * pxSize;
+    const top = (selectedArea.y + offset.y - panOffset.y) * pxSize;
+    const w = selectedArea.width * pxSize;
+    const h = selectedArea.height * pxSize;
+
+    // Actual mouse position relative to canvas top-left
+    const localX = mouseX - rect.left;
+    const localY = mouseY - rect.top;
+
+    for (const handle of RESIZE_HANDLES) {
+      const hX = left + w * handle.x;
+      const hY = top + h * handle.y;
+
+      // Pythagorean distance check
+      const dist = Math.sqrt((localX - hX) ** 2 + (localY - hY) ** 2);
+      if (dist <= RESIZE_HANDLE_RADIUS) {
+        setHoveredResizeHandle(handle.name);
+        return;
+      }
+    }
+    setHoveredResizeHandle(null);
   }
 
   function updateMousePos(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
@@ -477,12 +514,14 @@ export default function Canvas() {
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     if (activeMouseButton.current !== null) handleAction(e);
     else updateHoveredPixel(e);
+    updateHoveredResizeHandle(e.clientX, e.clientY);
   }
 
   function handleMouseLeave() {
     activeMouseButton.current = null;
     if (selectionAction) endSelectionAction();
     setHoveredPixel(null);
+    setHoveredResizeHandle(null);
     clearDrawBuffer();
   }
 
@@ -553,6 +592,7 @@ export default function Canvas() {
     gridSize,
     zoomLevel,
     hoveredPixel,
+    hoveredResizeHandle,
     panOffset,
     brushSize,
     selectionMoveOffset,
@@ -628,7 +668,13 @@ export default function Canvas() {
       onMouseMove={updateMousePos}
     >
       <canvas
-        className={`bg-white ${showMoveCursor && "cursor-move"}`}
+        className="bg-white"
+        style={{
+          ...(showMoveCursor && { cursor: "move" }),
+          ...(hoveredResizeHandle && {
+            cursor: `${hoveredResizeHandle}-resize`,
+          }),
+        }}
         ref={canvasRef}
         id="canvas"
         width={canvasSize.x}

@@ -16,6 +16,8 @@ export type Side =
   | "bottom-center"
   | "bottom-right";
 
+export type Direction = "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se";
+
 export type Rect = {
   x: number;
   y: number;
