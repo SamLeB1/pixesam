@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { MdAdd, MdEdit } from "react-icons/md";
 import PaletteColors from "./PaletteColors";
+import ModalNewPalette from "./ModalNewPalette";
+import ModalEditPalette from "./ModalEditPalette";
 
 const defaultPalette = [
   "#be4a2f",
@@ -67,6 +69,12 @@ export default function ColorPaletteMenu() {
           className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
           type="button"
           title="New palette"
+          onClick={() => {
+            const modal = document.getElementById(
+              "modal-new-palette",
+            ) as HTMLDialogElement;
+            if (modal) modal.showModal();
+          }}
         >
           <MdAdd size={20} color="oklch(87% 0 0)" />
         </button>
@@ -74,6 +82,12 @@ export default function ColorPaletteMenu() {
           className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
           type="button"
           title="Edit palette"
+          onClick={() => {
+            const modal = document.getElementById(
+              "modal-edit-palette",
+            ) as HTMLDialogElement;
+            if (modal) modal.showModal();
+          }}
         >
           <MdEdit size={20} color="oklch(87% 0 0)" />
         </button>
@@ -81,6 +95,8 @@ export default function ColorPaletteMenu() {
       <PaletteColors
         colors={selectedPalette === "default" ? defaultPalette : sunsetPalette}
       />
+      <ModalNewPalette />
+      <ModalEditPalette />
     </div>
   );
 }
