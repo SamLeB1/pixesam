@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MdAdd, MdEdit } from "react-icons/md";
 import PaletteColors from "./PaletteColors";
 
 const defaultPalette = [
@@ -52,15 +53,31 @@ export default function ColorPaletteMenu() {
 
   return (
     <div>
-      <select
-        className="select select-sm mb-2 w-1/2"
-        id="palette-select"
-        value={selectedPalette}
-        onChange={(e) => setSelectedPalette(e.target.value)}
-      >
-        <option value="default">Default</option>
-        <option value="sunset">Sunset</option>
-      </select>
+      <div className="mb-2 flex items-center">
+        <select
+          className="select select-sm mr-auto w-1/2"
+          id="palette-select"
+          value={selectedPalette}
+          onChange={(e) => setSelectedPalette(e.target.value)}
+        >
+          <option value="default">Default</option>
+          <option value="sunset">Sunset</option>
+        </select>
+        <button
+          className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+          type="button"
+          title="New palette"
+        >
+          <MdAdd size={20} color="oklch(87% 0 0)" />
+        </button>
+        <button
+          className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+          type="button"
+          title="Edit palette"
+        >
+          <MdEdit size={20} color="oklch(87% 0 0)" />
+        </button>
+      </div>
       <PaletteColors
         colors={selectedPalette === "default" ? defaultPalette : sunsetPalette}
       />
