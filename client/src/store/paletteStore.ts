@@ -68,7 +68,7 @@ type PaletteState = {
   ) => void;
   deletePalette: (id: string) => void;
   selectPalette: (id: string) => void;
-  getSelectedPalette: () => ColorPalette | undefined;
+  getSelectedPalette: () => ColorPalette;
 };
 
 export const usePaletteStore = create<PaletteState>((set, get) => ({
@@ -112,6 +112,6 @@ export const usePaletteStore = create<PaletteState>((set, get) => ({
 
   getSelectedPalette: () => {
     const { palettes, selectedPaletteId } = get();
-    return palettes.find((p) => p.id === selectedPaletteId);
+    return palettes.find((p) => p.id === selectedPaletteId) as ColorPalette;
   },
 }));
