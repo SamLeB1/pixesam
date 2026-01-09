@@ -37,3 +37,10 @@ export type PxsmData = {
   height: number;
   pixels: number[];
 };
+
+export type ColorPalette = {
+  id: string;
+  name: string;
+  colors: string[];
+  isDefault: boolean;
+};
