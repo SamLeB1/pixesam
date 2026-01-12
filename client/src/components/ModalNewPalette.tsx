@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
-import { MdAdd, MdClose } from "react-icons/md";
+import { MdAdd, MdClose, MdColorLens } from "react-icons/md";
 import { usePaletteStore } from "../store/paletteStore";
+import { useEditorStore } from "../store/editorStore";
+import { extractColorsFromPixelData } from "../utils/colorExtractor";
 
 const DEFAULT_COLOR_PICKER_VALUE = "#000000";
 
@@ -22,6 +24,18 @@ export default function ModalNewPalette() {
     if (colorInputRef.current) {
       const newColor = colorInputRef.current.value;
       setColors([...colors, newColor]);
+    }
+  }
+
+  function handleAddColorsFromDrawing() {
+    const { pixelData } = useEditorStore.getState();
+    const extractedColors = extractColorsFromPixelData(pixelData);
+    const existingColorsLower = colors.map((c) => c.toLowerCase());
+    const newColors = extractedColors.filter(
+      (color) => !existingColorsLower.includes(color.toLowerCase()),
+    );
+    if (newColors.length > 0) {
+      setColors([...colors, ...newColors]);
     }
   }
 
@@ -86,12 +100,20 @@ export default function ModalNewPalette() {
             defaultValue={DEFAULT_COLOR_PICKER_VALUE}
           />
           <button
-            className="btn btn-sm btn-primary"
+            className="btn btn-sm btn-primary mr-2"
             type="button"
             onClick={handleAddColor}
           >
             <MdAdd size={16} />
             Add color
+          </button>
+          <button
+            className="btn btn-sm btn-secondary"
+            type="button"
+            onClick={handleAddColorsFromDrawing}
+          >
+            <MdColorLens size={16} />
+            Add from drawing
           </button>
         </div>
         {colors.length === 0 ? (
