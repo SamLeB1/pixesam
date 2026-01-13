@@ -20,8 +20,8 @@ export default function EraserToolOptions() {
   }
 
   return (
-    <div className="flex h-full items-center" title="Brush size in pixels">
-      <label className="label text-sm text-white">
+    <div className="flex h-full items-center">
+      <label className="label text-sm text-white" title="Brush size in pixels">
         Brush size
         <input
           className="input input-xs ml-1 w-12 pl-2"

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "sonner";
 import Canvas from "./components/Canvas";
 import TopBar from "./components/TopBar";
@@ -7,6 +8,14 @@ import BottomBar from "./components/BottomBar";
 import ToolOptionsBar from "./components/ToolOptionsBar";
 
 export default function App() {
+  useEffect(() => {
+    const modal = document.getElementById("modal-new") as HTMLDialogElement;
+    if (modal) {
+      modal.showModal();
+      (document.activeElement as HTMLElement)?.blur();
+    }
+  }, []);
+
   return (
     <>
       <div className="flex h-screen flex-col bg-neutral-900">
