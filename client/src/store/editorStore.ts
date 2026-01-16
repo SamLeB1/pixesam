@@ -19,7 +19,14 @@ import {
   MAX_PX_SIZE,
   MAX_HISTORY_SIZE,
 } from "../constants";
-import type { RGBA, Side, Rect, Clipboard, PxsmData } from "../types";
+import type {
+  RGBA,
+  Side,
+  Direction,
+  Rect,
+  Clipboard,
+  PxsmData,
+} from "../types";
 
 type Action =
   | DrawAction
@@ -95,9 +102,11 @@ type EditorState = {
   primaryColor: string;
   secondaryColor: string;
   brushSize: number;
-  selectionAction: "select" | "move" | null;
+  selectionAction: "select" | "move" | "resize" | null;
   selectionStartPos: { x: number; y: number } | null;
   selectionMoveOffset: { x: number; y: number } | null;
+  selectionResizeOffset: { n: number; e: number; s: number; w: number } | null;
+  activeResizeHandle: Direction | null;
   selectedArea: Rect | null;
   selectedPixels: RGBA[];
   showSelectionPreview: boolean;
@@ -114,9 +123,13 @@ type EditorState = {
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
-  setSelectionAction: (action: "select" | "move" | null) => void;
+  setSelectionAction: (action: "select" | "move" | "resize" | null) => void;
   setSelectionStartPos: (pos: { x: number; y: number } | null) => void;
   setSelectionMoveOffset: (offset: { x: number; y: number } | null) => void;
+  setSelectionResizeOffset: (
+    offset: { n: number; e: number; s: number; w: number } | null,
+  ) => void;
+  setActiveResizeHandle: (handle: Direction | null) => void;
   setSelectedArea: (area: Rect | null) => void;
   setSelectedPixels: (pixels: RGBA[]) => void;
   setShowSelectionPreview: (show: boolean) => void;
@@ -170,6 +183,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectionAction: null,
   selectionStartPos: null,
   selectionMoveOffset: null,
+  selectionResizeOffset: null,
+  activeResizeHandle: null,
   selectedArea: null,
   selectedPixels: [],
   showSelectionPreview: false,
@@ -189,6 +204,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectionAction: (action) => set({ selectionAction: action }),
   setSelectionStartPos: (pos) => set({ selectionStartPos: pos }),
   setSelectionMoveOffset: (offset) => set({ selectionMoveOffset: offset }),
+  setSelectionResizeOffset: (offset) => set({ selectionResizeOffset: offset }),
+  setActiveResizeHandle: (handle) => set({ activeResizeHandle: handle }),
   setSelectedArea: (area) => set({ selectedArea: area }),
   setSelectedPixels: (pixels) => set({ selectedPixels: pixels }),
   setShowSelectionPreview: (show) => set({ showSelectionPreview: show }),
@@ -610,6 +627,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionAction: null,
       selectionStartPos: null,
       selectionMoveOffset: null,
+      selectionResizeOffset: null,
+      activeResizeHandle: null,
       selectedArea: null,
       selectedPixels: [],
       showSelectionPreview: false,
@@ -630,9 +649,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           selectedPixels,
           showSelectionPreview,
         };
-      } else if (selectionAction === "move")
+      } else if (selectionAction === "move") {
         return { selectionAction: null, selectionStartPos: null };
-      else return {};
+      } else if (selectionAction === "resize") {
+        return {
+          selectionAction: null,
+          selectionStartPos: null,
+          activeResizeHandle: null,
+        };
+      } else return {};
     }),
   applySelectionAction: () =>
     set((state) => {
@@ -640,6 +665,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         pixelData,
         gridSize,
         selectionMoveOffset,
+        selectionResizeOffset,
         selectedArea,
         selectedPixels,
         isPasting,
@@ -647,23 +673,61 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         initSelection,
         updateHistory,
       } = state;
-      if (!selectionMoveOffset || !selectedArea) {
+
+      const moveOff = selectionMoveOffset || { x: 0, y: 0 };
+      const resizeOff = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
+      const hasMoved = moveOff.x !== 0 || moveOff.y !== 0;
+      const hasResized =
+        resizeOff.n !== 0 ||
+        resizeOff.e !== 0 ||
+        resizeOff.s !== 0 ||
+        resizeOff.w !== 0;
+
+      if ((!hasMoved && !hasResized && !isPasting) || !selectedArea) {
         initSelection();
         return {};
       }
 
+      // Calculate new dimensions with resize offset
+      const newWidth = Math.max(
+        1,
+        selectedArea.width - resizeOff.w + resizeOff.e,
+      );
+      const newHeight = Math.max(
+        1,
+        selectedArea.height - resizeOff.n + resizeOff.s,
+      );
+
       const newData = new Uint8ClampedArray(pixelData);
       const newSelectedArea: Rect = {
-        x: selectedArea.x + selectionMoveOffset.x,
-        y: selectedArea.y + selectionMoveOffset.y,
-        width: selectedArea.width,
-        height: selectedArea.height,
+        x: selectedArea.x + resizeOff.w + moveOff.x,
+        y: selectedArea.y + resizeOff.n + moveOff.y,
+        width: newWidth,
+        height: newHeight,
       };
+
+      // Scale pixels using nearest-neighbor if dimensions changed
+      let pixelsToApply = selectedPixels;
+      if (
+        newWidth !== selectedArea.width ||
+        newHeight !== selectedArea.height
+      ) {
+        const scaledPixels: RGBA[] = [];
+        for (let dy = 0; dy < newHeight; dy++) {
+          for (let dx = 0; dx < newWidth; dx++) {
+            const srcX = Math.floor((dx * selectedArea.width) / newWidth);
+            const srcY = Math.floor((dy * selectedArea.height) / newHeight);
+            const srcIndex = srcY * selectedArea.width + srcX;
+            scaledPixels.push(selectedPixels[srcIndex]);
+          }
+        }
+        pixelsToApply = scaledPixels;
+      }
 
       if (isPasting) {
         drawRectContent(
           newSelectedArea,
-          selectedPixels,
+          pixelsToApply,
           newData,
           gridSize,
           true,
@@ -672,7 +736,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const action: PasteAction = {
           action: "paste",
           area: newSelectedArea,
-          pixels: selectedPixels,
+          pixels: pixelsToApply,
           prevPixels: getPixelsInRect(newSelectedArea),
         };
         updateHistory(action);
@@ -680,7 +744,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         clearRectContent(selectedArea, newData, gridSize);
         drawRectContent(
           newSelectedArea,
-          selectedPixels,
+          pixelsToApply,
           newData,
           gridSize,
           true,
@@ -689,7 +753,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const action: MoveAction = {
           action: "move",
           area: selectedArea,
-          offset: selectionMoveOffset,
+          offset: moveOff,
           sourcePixels: selectedPixels,
           destPixels: getPixelsInRect(newSelectedArea),
         };
@@ -896,6 +960,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         showSelectionPreview,
         mousePos,
         clipboard,
+        initSelection,
         applySelectionAction,
         paste,
       } = state;
@@ -922,11 +987,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         height,
       };
 
+      initSelection();
       return {
         selectedTool: "select",
-        selectionAction: null,
-        selectionStartPos: null,
-        selectionMoveOffset: { x: 0, y: 0 },
         selectedArea: newSelectedArea,
         selectedPixels: pixels,
         showSelectionPreview: true,

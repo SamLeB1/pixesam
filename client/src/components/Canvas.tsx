@@ -4,7 +4,7 @@ import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import { isValidIndex } from "../utils/canvas";
 import { BASE_PX_SIZE } from "../constants";
-import type { Direction } from "../types";
+import type { Direction, Rect } from "../types";
 
 const lightCheckerboardColor = "#ffffff";
 const darkCheckerboardColor = "#e5e5e5";
@@ -33,6 +33,8 @@ export default function Canvas() {
     selectionAction,
     selectionStartPos,
     selectionMoveOffset,
+    selectionResizeOffset,
+    activeResizeHandle,
     selectedArea,
     selectedPixels,
     showSelectionPreview,
@@ -44,6 +46,8 @@ export default function Canvas() {
     setSelectionAction,
     setSelectionStartPos,
     setSelectionMoveOffset,
+    setSelectionResizeOffset,
+    setActiveResizeHandle,
     setSelectedArea,
     setShowSelectionPreview,
     setMousePos,
@@ -64,6 +68,7 @@ export default function Canvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const activeMouseButton = useRef<number>(null);
   const prevPanMousePos = useRef({ x: 0, y: 0 });
+  const resizeStartOffset = useRef({ n: 0, e: 0, s: 0, w: 0 });
   const [hoveredPixel, setHoveredPixel] = useState<{
     x: number;
     y: number;
@@ -156,14 +161,16 @@ export default function Canvas() {
     }
   }
 
-  function drawSelectionMovePreview(
+  function drawSelectionPreview(
     ctx: CanvasRenderingContext2D,
     clearSource: boolean,
   ) {
     if (!selectedArea) return;
     const pxSize = getPxSize();
-    const offset = selectionMoveOffset || { x: 0, y: 0 };
+    const bounds = getEffectiveSelectionBounds();
+    if (!bounds) return;
 
+    // Clear the source area
     if (clearSource) {
       for (let i = 0; i < selectedArea.height; i++) {
         for (let j = 0; j < selectedArea.width; j++) {
@@ -185,15 +192,26 @@ export default function Canvas() {
         }
       }
     }
-    let iteration = 0;
-    for (let i = 0; i < selectedArea.height; i++) {
-      for (let j = 0; j < selectedArea.width; j++) {
-        const destX = selectedArea.x + j + offset.x;
-        const destY = selectedArea.y + i + offset.y;
+
+    // Draw preview at destination with nearest-neighbor scaling
+    const srcWidth = selectedArea.width;
+    const srcHeight = selectedArea.height;
+    const dstWidth = bounds.width;
+    const dstHeight = bounds.height;
+
+    for (let dy = 0; dy < dstHeight; dy++) {
+      for (let dx = 0; dx < dstWidth; dx++) {
+        const destX = bounds.x + dx;
+        const destY = bounds.y + dy;
 
         if (isValidIndex(destX, destY, gridSize)) {
-          if (iteration >= selectedPixels.length) return;
-          const { r, g, b, a } = selectedPixels[iteration];
+          // Nearest-neighbor scaling
+          const srcX = Math.floor((dx * srcWidth) / dstWidth);
+          const srcY = Math.floor((dy * srcHeight) / dstHeight);
+          const srcIndex = srcY * srcWidth + srcX;
+
+          if (srcIndex >= selectedPixels.length) continue;
+          const { r, g, b, a } = selectedPixels[srcIndex];
           let hoverColor;
           if (a === 0) {
             if (destY % 2 === destX % 2)
@@ -214,20 +232,19 @@ export default function Canvas() {
             pxSize,
           );
         }
-        iteration++;
       }
     }
   }
 
   function drawResizeHandles(ctx: CanvasRenderingContext2D) {
-    if (!selectedArea) return;
+    const bounds = getEffectiveSelectionBounds();
+    if (!bounds) return;
 
     const pxSize = getPxSize();
-    const offset = selectionMoveOffset || { x: 0, y: 0 };
-    const left = (selectedArea.x + offset.x - panOffset.x) * pxSize;
-    const top = (selectedArea.y + offset.y - panOffset.y) * pxSize;
-    const w = selectedArea.width * pxSize;
-    const h = selectedArea.height * pxSize;
+    const left = (bounds.x - panOffset.x) * pxSize;
+    const top = (bounds.y - panOffset.y) * pxSize;
+    const w = bounds.width * pxSize;
+    const h = bounds.height * pxSize;
 
     RESIZE_HANDLES.forEach((handle) => {
       const hX = left + w * handle.x;
@@ -248,6 +265,22 @@ export default function Canvas() {
     return BASE_PX_SIZE * zoomLevel;
   }
 
+  function getEffectiveSelectionBounds(): Rect | null {
+    if (!selectedArea) return null;
+    const moveOff = selectionMoveOffset || { x: 0, y: 0 };
+    const resizeOff = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
+
+    const width = Math.max(1, selectedArea.width - resizeOff.w + resizeOff.e);
+    const height = Math.max(1, selectedArea.height - resizeOff.n + resizeOff.s);
+
+    return {
+      x: selectedArea.x + resizeOff.w + moveOff.x,
+      y: selectedArea.y + resizeOff.n + moveOff.y,
+      width,
+      height,
+    };
+  }
+
   function updateHoveredPixel(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ) {
@@ -263,20 +296,25 @@ export default function Canvas() {
   }
 
   function updateHoveredResizeHandle(mouseX: number, mouseY: number) {
-    if (!canvasRef.current || !selectedArea || !showSelectionPreview) {
+    if (!canvasRef.current || !showSelectionPreview) {
+      setHoveredResizeHandle(null);
+      return;
+    }
+
+    const bounds = getEffectiveSelectionBounds();
+    if (!bounds) {
       setHoveredResizeHandle(null);
       return;
     }
 
     const pxSize = getPxSize();
-    const offset = selectionMoveOffset || { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
 
     // Selection boundaries in screen pixels relative to canvas top-left
-    const left = (selectedArea.x + offset.x - panOffset.x) * pxSize;
-    const top = (selectedArea.y + offset.y - panOffset.y) * pxSize;
-    const w = selectedArea.width * pxSize;
-    const h = selectedArea.height * pxSize;
+    const left = (bounds.x - panOffset.x) * pxSize;
+    const top = (bounds.y - panOffset.y) * pxSize;
+    const w = bounds.width * pxSize;
+    const h = bounds.height * pxSize;
 
     // Actual mouse position relative to canvas top-left
     const localX = mouseX - rect.left;
@@ -315,13 +353,13 @@ export default function Canvas() {
   }
 
   function isInSelectedArea(x: number, y: number) {
-    if (!selectedArea) return false;
-    const offset = selectionMoveOffset ? selectionMoveOffset : { x: 0, y: 0 };
+    const bounds = getEffectiveSelectionBounds();
+    if (!bounds) return false;
     return (
-      x >= selectedArea.x + offset.x &&
-      y >= selectedArea.y + offset.y &&
-      x < selectedArea.x + selectedArea.width + offset.x &&
-      y < selectedArea.y + selectedArea.height + offset.y
+      x >= bounds.x &&
+      y >= bounds.y &&
+      x < bounds.x + bounds.width &&
+      y < bounds.y + bounds.height
     );
   }
 
@@ -396,9 +434,21 @@ export default function Canvas() {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+
     if (isInitialClick || !selectionStartPos) {
       if (selectionAction) return;
-      if (isInSelectedArea(x, y)) {
+      if (hoveredResizeHandle) {
+        setSelectionAction("resize");
+        setSelectionStartPos({ x, y });
+        setActiveResizeHandle(hoveredResizeHandle);
+        resizeStartOffset.current = selectionResizeOffset || {
+          n: 0,
+          e: 0,
+          s: 0,
+          w: 0,
+        };
+        return;
+      } else if (isInSelectedArea(x, y)) {
         setSelectionAction("move");
         const offset = selectionMoveOffset
           ? selectionMoveOffset
@@ -433,6 +483,49 @@ export default function Canvas() {
         x: x - selectionStartPos.x,
         y: y - selectionStartPos.y,
       });
+    } else if (selectionAction === "resize") {
+      if (!selectedArea || !activeResizeHandle) return;
+
+      const dx = x - selectionStartPos.x;
+      const dy = y - selectionStartPos.y;
+      const start = resizeStartOffset.current;
+
+      // Add delta to start offset for the appropriate edges
+      const newOffset = { ...start };
+      if (activeResizeHandle.includes("n")) newOffset.n = start.n + dy;
+      if (activeResizeHandle.includes("s")) newOffset.s = start.s + dy;
+      if (activeResizeHandle.includes("w")) newOffset.w = start.w + dx;
+      if (activeResizeHandle.includes("e")) newOffset.e = start.e + dx;
+
+      // Clamp offsets so effective size is at least 1
+      const minWidth = 1;
+      const minHeight = 1;
+
+      // For width: selectedArea.width - w + e >= minWidth
+      // For east resize: e >= minWidth - selectedArea.width + w
+      // For west resize: w <= selectedArea.width + e - minWidth
+      if (activeResizeHandle.includes("e")) {
+        const minE = minWidth - selectedArea.width + newOffset.w;
+        newOffset.e = Math.max(newOffset.e, minE);
+      }
+      if (activeResizeHandle.includes("w")) {
+        const maxW = selectedArea.width + newOffset.e - minWidth;
+        newOffset.w = Math.min(newOffset.w, maxW);
+      }
+
+      // For height: selectedArea.height - n + s >= minHeight
+      // For south resize: s >= minHeight - selectedArea.height + n
+      // For north resize: n <= selectedArea.height + s - minHeight
+      if (activeResizeHandle.includes("s")) {
+        const minS = minHeight - selectedArea.height + newOffset.n;
+        newOffset.s = Math.max(newOffset.s, minS);
+      }
+      if (activeResizeHandle.includes("n")) {
+        const maxN = selectedArea.height + newOffset.s - minHeight;
+        newOffset.n = Math.min(newOffset.n, maxN);
+      }
+
+      setSelectionResizeOffset(newOffset);
     }
   }
 
@@ -566,7 +659,7 @@ export default function Canvas() {
     }
 
     if (showSelectionPreview) {
-      drawSelectionMovePreview(ctx, !isPasting);
+      drawSelectionPreview(ctx, !isPasting);
       drawResizeHandles(ctx);
     } else if (selectedArea) {
       const { x, y, width, height } = selectedArea;
@@ -598,6 +691,7 @@ export default function Canvas() {
     panOffset,
     brushSize,
     selectionMoveOffset,
+    selectionResizeOffset,
     selectedArea,
     showSelectionPreview,
   ]);
