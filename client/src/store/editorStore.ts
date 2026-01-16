@@ -935,13 +935,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   copy: () =>
     set((state) => {
-      const { selectedArea, getPixelsInRect } = state;
+      const {
+        selectedArea,
+        selectedPixels,
+        showSelectionPreview,
+        getPixelsInRect,
+        getEffectiveSelectionBounds,
+      } = state;
       if (!selectedArea) return {};
+
+      const bounds = getEffectiveSelectionBounds() as Rect;
+      let pixelsToCopy = showSelectionPreview
+        ? selectedPixels
+        : getPixelsInRect(selectedArea);
+      if (
+        selectedArea.width !== bounds.width ||
+        selectedArea.height !== bounds.height
+      ) {
+        pixelsToCopy = resizeWithNearestNeighbor(
+          pixelsToCopy,
+          selectedArea.width,
+          selectedArea.height,
+          bounds.width,
+          bounds.height,
+        );
+      }
       return {
         clipboard: {
-          pixels: getPixelsInRect(selectedArea),
-          width: selectedArea.width,
-          height: selectedArea.height,
+          pixels: pixelsToCopy,
+          width: bounds.width,
+          height: bounds.height,
         },
       };
     }),
