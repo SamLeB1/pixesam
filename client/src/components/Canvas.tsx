@@ -94,7 +94,8 @@ export default function Canvas() {
     (!selectionAction &&
       hoveredPixel &&
       isInSelectedArea(hoveredPixel.x, hoveredPixel.y)) ||
-    selectionAction === "move";
+    selectionAction === "move" ||
+    selectionAction === "resize";
   const { zoomStepTowardsCursor, zoomStepTowardsCenter, resetZoom } =
     useCanvasZoom();
 
@@ -249,7 +250,9 @@ export default function Canvas() {
     RESIZE_HANDLES.forEach((handle) => {
       const hX = left + w * handle.x;
       const hY = top + h * handle.y;
-      const isHovered = hoveredResizeHandle === handle.name;
+      const isHovered =
+        (!selectionAction && hoveredResizeHandle === handle.name) ||
+        activeResizeHandle === handle.name;
 
       ctx.beginPath();
       ctx.arc(hX, hY, RESIZE_HANDLE_RADIUS, 0, Math.PI * 2);
@@ -752,9 +755,10 @@ export default function Canvas() {
         className="bg-white"
         style={{
           ...(showMoveCursor && { cursor: "move" }),
-          ...(hoveredResizeHandle && {
-            cursor: `${hoveredResizeHandle}-resize`,
-          }),
+          ...(!selectionAction &&
+            hoveredResizeHandle && {
+              cursor: `${hoveredResizeHandle}-resize`,
+            }),
         }}
         ref={canvasRef}
         id="canvas"
