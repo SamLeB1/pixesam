@@ -52,6 +52,7 @@ export default function Canvas() {
     setShowSelectionPreview,
     setMousePos,
     getPixelColor,
+    getEffectiveSelectionBounds,
     draw,
     erase,
     floodFill,
@@ -167,8 +168,7 @@ export default function Canvas() {
   ) {
     if (!selectedArea) return;
     const pxSize = getPxSize();
-    const bounds = getEffectiveSelectionBounds();
-    if (!bounds) return;
+    const bounds = getEffectiveSelectionBounds() as Rect;
 
     // Clear the source area
     if (clearSource) {
@@ -263,22 +263,6 @@ export default function Canvas() {
 
   function getPxSize() {
     return BASE_PX_SIZE * zoomLevel;
-  }
-
-  function getEffectiveSelectionBounds(): Rect | null {
-    if (!selectedArea) return null;
-    const moveOff = selectionMoveOffset || { x: 0, y: 0 };
-    const resizeOff = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
-
-    const width = Math.max(1, selectedArea.width - resizeOff.w + resizeOff.e);
-    const height = Math.max(1, selectedArea.height - resizeOff.n + resizeOff.s);
-
-    return {
-      x: selectedArea.x + resizeOff.w + moveOff.x,
-      y: selectedArea.y + resizeOff.n + moveOff.y,
-      width,
-      height,
-    };
   }
 
   function updateHoveredPixel(

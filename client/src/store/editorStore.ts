@@ -139,6 +139,7 @@ type EditorState = {
   selectTool: (tool: Tool) => void;
   getPixelColor: (x: number, y: number) => RGBA;
   getPixelsInRect: (rect: Rect) => RGBA[];
+  getEffectiveSelectionBounds: () => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
@@ -247,6 +248,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     }
     return pixels;
+  },
+  getEffectiveSelectionBounds: () => {
+    const { selectedArea, selectionMoveOffset, selectionResizeOffset } = get();
+    if (!selectedArea) return null;
+
+    const moveOffset = selectionMoveOffset || { x: 0, y: 0 };
+    const resizeOffset = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
+    const width = Math.max(
+      1,
+      selectedArea.width - resizeOffset.w + resizeOffset.e,
+    );
+    const height = Math.max(
+      1,
+      selectedArea.height - resizeOffset.n + resizeOffset.s,
+    );
+    return {
+      x: selectedArea.x + moveOffset.x + resizeOffset.w,
+      y: selectedArea.y + moveOffset.y + resizeOffset.n,
+      width,
+      height,
+    };
   },
   draw: (x, y, color) =>
     set((state) => {
@@ -671,6 +693,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedPixels,
         isPasting,
         getPixelsInRect,
+        getEffectiveSelectionBounds,
         initSelection,
         updateHistory,
       } = state;
@@ -683,29 +706,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         resizeOff.e !== 0 ||
         resizeOff.s !== 0 ||
         resizeOff.w !== 0;
-
       if ((!hasMoved && !hasResized && !isPasting) || !selectedArea) {
         initSelection();
         return {};
       }
 
-      // Calculate new dimensions with resize offset
-      const newWidth = Math.max(
-        1,
-        selectedArea.width - resizeOff.w + resizeOff.e,
-      );
-      const newHeight = Math.max(
-        1,
-        selectedArea.height - resizeOff.n + resizeOff.s,
-      );
-
       const newData = new Uint8ClampedArray(pixelData);
-      const newSelectedArea: Rect = {
-        x: selectedArea.x + resizeOff.w + moveOff.x,
-        y: selectedArea.y + resizeOff.n + moveOff.y,
-        width: newWidth,
-        height: newHeight,
-      };
+      const newSelectedArea = getEffectiveSelectionBounds() as Rect;
       const pixelsToApply = resizeWithNearestNeighbor(
         selectedPixels,
         selectedArea.width,
