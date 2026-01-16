@@ -31,7 +31,7 @@ import type {
 type Action =
   | DrawAction
   | BucketAction
-  | MoveAction
+  | TransformAction
   | DeleteAction
   | PasteAction
   | NewAction
@@ -50,12 +50,12 @@ type BucketAction = {
   prevPixelData: Uint8ClampedArray;
 };
 
-type MoveAction = {
-  action: "move";
-  area: Rect;
-  offset: { x: number; y: number };
-  sourcePixels: RGBA[];
-  destPixels: RGBA[];
+type TransformAction = {
+  action: "transform";
+  srcRect: Rect;
+  dstRect: Rect;
+  srcPixels: RGBA[];
+  dstPixels: RGBA[];
 };
 
 type DeleteAction = {
@@ -750,12 +750,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           true,
         );
 
-        const action: MoveAction = {
-          action: "move",
-          area: selectedArea,
-          offset: moveOff,
-          sourcePixels: selectedPixels,
-          destPixels: getPixelsInRect(newSelectedArea),
+        const action: TransformAction = {
+          action: "transform",
+          srcRect: selectedArea,
+          dstRect: newSelectedArea,
+          srcPixels: selectedPixels,
+          dstPixels: getPixelsInRect(newSelectedArea),
         };
         updateHistory(action);
       }
@@ -815,17 +815,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ pixelData: newData });
     } else if (action.action === "bucket") {
       set({ pixelData: action.prevPixelData });
-    } else if (action.action === "move") {
-      const { area, offset, sourcePixels, destPixels } = action;
+    } else if (action.action === "transform") {
+      const { srcRect, dstRect, srcPixels, dstPixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      const newArea: Rect = {
-        x: area.x + offset.x,
-        y: area.y + offset.y,
-        width: area.width,
-        height: area.height,
-      };
-      drawRectContent(newArea, destPixels, newData, gridSize, false);
-      drawRectContent(area, sourcePixels, newData, gridSize, true);
+      drawRectContent(dstRect, dstPixels, newData, gridSize, false);
+      drawRectContent(srcRect, srcPixels, newData, gridSize, true);
       set({ pixelData: newData });
     } else if (action.action === "delete") {
       const { area, pixels } = action;
@@ -885,17 +879,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "bucket") {
       const { x, y, color } = action;
       floodFill(x, y, color, false);
-    } else if (action.action === "move") {
-      const { area, offset, sourcePixels } = action;
+    } else if (action.action === "transform") {
+      const { srcRect, dstRect, srcPixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      const newArea: Rect = {
-        x: area.x + offset.x,
-        y: area.y + offset.y,
-        width: area.width,
-        height: area.height,
-      };
-      clearRectContent(area, newData, gridSize);
-      drawRectContent(newArea, sourcePixels, newData, gridSize, true);
+      const scaledPixels: RGBA[] = [];
+      for (let dstY = 0; dstY < dstRect.height; dstY++) {
+        for (let dstX = 0; dstX < dstRect.width; dstX++) {
+          const srcX = Math.floor((dstX * srcRect.width) / dstRect.width);
+          const srcY = Math.floor((dstY * srcRect.height) / dstRect.height);
+          const srcIndex = srcY * srcRect.width + srcX;
+          scaledPixels.push(srcPixels[srcIndex]);
+        }
+      }
+      clearRectContent(srcRect, newData, gridSize);
+      drawRectContent(dstRect, scaledPixels, newData, gridSize, true);
       set({ pixelData: newData });
     } else if (action.action === "delete") {
       const { area } = action;
