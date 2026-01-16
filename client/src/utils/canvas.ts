@@ -86,3 +86,22 @@ export function clearRectContent(
     }
   }
 }
+
+export function resizeWithNearestNeighbor(
+  pixels: RGBA[],
+  sw: number,
+  sh: number,
+  dw: number,
+  dh: number,
+) {
+  const newPixels: RGBA[] = [];
+  for (let dy = 0; dy < dh; dy++) {
+    for (let dx = 0; dx < dw; dx++) {
+      const sx = Math.floor((dx * sw) / dw);
+      const sy = Math.floor((dy * sh) / dh);
+      const index = sy * sw + sx;
+      newPixels.push(pixels[index]);
+    }
+  }
+  return newPixels;
+}

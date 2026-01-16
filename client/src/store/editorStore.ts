@@ -8,6 +8,7 @@ import {
   isEqualColor,
   drawRectContent,
   clearRectContent,
+  resizeWithNearestNeighbor,
 } from "../utils/canvas";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
@@ -705,24 +706,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         width: newWidth,
         height: newHeight,
       };
-
-      // Scale pixels using nearest-neighbor if dimensions changed
-      let pixelsToApply = selectedPixels;
-      if (
-        newWidth !== selectedArea.width ||
-        newHeight !== selectedArea.height
-      ) {
-        const scaledPixels: RGBA[] = [];
-        for (let dy = 0; dy < newHeight; dy++) {
-          for (let dx = 0; dx < newWidth; dx++) {
-            const srcX = Math.floor((dx * selectedArea.width) / newWidth);
-            const srcY = Math.floor((dy * selectedArea.height) / newHeight);
-            const srcIndex = srcY * selectedArea.width + srcX;
-            scaledPixels.push(selectedPixels[srcIndex]);
-          }
-        }
-        pixelsToApply = scaledPixels;
-      }
+      const pixelsToApply = resizeWithNearestNeighbor(
+        selectedPixels,
+        selectedArea.width,
+        selectedArea.height,
+        newSelectedArea.width,
+        newSelectedArea.height,
+      );
 
       if (isPasting) {
         drawRectContent(
@@ -882,17 +872,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "transform") {
       const { srcRect, dstRect, srcPixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      const scaledPixels: RGBA[] = [];
-      for (let dstY = 0; dstY < dstRect.height; dstY++) {
-        for (let dstX = 0; dstX < dstRect.width; dstX++) {
-          const srcX = Math.floor((dstX * srcRect.width) / dstRect.width);
-          const srcY = Math.floor((dstY * srcRect.height) / dstRect.height);
-          const srcIndex = srcY * srcRect.width + srcX;
-          scaledPixels.push(srcPixels[srcIndex]);
-        }
-      }
+      const pixelsToApply = resizeWithNearestNeighbor(
+        srcPixels,
+        srcRect.width,
+        srcRect.height,
+        dstRect.width,
+        dstRect.height,
+      );
       clearRectContent(srcRect, newData, gridSize);
-      drawRectContent(dstRect, scaledPixels, newData, gridSize, true);
+      drawRectContent(dstRect, pixelsToApply, newData, gridSize, true);
       set({ pixelData: newData });
     } else if (action.action === "delete") {
       const { area } = action;
