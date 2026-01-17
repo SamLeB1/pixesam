@@ -268,6 +268,23 @@ export default function Canvas() {
     return BASE_PX_SIZE * zoomLevel;
   }
 
+  function getResizeStartPos() {
+    const bounds = getEffectiveSelectionBounds();
+    if (!bounds || !hoveredResizeHandle) return null;
+
+    let x;
+    if (hoveredResizeHandle.includes("w")) x = bounds.x;
+    else if (hoveredResizeHandle.includes("e")) x = bounds.x + bounds.width - 1;
+    else x = Math.floor(bounds.x + (bounds.width - 1) / 2);
+    let y;
+    if (hoveredResizeHandle.includes("n")) y = bounds.y;
+    else if (hoveredResizeHandle.includes("s"))
+      y = bounds.y + bounds.height - 1;
+    else y = Math.floor(bounds.y + (bounds.height - 1) / 2);
+
+    return { x, y };
+  }
+
   function updateHoveredPixel(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ) {
@@ -425,8 +442,10 @@ export default function Canvas() {
     if (isInitialClick || !selectionStartPos) {
       if (selectionAction) return;
       if (hoveredResizeHandle) {
+        const resizeStartPos = getResizeStartPos();
+        if (!resizeStartPos) return;
         setSelectionAction("resize");
-        setSelectionStartPos({ x, y });
+        setSelectionStartPos(resizeStartPos);
         setActiveResizeHandle(hoveredResizeHandle);
         resizeStartOffset.current = selectionResizeOffset || {
           n: 0,
