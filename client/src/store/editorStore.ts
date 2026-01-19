@@ -113,6 +113,7 @@ type EditorState = {
   selectedPixels: RGBA[];
   showSelectionPreview: boolean;
   isPasting: boolean;
+  lassoPath: { x: number; y: number }[];
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
@@ -137,6 +138,7 @@ type EditorState = {
   setSelectedPixels: (pixels: RGBA[]) => void;
   setShowSelectionPreview: (show: boolean) => void;
   setIsPasting: (isPasting: boolean) => void;
+  setLassoPath: (path: { x: number; y: number }[]) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
   selectTool: (tool: Tool) => void;
   getPixelColor: (x: number, y: number) => RGBA;
@@ -194,6 +196,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedPixels: [],
   showSelectionPreview: false,
   isPasting: false,
+  lassoPath: [],
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
@@ -216,6 +219,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedPixels: (pixels) => set({ selectedPixels: pixels }),
   setShowSelectionPreview: (show) => set({ showSelectionPreview: show }),
   setIsPasting: (isPasting) => set({ isPasting }),
+  setLassoPath: (path) => set({ lassoPath: path }),
   setMousePos: (mousePos) => set({ mousePos }),
   selectTool: (tool) =>
     set((state) => {
@@ -660,6 +664,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedPixels: [],
       showSelectionPreview: false,
       isPasting: false,
+      lassoPath: [],
     }),
   endSelectionAction: () =>
     set((state) => {

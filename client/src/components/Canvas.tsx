@@ -30,6 +30,7 @@ export default function Canvas() {
     primaryColor,
     secondaryColor,
     brushSize,
+    selectionMode,
     selectionAction,
     selectionStartPos,
     selectionMoveOffset,
@@ -39,6 +40,7 @@ export default function Canvas() {
     selectedPixels,
     showSelectionPreview,
     isPasting,
+    lassoPath,
     setPanOffset,
     selectTool,
     setPrimaryColor,
@@ -50,6 +52,7 @@ export default function Canvas() {
     setActiveResizeHandle,
     setSelectedArea,
     setShowSelectionPreview,
+    setLassoPath,
     setMousePos,
     getPixelColor,
     getEffectiveSelectionBounds,
@@ -466,24 +469,52 @@ export default function Canvas() {
         if (showSelectionPreview) applySelectionAction();
         setSelectionAction("select");
         setSelectionStartPos({ x, y });
-        setSelectedArea(null);
         return;
       }
     }
 
     if (selectionAction === "select") {
-      const dx = x - selectionStartPos.x;
-      const dy = y - selectionStartPos.y;
-      const areaX = dx >= 0 ? selectionStartPos.x : selectionStartPos.x + dx;
-      const areaY = dy >= 0 ? selectionStartPos.y : selectionStartPos.y + dy;
-      const areaWidth = Math.abs(dx) + 1;
-      const areaHeight = Math.abs(dy) + 1;
-      setSelectedArea({
-        x: areaX,
-        y: areaY,
-        width: areaWidth,
-        height: areaHeight,
-      });
+      if (selectionMode === "rectangular") {
+        const dx = x - selectionStartPos.x;
+        const dy = y - selectionStartPos.y;
+        const areaX = dx >= 0 ? selectionStartPos.x : selectionStartPos.x + dx;
+        const areaY = dy >= 0 ? selectionStartPos.y : selectionStartPos.y + dy;
+        const areaWidth = Math.abs(dx) + 1;
+        const areaHeight = Math.abs(dy) + 1;
+        setSelectedArea({
+          x: areaX,
+          y: areaY,
+          width: areaWidth,
+          height: areaHeight,
+        });
+      } else if (selectionMode === "lasso") {
+        if (!isValidIndex(x, y, gridSize)) return;
+        const newLassoPath = [...lassoPath];
+        if (newLassoPath.length === 0) newLassoPath.push({ x, y });
+        else {
+          const last = newLassoPath[newLassoPath.length - 1];
+          if (last.x !== x || last.y !== y) newLassoPath.push({ x, y });
+          else return;
+        }
+
+        const first = newLassoPath[0];
+        const minMax = [first.x, first.y, first.x, first.y];
+        for (let i = 1; i < newLassoPath.length; i++) {
+          const p = newLassoPath[i];
+          if (p.x < minMax[0]) minMax[0] = p.x;
+          if (p.y < minMax[1]) minMax[1] = p.y;
+          if (p.x > minMax[2]) minMax[2] = p.x;
+          if (p.y > minMax[3]) minMax[3] = p.y;
+        }
+
+        setSelectedArea({
+          x: minMax[0],
+          y: minMax[1],
+          width: minMax[2] - minMax[0] + 1,
+          height: minMax[3] - minMax[1] + 1,
+        });
+        setLassoPath(newLassoPath);
+      }
     } else if (selectionAction === "move") {
       setSelectionMoveOffset({
         x: x - selectionStartPos.x,
