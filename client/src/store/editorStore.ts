@@ -10,6 +10,7 @@ import {
   clearRectContent,
   resizeWithNearestNeighbor,
 } from "../utils/canvas";
+import { interpolateBetweenPoints } from "../utils/geometry";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
@@ -169,6 +170,7 @@ type EditorState = {
   endSelectionAction: () => void;
   applySelectionAction: () => void;
   deleteSelection: () => void;
+  closeLassoPath: () => void;
   undo: () => void;
   redo: () => void;
   updateHistory: (action: Action) => void;
@@ -673,13 +675,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   endSelectionAction: () =>
     set((state) => {
-      const { selectionAction, selectedArea, getPixelsInRect } = state;
+      const { selectionAction, selectedArea, getPixelsInRect, closeLassoPath } =
+        state;
 
       if (selectionAction === "select") {
         const selectedPixels = selectedArea
           ? getPixelsInRect(selectedArea)
           : [];
         const showSelectionPreview = selectedArea ? true : false;
+        closeLassoPath();
         return {
           selectionAction: null,
           selectionStartPos: null,
@@ -803,6 +807,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       initSelection();
       return { pixelData: newData };
+    }),
+  closeLassoPath: () =>
+    set((state) => {
+      const { lassoPath } = state;
+      if (lassoPath.length < 3) return {};
+      const first = lassoPath[0];
+      const last = lassoPath[lassoPath.length - 1];
+      if (Math.abs(first.x - last.x) < 2 && Math.abs(first.y - last.y) < 2)
+        return {};
+      const points = interpolateBetweenPoints(last.x, last.y, first.x, first.y);
+      points.pop();
+      return { lassoPath: [...lassoPath, ...points] };
     }),
   undo: () => {
     const { pixelData, gridSize, undoHistory, redoHistory, initSelection } =
