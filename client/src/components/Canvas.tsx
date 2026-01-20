@@ -8,6 +8,7 @@ import type { Direction, Rect } from "../types";
 
 const lightCheckerboardColor = "#ffffff";
 const darkCheckerboardColor = "#e5e5e5";
+const FILTER_STRENGTH = 25;
 const RESIZE_HANDLES: { name: Direction; x: number; y: number }[] = [
   { name: "nw", x: 0, y: 0 },
   { name: "n", x: 0.5, y: 0 },
@@ -146,13 +147,13 @@ export default function Canvas() {
           if (a === 0) {
             if (pixelY % 2 === pixelX % 2)
               hoverColor = tinycolor(darkCheckerboardColor)
-                .darken(15)
+                .darken(FILTER_STRENGTH)
                 .toHexString();
             else
               hoverColor = tinycolor(lightCheckerboardColor)
-                .darken(15)
+                .darken(FILTER_STRENGTH)
                 .toHexString();
-          } else hoverColor = getHoverColor(r, g, b, a);
+          } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
 
           ctx.fillStyle = hoverColor;
           ctx.fillRect(
@@ -164,6 +165,43 @@ export default function Canvas() {
         }
       }
     }
+  }
+
+  function drawLassoPath(ctx: CanvasRenderingContext2D) {
+    const pxSize = getPxSize();
+    for (let i = 0; i < lassoPath.length; i++) {
+      const { x, y } = lassoPath[i];
+      if (!isValidIndex(x, y, gridSize)) continue;
+
+      const { r, g, b, a } = getPixelColor(x, y);
+      let hoverColor;
+      if (a === 0) {
+        if (y % 2 === x % 2)
+          hoverColor = tinycolor(darkCheckerboardColor)
+            .darken(FILTER_STRENGTH)
+            .toHexString();
+        else
+          hoverColor = tinycolor(lightCheckerboardColor)
+            .darken(FILTER_STRENGTH)
+            .toHexString();
+      } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
+
+      ctx.fillStyle = hoverColor;
+      ctx.fillRect(
+        (x - panOffset.x) * pxSize,
+        (y - panOffset.y) * pxSize,
+        pxSize,
+        pxSize,
+      );
+    }
+  }
+
+  function drawSelectionDrag(ctx: CanvasRenderingContext2D) {
+    if (!selectedArea) return;
+    const { x, y, width, height } = selectedArea;
+    if (selectionMode === "rectangular")
+      drawFilterRect(ctx, x, y, width, height);
+    else if (selectionMode === "lasso") drawLassoPath(ctx);
   }
 
   function drawSelectionPreview(
@@ -220,13 +258,13 @@ export default function Canvas() {
           if (a === 0) {
             if (destY % 2 === destX % 2)
               hoverColor = tinycolor(darkCheckerboardColor)
-                .darken(15)
+                .darken(FILTER_STRENGTH)
                 .toHexString();
             else
               hoverColor = tinycolor(lightCheckerboardColor)
-                .darken(15)
+                .darken(FILTER_STRENGTH)
                 .toHexString();
-          } else hoverColor = getHoverColor(r, g, b, a);
+          } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
 
           ctx.fillStyle = hoverColor;
           ctx.fillRect(
@@ -350,12 +388,18 @@ export default function Canvas() {
     setMousePos({ x, y });
   }
 
-  function getHoverColor(r: number, g: number, b: number, a: number) {
+  function getHoverColor(
+    r: number,
+    g: number,
+    b: number,
+    a: number,
+    strength = 25,
+  ) {
     const originalColor = tinycolor({ r, g, b, a: a / 255 });
     const hoverColor =
       originalColor.getLuminance() < 0.5
-        ? originalColor.lighten(15)
-        : originalColor.darken(15);
+        ? originalColor.lighten(strength)
+        : originalColor.darken(strength);
     return hoverColor.toHexString();
   }
 
@@ -698,9 +742,8 @@ export default function Canvas() {
     if (showSelectionPreview) {
       drawSelectionPreview(ctx, !isPasting);
       drawResizeHandles(ctx);
-    } else if (selectedArea) {
-      const { x, y, width, height } = selectedArea;
-      drawFilterRect(ctx, x, y, width, height);
+    } else if (selectionAction === "select") {
+      drawSelectionDrag(ctx);
     } else if (hoveredPixel) {
       const offset = -Math.floor(brushSize / 2);
       const x = hoveredPixel.x + offset;
@@ -731,6 +774,7 @@ export default function Canvas() {
     selectionResizeOffset,
     selectedArea,
     showSelectionPreview,
+    lassoPath,
   ]);
 
   useEffect(() => {
