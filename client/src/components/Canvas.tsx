@@ -3,6 +3,7 @@ import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import { isValidIndex } from "../utils/canvas";
+import { interpolateBetweenPoints } from "../utils/geometry";
 import { BASE_PX_SIZE } from "../constants";
 import type { Direction, Rect } from "../types";
 
@@ -538,30 +539,7 @@ export default function Canvas() {
         else {
           const last = newLassoPath[newLassoPath.length - 1];
           if (last.x === x && last.y === y) return;
-          // Bresenham's line algorithm to fill gaps
-          let x0 = last.x,
-            y0 = last.y;
-          const x1 = x,
-            y1 = y;
-          const dx = Math.abs(x1 - x0);
-          const dy = -Math.abs(y1 - y0);
-          const sx = x0 < x1 ? 1 : -1;
-          const sy = y0 < y1 ? 1 : -1;
-          let err = dx + dy;
-          while (true) {
-            if (x0 === x1 && y0 === y1) break;
-            const e2 = 2 * err;
-            if (e2 >= dy) {
-              err += dy;
-              x0 += sx;
-            }
-            if (e2 <= dx) {
-              err += dx;
-              y0 += sy;
-            }
-            if (isValidIndex(x0, y0, gridSize))
-              newLassoPath.push({ x: x0, y: y0 });
-          }
+          newLassoPath.push(...interpolateBetweenPoints(last.x, last.y, x, y));
         }
 
         const first = newLassoPath[0];

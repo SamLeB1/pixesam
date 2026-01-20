@@ -104,6 +104,7 @@ type EditorState = {
   secondaryColor: string;
   brushSize: number;
   selectionMode: "rectangular" | "lasso";
+  selectionMask: Uint8Array | null;
   selectionAction: "select" | "move" | "resize" | null;
   selectionStartPos: { x: number; y: number } | null;
   selectionMoveOffset: { x: number; y: number } | null;
@@ -127,6 +128,7 @@ type EditorState = {
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
   setSelectionMode: (mode: "rectangular" | "lasso") => void;
+  setSelectionMask: (mask: Uint8Array | null) => void;
   setSelectionAction: (action: "select" | "move" | "resize" | null) => void;
   setSelectionStartPos: (pos: { x: number; y: number } | null) => void;
   setSelectionMoveOffset: (offset: { x: number; y: number } | null) => void;
@@ -187,6 +189,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   secondaryColor: "#ffffff",
   brushSize: 1,
   selectionMode: "rectangular",
+  selectionMask: null,
   selectionAction: null,
   selectionStartPos: null,
   selectionMoveOffset: null,
@@ -210,6 +213,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setBrushSize: (n) => set({ brushSize: n }),
   setSelectionMode: (mode) => set({ selectionMode: mode }),
+  setSelectionMask: (mask) => set({ selectionMask: mask }),
   setSelectionAction: (action) => set({ selectionAction: action }),
   setSelectionStartPos: (pos) => set({ selectionStartPos: pos }),
   setSelectionMoveOffset: (offset) => set({ selectionMoveOffset: offset }),
@@ -655,6 +659,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   initSelection: () =>
     set({
+      selectionMask: null,
       selectionAction: null,
       selectionStartPos: null,
       selectionMoveOffset: null,
