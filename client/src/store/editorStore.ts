@@ -10,7 +10,7 @@ import {
   clearRectContent,
   resizeWithNearestNeighbor,
 } from "../utils/canvas";
-import { interpolateBetweenPoints } from "../utils/geometry";
+import { interpolateBetweenPoints, isInPolygon } from "../utils/geometry";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
@@ -170,6 +170,7 @@ type EditorState = {
   endSelectionAction: () => void;
   applySelectionAction: () => void;
   deleteSelection: () => void;
+  generateSelectionMask: () => Uint8Array | null;
   closeLassoPath: () => void;
   undo: () => void;
   redo: () => void;
@@ -675,21 +676,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   endSelectionAction: () =>
     set((state) => {
-      const { selectionAction, selectedArea, getPixelsInRect, closeLassoPath } =
-        state;
+      const {
+        selectionMode,
+        selectionAction,
+        selectedArea,
+        getPixelsInRect,
+        initSelection,
+        generateSelectionMask,
+        closeLassoPath,
+      } = state;
 
       if (selectionAction === "select") {
-        const selectedPixels = selectedArea
-          ? getPixelsInRect(selectedArea)
-          : [];
-        const showSelectionPreview = selectedArea ? true : false;
-        closeLassoPath();
-        return {
-          selectionAction: null,
-          selectionStartPos: null,
-          selectedPixels,
-          showSelectionPreview,
-        };
+        if (selectedArea) {
+          if (selectionMode === "lasso") closeLassoPath();
+          const mask = generateSelectionMask();
+          return {
+            selectionMask: mask,
+            selectionAction: null,
+            selectionStartPos: null,
+            selectedPixels: getPixelsInRect(selectedArea),
+            showSelectionPreview: true,
+          };
+        } else {
+          initSelection();
+          return {};
+        }
       } else if (selectionAction === "move") {
         return { selectionAction: null, selectionStartPos: null };
       } else if (selectionAction === "resize") {
@@ -808,6 +819,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       initSelection();
       return { pixelData: newData };
     }),
+  generateSelectionMask: () => {
+    const { selectionMode, selectedArea, lassoPath } = get();
+    if (!selectedArea) return null;
+    if (selectionMode === "lasso") {
+      const mask = new Uint8Array(selectedArea.width * selectedArea.height);
+      for (let i = 0; i < selectedArea.height; i++) {
+        for (let j = 0; j < selectedArea.width; j++) {
+          const x = selectedArea.x + j;
+          const y = selectedArea.y + i;
+          if (isInPolygon(x, y, lassoPath)) {
+            const index = i * selectedArea.width + j;
+            if (index >= mask.length) continue;
+            mask[index] = 1;
+          }
+        }
+      }
+      return mask;
+    } else return null;
+  },
   closeLassoPath: () =>
     set((state) => {
       const { lassoPath } = state;
