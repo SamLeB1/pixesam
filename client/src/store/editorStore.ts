@@ -145,7 +145,7 @@ type EditorState = {
   setMousePos: (mousePos: { x: number; y: number }) => void;
   selectTool: (tool: Tool) => void;
   getPixelColor: (x: number, y: number) => RGBA;
-  getPixelsInRect: (rect: Rect) => RGBA[];
+  getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
   erase: (x: number, y: number) => void;
@@ -251,15 +251,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       a: pixelData[baseIndex + 3],
     };
   },
-  getPixelsInRect: (rect) => {
+  getPixelsInRect: (rect, mask = null) => {
     const { gridSize, getPixelColor } = get();
     const pixels: RGBA[] = [];
-    for (let i = 0; i < rect.height; i++) {
-      for (let j = 0; j < rect.width; j++) {
-        const pixelX = rect.x + j;
-        const pixelY = rect.y + i;
-        if (isValidIndex(pixelX, pixelY, gridSize))
-          pixels.push(getPixelColor(pixelX, pixelY));
+    if (mask) {
+      for (let i = 0; i < rect.height; i++) {
+        for (let j = 0; j < rect.width; j++) {
+          const pixelX = rect.x + j;
+          const pixelY = rect.y + i;
+          if (isValidIndex(pixelX, pixelY, gridSize)) {
+            const baseIndex = i * rect.width + j;
+            if (baseIndex >= mask.length) continue;
+            if (mask[baseIndex]) pixels.push(getPixelColor(pixelX, pixelY));
+            else pixels.push({ r: 0, g: 0, b: 0, a: 0 });
+          }
+        }
+      }
+    } else {
+      for (let i = 0; i < rect.height; i++) {
+        for (let j = 0; j < rect.width; j++) {
+          const pixelX = rect.x + j;
+          const pixelY = rect.y + i;
+          if (isValidIndex(pixelX, pixelY, gridSize))
+            pixels.push(getPixelColor(pixelX, pixelY));
+        }
       }
     }
     return pixels;
@@ -694,7 +709,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             selectionMask: mask,
             selectionAction: null,
             selectionStartPos: null,
-            selectedPixels: getPixelsInRect(selectedArea),
+            selectedPixels: getPixelsInRect(selectedArea, mask),
             showSelectionPreview: true,
           };
         } else {

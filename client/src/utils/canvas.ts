@@ -55,19 +55,37 @@ export function drawRectContent(
   pixels: RGBA[],
   data: Uint8ClampedArray,
   dataSize: { x: number; y: number },
-  full = true,
+  full: boolean,
+  mask: Uint8Array | null = null,
 ) {
   let currPixelIndex = 0;
-  for (let i = 0; i < rect.height; i++) {
-    for (let j = 0; j < rect.width; j++) {
-      const px = rect.x + j;
-      const py = rect.y + i;
-      if (isValidIndex(px, py, dataSize)) {
-        if (currPixelIndex >= pixels.length) return;
-        setPixelColor(px, py, dataSize.x, pixels[currPixelIndex], data);
-        if (!full) currPixelIndex++;
+  if (mask) {
+    for (let i = 0; i < rect.height; i++) {
+      for (let j = 0; j < rect.width; j++) {
+        const px = rect.x + j;
+        const py = rect.y + i;
+        if (isValidIndex(px, py, dataSize)) {
+          if (currPixelIndex >= pixels.length) return;
+          const baseIndex = i * rect.width + j;
+          if (baseIndex < mask.length && mask[baseIndex])
+            setPixelColor(px, py, dataSize.x, pixels[currPixelIndex], data);
+          if (!full) currPixelIndex++;
+        }
+        if (full) currPixelIndex++;
       }
-      if (full) currPixelIndex++;
+    }
+  } else {
+    for (let i = 0; i < rect.height; i++) {
+      for (let j = 0; j < rect.width; j++) {
+        const px = rect.x + j;
+        const py = rect.y + i;
+        if (isValidIndex(px, py, dataSize)) {
+          if (currPixelIndex >= pixels.length) return;
+          setPixelColor(px, py, dataSize.x, pixels[currPixelIndex], data);
+          if (!full) currPixelIndex++;
+        }
+        if (full) currPixelIndex++;
+      }
     }
   }
 }
@@ -76,13 +94,28 @@ export function clearRectContent(
   rect: Rect,
   data: Uint8ClampedArray,
   dataSize: { x: number; y: number },
+  mask: Uint8Array | null = null,
 ) {
-  for (let i = 0; i < rect.height; i++) {
-    for (let j = 0; j < rect.width; j++) {
-      const px = rect.x + j;
-      const py = rect.y + i;
-      if (isValidIndex(px, py, dataSize))
-        setPixelColor(px, py, dataSize.x, { r: 0, g: 0, b: 0, a: 0 }, data);
+  if (mask) {
+    for (let i = 0; i < rect.height; i++) {
+      for (let j = 0; j < rect.width; j++) {
+        const px = rect.x + j;
+        const py = rect.y + i;
+        if (isValidIndex(px, py, dataSize)) {
+          const baseIndex = i * rect.width + j;
+          if (baseIndex < mask.length && mask[baseIndex])
+            setPixelColor(px, py, dataSize.x, { r: 0, g: 0, b: 0, a: 0 }, data);
+        }
+      }
+    }
+  } else {
+    for (let i = 0; i < rect.height; i++) {
+      for (let j = 0; j < rect.width; j++) {
+        const px = rect.x + j;
+        const py = rect.y + i;
+        if (isValidIndex(px, py, dataSize))
+          setPixelColor(px, py, dataSize.x, { r: 0, g: 0, b: 0, a: 0 }, data);
+      }
     }
   }
 }
