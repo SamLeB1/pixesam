@@ -8,7 +8,7 @@ import {
   isEqualColor,
   drawRectContent,
   clearRectContent,
-  resizeWithNearestNeighbor,
+  resizePixelsWithNearestNeighbor,
 } from "../utils/canvas";
 import { interpolateBetweenPoints, isInPolygon } from "../utils/geometry";
 import { isValidPxsmData } from "../utils/pxsmValidator";
@@ -757,7 +757,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const newData = new Uint8ClampedArray(pixelData);
       const newSelectedArea = getEffectiveSelectionBounds() as Rect;
-      const pixelsToApply = resizeWithNearestNeighbor(
+      const pixelsToApply = resizePixelsWithNearestNeighbor(
         selectedPixels,
         selectedArea.width,
         selectedArea.height,
@@ -954,7 +954,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "transform") {
       const { srcRect, dstRect, srcPixels } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      const pixelsToApply = resizeWithNearestNeighbor(
+      const pixelsToApply = resizePixelsWithNearestNeighbor(
         srcPixels,
         srcRect.width,
         srcRect.height,
@@ -1027,7 +1027,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedArea.width !== bounds.width ||
         selectedArea.height !== bounds.height
       ) {
-        pixelsToCopy = resizeWithNearestNeighbor(
+        pixelsToCopy = resizePixelsWithNearestNeighbor(
           pixelsToCopy,
           selectedArea.width,
           selectedArea.height,

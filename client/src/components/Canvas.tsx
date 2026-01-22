@@ -33,6 +33,7 @@ export default function Canvas() {
     secondaryColor,
     brushSize,
     selectionMode,
+    selectionMask,
     selectionAction,
     selectionStartPos,
     selectionMoveOffset,
@@ -217,9 +218,16 @@ export default function Canvas() {
     if (clearSource) {
       for (let i = 0; i < selectedArea.height; i++) {
         for (let j = 0; j < selectedArea.width; j++) {
+          const baseIndex = i * selectedArea.width + j;
+          if (
+            selectionMask &&
+            baseIndex < selectionMask.length &&
+            !selectionMask[baseIndex]
+          )
+            continue;
+
           const sourceX = selectedArea.x + j;
           const sourceY = selectedArea.y + i;
-
           if (isValidIndex(sourceX, sourceY, gridSize)) {
             ctx.fillStyle =
               sourceY % 2 === sourceX % 2
@@ -252,8 +260,14 @@ export default function Canvas() {
           const srcX = Math.floor((dx * srcWidth) / dstWidth);
           const srcY = Math.floor((dy * srcHeight) / dstHeight);
           const srcIndex = srcY * srcWidth + srcX;
-
+          if (
+            selectionMask &&
+            srcIndex < selectionMask.length &&
+            !selectionMask[srcIndex]
+          )
+            continue;
           if (srcIndex >= selectedPixels.length) continue;
+
           const { r, g, b, a } = selectedPixels[srcIndex];
           let hoverColor;
           if (a === 0) {

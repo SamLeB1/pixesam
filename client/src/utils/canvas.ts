@@ -120,7 +120,7 @@ export function clearRectContent(
   }
 }
 
-export function resizeWithNearestNeighbor(
+export function resizePixelsWithNearestNeighbor(
   pixels: RGBA[],
   sw: number,
   sh: number,
@@ -137,4 +137,24 @@ export function resizeWithNearestNeighbor(
     }
   }
   return newPixels;
+}
+
+export function resizeMaskWithNearestNeighbor(
+  mask: Uint8Array,
+  sw: number,
+  sh: number,
+  dw: number,
+  dh: number,
+) {
+  const newMask = new Uint8Array(dw * dh);
+  for (let dy = 0; dy < dh; dy++) {
+    for (let dx = 0; dx < dw; dx++) {
+      const sx = Math.floor((dx * sw) / dw);
+      const sy = Math.floor((dy * sh) / dh);
+      const si = sy * sw + sx;
+      const di = dy * dw + dx;
+      newMask[di] = mask[si];
+    }
+  }
+  return newMask;
 }
