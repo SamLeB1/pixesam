@@ -123,6 +123,7 @@ type EditorState = {
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
+  drawnPixels: Set<string>;
   lastDrawPos: { x: number; y: number } | null;
   mousePos: { x: number; y: number };
   clipboard: Clipboard | null;
@@ -211,6 +212,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
+  drawnPixels: new Set(),
   lastDrawPos: null,
   mousePos: { x: 0, y: 0 },
   clipboard: null,
@@ -313,12 +315,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         gridSize,
         brushSize,
         drawBuffer,
+        drawnPixels,
         lastDrawPos,
         getPixelColor,
       } = state;
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
       const newData = new Uint8ClampedArray(pixelData);
       const newDrawBuffer = [...drawBuffer];
+      const newDrawnPixels = new Set(drawnPixels);
       const offset = -Math.floor(brushSize / 2);
 
       const pointsToDraw = lastDrawPos
@@ -329,21 +333,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           for (let j = 0; j < brushSize; j++) {
             const pixelX = point.x + j + offset;
             const pixelY = point.y + i + offset;
-            if (isValidIndex(pixelX, pixelY, gridSize)) {
-              newDrawBuffer.unshift({
-                x: pixelX,
-                y: pixelY,
-                color,
-                prevColor: getPixelColor(pixelX, pixelY),
-              });
-              setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
-            }
+            if (!isValidIndex(pixelX, pixelY, gridSize)) continue;
+            const key = `${pixelX},${pixelY}`;
+            if (newDrawnPixels.has(key)) continue;
+            newDrawnPixels.add(key);
+            newDrawBuffer.push({
+              x: pixelX,
+              y: pixelY,
+              color,
+              prevColor: getPixelColor(pixelX, pixelY),
+            });
+            setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
         }
       }
       return {
         pixelData: newData,
         drawBuffer: newDrawBuffer,
+        drawnPixels: newDrawnPixels,
         lastDrawPos: { x, y },
       };
     }),
@@ -1056,13 +1063,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clearDrawBuffer: () =>
     set((state) => {
       const { drawBuffer, updateHistory } = state;
-      if (drawBuffer.length === 0) return { lastDrawPos: null };
+      if (drawBuffer.length === 0)
+        return { drawnPixels: new Set(), lastDrawPos: null };
       const action: DrawAction = {
         action: "draw",
         pixels: drawBuffer,
       };
       updateHistory(action);
-      return { drawBuffer: [], lastDrawPos: null };
+      return { drawBuffer: [], drawnPixels: new Set(), lastDrawPos: null };
     }),
   copy: () =>
     set((state) => {
