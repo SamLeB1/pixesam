@@ -54,7 +54,6 @@ export default function Canvas() {
     setSelectionResizeOffset,
     setActiveResizeHandle,
     setSelectedArea,
-    setShowSelectionPreview,
     setLassoPath,
     setMousePos,
     getPixelColor,
@@ -522,7 +521,6 @@ export default function Canvas() {
           ? selectionMoveOffset
           : { x: 0, y: 0 };
         setSelectionStartPos({ x: x - offset.x, y: y - offset.y });
-        setShowSelectionPreview(true);
         return;
       } else {
         if (showSelectionPreview) applySelectionAction();

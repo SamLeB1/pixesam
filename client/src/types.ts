@@ -29,6 +29,7 @@ export type Clipboard = {
   pixels: RGBA[];
   width: number;
   height: number;
+  mask: Uint8Array | null;
 };
 
 export type PxsmData = {

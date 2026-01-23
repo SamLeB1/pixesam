@@ -9,6 +9,7 @@ import {
   drawRectContent,
   clearRectContent,
   resizePixelsWithNearestNeighbor,
+  resizeMaskWithNearestNeighbor,
 } from "../utils/canvas";
 import { interpolateBetweenPoints, isInPolygon } from "../utils/geometry";
 import { isValidPxsmData } from "../utils/pxsmValidator";
@@ -58,12 +59,14 @@ type TransformAction = {
   dstRect: Rect;
   srcPixels: RGBA[];
   dstPixels: RGBA[];
+  mask: Uint8Array | null;
 };
 
 type DeleteAction = {
   action: "delete";
   area: Rect;
   pixels: RGBA[];
+  mask: Uint8Array | null;
 };
 
 type PasteAction = {
@@ -71,6 +74,7 @@ type PasteAction = {
   area: Rect;
   pixels: RGBA[];
   prevPixels: RGBA[];
+  mask: Uint8Array | null;
 };
 
 type NewAction = {
@@ -731,6 +735,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const {
         pixelData,
         gridSize,
+        selectionMask,
         selectionMoveOffset,
         selectionResizeOffset,
         selectedArea,
@@ -757,6 +762,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const newData = new Uint8ClampedArray(pixelData);
       const newSelectedArea = getEffectiveSelectionBounds() as Rect;
+      const newMask = selectionMask
+        ? resizeMaskWithNearestNeighbor(
+            selectionMask,
+            selectedArea.width,
+            selectedArea.height,
+            newSelectedArea.width,
+            newSelectedArea.height,
+          )
+        : null;
       const pixelsToApply = resizePixelsWithNearestNeighbor(
         selectedPixels,
         selectedArea.width,
@@ -772,23 +786,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           newData,
           gridSize,
           true,
+          newMask,
         );
 
         const action: PasteAction = {
           action: "paste",
           area: newSelectedArea,
           pixels: pixelsToApply,
-          prevPixels: getPixelsInRect(newSelectedArea),
+          prevPixels: getPixelsInRect(newSelectedArea, newMask),
+          mask: newMask,
         };
         updateHistory(action);
       } else {
-        clearRectContent(selectedArea, newData, gridSize);
+        clearRectContent(selectedArea, newData, gridSize, selectionMask);
         drawRectContent(
           newSelectedArea,
           pixelsToApply,
           newData,
           gridSize,
           true,
+          newMask,
         );
 
         const action: TransformAction = {
@@ -796,7 +813,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           srcRect: selectedArea,
           dstRect: newSelectedArea,
           srcPixels: selectedPixels,
-          dstPixels: getPixelsInRect(newSelectedArea),
+          dstPixels: getPixelsInRect(newSelectedArea, newMask),
+          mask: selectionMask,
         };
         updateHistory(action);
       }
@@ -809,6 +827,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const {
         pixelData,
         gridSize,
+        selectionMask,
         selectedArea,
         isPasting,
         getPixelsInRect,
@@ -822,12 +841,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       const newData = new Uint8ClampedArray(pixelData);
-      clearRectContent(selectedArea, newData, gridSize);
+      clearRectContent(selectedArea, newData, gridSize, selectionMask);
 
       const action: DeleteAction = {
         action: "delete",
         area: selectedArea,
-        pixels: getPixelsInRect(selectedArea),
+        pixels: getPixelsInRect(selectedArea, selectionMask),
+        mask: selectionMask,
       };
       updateHistory(action);
 
@@ -888,20 +908,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "bucket") {
       set({ pixelData: action.prevPixelData });
     } else if (action.action === "transform") {
-      const { srcRect, dstRect, srcPixels, dstPixels } = action;
+      const { srcRect, dstRect, srcPixels, dstPixels, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      drawRectContent(dstRect, dstPixels, newData, gridSize, false);
-      drawRectContent(srcRect, srcPixels, newData, gridSize, true);
+      const newMask = mask
+        ? resizeMaskWithNearestNeighbor(
+            mask,
+            srcRect.width,
+            srcRect.height,
+            dstRect.width,
+            dstRect.height,
+          )
+        : null;
+      drawRectContent(dstRect, dstPixels, newData, gridSize, false, newMask);
+      drawRectContent(srcRect, srcPixels, newData, gridSize, true, mask);
       set({ pixelData: newData });
     } else if (action.action === "delete") {
-      const { area, pixels } = action;
+      const { area, pixels, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      drawRectContent(area, pixels, newData, gridSize, false);
+      drawRectContent(area, pixels, newData, gridSize, true, mask);
       set({ pixelData: newData });
     } else if (action.action === "paste") {
-      const { area, prevPixels } = action;
+      const { area, prevPixels, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      drawRectContent(area, prevPixels, newData, gridSize, false);
+      drawRectContent(area, prevPixels, newData, gridSize, false, mask);
       set({ pixelData: newData });
     } else if (action.action === "new") {
       const { prevPixelData, prevGridSize } = action;
@@ -952,8 +981,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const { x, y, color } = action;
       floodFill(x, y, color, false);
     } else if (action.action === "transform") {
-      const { srcRect, dstRect, srcPixels } = action;
+      const { srcRect, dstRect, srcPixels, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
+      const newMask = mask
+        ? resizeMaskWithNearestNeighbor(
+            mask,
+            srcRect.width,
+            srcRect.height,
+            dstRect.width,
+            dstRect.height,
+          )
+        : null;
       const pixelsToApply = resizePixelsWithNearestNeighbor(
         srcPixels,
         srcRect.width,
@@ -961,18 +999,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         dstRect.width,
         dstRect.height,
       );
-      clearRectContent(srcRect, newData, gridSize);
-      drawRectContent(dstRect, pixelsToApply, newData, gridSize, true);
+      clearRectContent(srcRect, newData, gridSize, mask);
+      drawRectContent(dstRect, pixelsToApply, newData, gridSize, true, newMask);
       set({ pixelData: newData });
     } else if (action.action === "delete") {
-      const { area } = action;
+      const { area, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      clearRectContent(area, newData, gridSize);
+      clearRectContent(area, newData, gridSize, mask);
       set({ pixelData: newData });
     } else if (action.action === "paste") {
-      const { area, pixels } = action;
+      const { area, pixels, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
-      drawRectContent(area, pixels, newData, gridSize, true);
+      drawRectContent(area, pixels, newData, gridSize, true, mask);
       set({ pixelData: newData });
     } else if (action.action === "new") {
       const { pixelData, gridSize } = action;
@@ -1011,6 +1049,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   copy: () =>
     set((state) => {
       const {
+        selectionMask,
         selectedArea,
         selectedPixels,
         showSelectionPreview,
@@ -1020,6 +1059,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!selectedArea) return {};
 
       const bounds = getEffectiveSelectionBounds() as Rect;
+      let newMask = selectionMask;
       let pixelsToCopy = showSelectionPreview
         ? selectedPixels
         : getPixelsInRect(selectedArea);
@@ -1027,6 +1067,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedArea.width !== bounds.width ||
         selectedArea.height !== bounds.height
       ) {
+        if (newMask)
+          newMask = resizeMaskWithNearestNeighbor(
+            newMask,
+            selectedArea.width,
+            selectedArea.height,
+            bounds.width,
+            bounds.height,
+          );
         pixelsToCopy = resizePixelsWithNearestNeighbor(
           pixelsToCopy,
           selectedArea.width,
@@ -1040,6 +1088,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           pixels: pixelsToCopy,
           width: bounds.width,
           height: bounds.height,
+          mask: newMask,
         },
       };
     }),
@@ -1061,7 +1110,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {};
       }
 
-      const { pixels, width, height } = clipboard;
+      const { pixels, width, height, mask } = clipboard;
       const clipboardX = Math.max(
         0,
         Math.min(gridSize.x - width, mousePos.x - Math.floor(width / 2)),
@@ -1080,6 +1129,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       initSelection();
       return {
         selectedTool: "select",
+        selectionMask: mask,
         selectedArea: newSelectedArea,
         selectedPixels: pixels,
         showSelectionPreview: true,
