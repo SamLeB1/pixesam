@@ -64,6 +64,7 @@ export default function Canvas() {
     endSelectionAction,
     applySelectionAction,
     deleteSelection,
+    performWandSelection,
     undo,
     redo,
     clearDrawBuffer,
@@ -524,8 +525,12 @@ export default function Canvas() {
         return;
       } else {
         if (showSelectionPreview) applySelectionAction();
-        setSelectionAction("select");
-        setSelectionStartPos({ x, y });
+
+        if (selectionMode === "wand") performWandSelection(x, y);
+        else {
+          setSelectionAction("select");
+          setSelectionStartPos({ x, y });
+        }
         return;
       }
     }

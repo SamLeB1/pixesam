@@ -176,6 +176,7 @@ type EditorState = {
   endSelectionAction: () => void;
   applySelectionAction: () => void;
   deleteSelection: () => void;
+  performWandSelection: (x: number, y: number) => void;
   generateSelectionMask: () => Uint8Array | null;
   closeLassoPath: () => void;
   undo: () => void;
@@ -878,6 +879,67 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       initSelection();
       return { pixelData: newData };
+    }),
+  performWandSelection: (x, y) =>
+    set((state) => {
+      const { gridSize, getPixelColor, getPixelsInRect } = state;
+      if (!isValidIndex(x, y, gridSize)) return {};
+
+      const targetColor = getPixelColor(x, y);
+      const visited = new Set<string>();
+      const selectedCoords: { x: number; y: number }[] = [];
+      const queue: { x: number; y: number }[] = [{ x, y }];
+
+      let minX = x,
+        maxX = x,
+        minY = y,
+        maxY = y;
+
+      while (queue.length > 0) {
+        const { x: cx, y: cy } = queue.shift()!;
+        const key = `${cx},${cy}`;
+
+        if (visited.has(key)) continue;
+        if (!isValidIndex(cx, cy, gridSize)) continue;
+
+        const currentColor = getPixelColor(cx, cy);
+        if (!isEqualColor(currentColor, targetColor)) continue;
+
+        visited.add(key);
+        selectedCoords.push({ x: cx, y: cy });
+
+        if (cx < minX) minX = cx;
+        if (cx > maxX) maxX = cx;
+        if (cy < minY) minY = cy;
+        if (cy > maxY) maxY = cy;
+
+        queue.push({ x: cx + 1, y: cy });
+        queue.push({ x: cx - 1, y: cy });
+        queue.push({ x: cx, y: cy + 1 });
+        queue.push({ x: cx, y: cy - 1 });
+      }
+
+      if (selectedCoords.length === 0) return {};
+
+      const width = maxX - minX + 1;
+      const height = maxY - minY + 1;
+      const selectedArea: Rect = { x: minX, y: minY, width, height };
+
+      // Generate mask
+      const mask = new Uint8Array(width * height);
+      for (const { x: px, y: py } of selectedCoords) {
+        const index = (py - minY) * width + (px - minX);
+        mask[index] = 1;
+      }
+
+      return {
+        selectionMask: mask,
+        selectionAction: null,
+        selectionStartPos: null,
+        selectedArea,
+        selectedPixels: getPixelsInRect(selectedArea, mask),
+        showSelectionPreview: true,
+      };
     }),
   generateSelectionMask: () => {
     const { selectionMode, selectedArea, lassoPath } = get();
