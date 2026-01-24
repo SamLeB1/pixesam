@@ -108,7 +108,7 @@ type EditorState = {
   primaryColor: string;
   secondaryColor: string;
   brushSize: number;
-  selectionMode: "rectangular" | "lasso";
+  selectionMode: "rectangular" | "lasso" | "wand";
   selectionMask: Uint8Array | null;
   selectionAction: "select" | "move" | "resize" | null;
   selectionStartPos: { x: number; y: number } | null;
@@ -134,7 +134,7 @@ type EditorState = {
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
-  setSelectionMode: (mode: "rectangular" | "lasso") => void;
+  setSelectionMode: (mode: "rectangular" | "lasso" | "wand") => void;
   setSelectionMask: (mask: Uint8Array | null) => void;
   setSelectionAction: (action: "select" | "move" | "resize" | null) => void;
   setSelectionStartPos: (pos: { x: number; y: number } | null) => void;
