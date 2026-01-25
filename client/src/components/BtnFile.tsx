@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useEditorStore } from "../store/editorStore";
+import useClickOutside from "../hooks/useClickOutside";
 import ModalNew from "./ModalNew";
 import ModalResize from "./ModalResize";
 import ModalExportToImage from "./ModalExportToImage";
@@ -9,9 +10,11 @@ import type { PxsmData } from "../types";
 export default function BtnFile() {
   const { clearCanvas, importFromPxsm, importImage, exportToPxsm } =
     useEditorStore();
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const pxsmFileInputRef = useRef<HTMLInputElement>(null);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  useClickOutside(dropdownRef, () => setIsOpen(false));
 
   function handlePxsmFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -81,98 +84,102 @@ export default function BtnFile() {
   }
 
   return (
-    <div>
-      <button
-        className={`${isOpen && "bg-gray-600"} cursor-pointer p-2 hover:bg-gray-600`}
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        File
-      </button>
-      {isOpen && (
-        <div className="absolute z-1 w-40 bg-gray-600">
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              const modal = document.getElementById(
-                "modal-new",
-              ) as HTMLDialogElement;
-              if (modal) modal.showModal();
-            }}
-          >
-            New
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              if (window.confirm("Are you sure you want to clear the canvas?"))
-                clearCanvas();
-            }}
-          >
-            Clear
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              const modal = document.getElementById(
-                "modal-resize",
-              ) as HTMLDialogElement;
-              if (modal) modal.showModal();
-            }}
-          >
-            Resize
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              exportToPxsm();
-            }}
-          >
-            Save as .pxsm
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              pxsmFileInputRef.current?.click();
-            }}
-          >
-            Import .pxsm
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              imageFileInputRef.current?.click();
-            }}
-          >
-            Import image
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              const modal = document.getElementById(
-                "modal-export-to-image",
-              ) as HTMLDialogElement;
-              if (modal) modal.showModal();
-            }}
-          >
-            Export
-          </button>
-        </div>
-      )}
+    <>
+      <div ref={dropdownRef}>
+        <button
+          className={`${isOpen && "bg-gray-600"} cursor-pointer p-2 hover:bg-gray-600`}
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+        >
+          File
+        </button>
+        {isOpen && (
+          <div className="absolute z-1 w-40 bg-gray-600">
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                const modal = document.getElementById(
+                  "modal-new",
+                ) as HTMLDialogElement;
+                if (modal) modal.showModal();
+              }}
+            >
+              New
+            </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                if (
+                  window.confirm("Are you sure you want to clear the canvas?")
+                )
+                  clearCanvas();
+              }}
+            >
+              Clear
+            </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                const modal = document.getElementById(
+                  "modal-resize",
+                ) as HTMLDialogElement;
+                if (modal) modal.showModal();
+              }}
+            >
+              Resize
+            </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                exportToPxsm();
+              }}
+            >
+              Save as .pxsm
+            </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                pxsmFileInputRef.current?.click();
+              }}
+            >
+              Import .pxsm
+            </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                imageFileInputRef.current?.click();
+              }}
+            >
+              Import image
+            </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start hover:bg-gray-500"
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                const modal = document.getElementById(
+                  "modal-export-to-image",
+                ) as HTMLDialogElement;
+                if (modal) modal.showModal();
+              }}
+            >
+              Export
+            </button>
+          </div>
+        )}
+      </div>
       <input
         ref={pxsmFileInputRef}
         className="hidden"
@@ -190,6 +197,6 @@ export default function BtnFile() {
       <ModalNew />
       <ModalResize />
       <ModalExportToImage />
-    </div>
+    </>
   );
 }

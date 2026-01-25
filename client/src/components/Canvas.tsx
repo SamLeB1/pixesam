@@ -687,6 +687,7 @@ export default function Canvas() {
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
+    e.stopPropagation();
     activeMouseButton.current = e.button;
     handleAction(e, true);
     setHoveredPixel(null);
@@ -721,6 +722,10 @@ export default function Canvas() {
     e.preventDefault();
     if (e.deltaY < 0) zoomStepTowardsCursor(e.clientX, e.clientY, true);
     else if (e.deltaY > 0) zoomStepTowardsCursor(e.clientX, e.clientY, false);
+  }
+
+  function handleMouseDownContainer() {
+    if (showSelectionPreview) applySelectionAction();
   }
 
   useEffect(() => {
@@ -861,6 +866,7 @@ export default function Canvas() {
       className="flex flex-grow items-center justify-center"
       ref={parentContainerRef}
       id="parent-container"
+      onMouseDown={handleMouseDownContainer}
       onMouseMove={updateMousePos}
     >
       <canvas
