@@ -52,6 +52,14 @@ export default function SideBarLeft() {
         >
           <div className="h-8 w-8 bg-white"></div>
         </button>
+        <button
+          className="cursor-pointer p-2 hover:bg-neutral-600"
+          type="button"
+          title="Move tool (M)"
+          onClick={() => selectTool("move")}
+        >
+          <div className="h-8 w-8 bg-white"></div>
+        </button>
       </div>
       <div className="relative mx-auto h-18 w-18">
         <input

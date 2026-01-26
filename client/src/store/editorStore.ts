@@ -35,6 +35,7 @@ type Action =
   | DrawAction
   | BucketAction
   | TransformAction
+  | MoveAction
   | DeleteAction
   | PasteAction
   | NewAction
@@ -60,6 +61,12 @@ type TransformAction = {
   srcPixels: RGBA[];
   dstPixels: RGBA[];
   mask: Uint8Array | null;
+};
+
+type MoveAction = {
+  action: "move";
+  pixels: Uint8ClampedArray;
+  offset: { x: number; y: number };
 };
 
 type DeleteAction = {
@@ -97,7 +104,7 @@ type DrawActionPixel = {
   prevColor: RGBA;
 };
 
-type Tool = "pencil" | "eraser" | "color-picker" | "bucket" | "select";
+type Tool = "pencil" | "eraser" | "color-picker" | "bucket" | "select" | "move";
 
 type EditorState = {
   pixelData: Uint8ClampedArray;
@@ -120,6 +127,8 @@ type EditorState = {
   showSelectionPreview: boolean;
   isPasting: boolean;
   lassoPath: { x: number; y: number }[];
+  moveStartPos: { x: number; y: number } | null;
+  moveOffset: { x: number; y: number } | null;
   undoHistory: Action[];
   redoHistory: Action[];
   drawBuffer: DrawActionPixel[];
@@ -148,6 +157,8 @@ type EditorState = {
   setShowSelectionPreview: (show: boolean) => void;
   setIsPasting: (isPasting: boolean) => void;
   setLassoPath: (path: { x: number; y: number }[]) => void;
+  setMoveStartPos: (pos: { x: number; y: number } | null) => void;
+  setMoveOffset: (offset: { x: number; y: number } | null) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
   selectTool: (tool: Tool) => void;
   getPixelColor: (x: number, y: number) => RGBA;
@@ -179,6 +190,7 @@ type EditorState = {
   performWandSelection: (x: number, y: number) => void;
   generateSelectionMask: () => Uint8Array | null;
   closeLassoPath: () => void;
+  applyMove: () => void;
   undo: () => void;
   redo: () => void;
   updateHistory: (action: Action) => void;
@@ -210,6 +222,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showSelectionPreview: false,
   isPasting: false,
   lassoPath: [],
+  moveStartPos: null,
+  moveOffset: null,
   undoHistory: [],
   redoHistory: [],
   drawBuffer: [],
@@ -236,18 +250,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setShowSelectionPreview: (show) => set({ showSelectionPreview: show }),
   setIsPasting: (isPasting) => set({ isPasting }),
   setLassoPath: (path) => set({ lassoPath: path }),
+  setMoveStartPos: (pos) => set({ moveStartPos: pos }),
+  setMoveOffset: (offset) => set({ moveOffset: offset }),
   setMousePos: (mousePos) => set({ mousePos }),
   selectTool: (tool) =>
     set((state) => {
       const {
         selectedTool,
         showSelectionPreview,
+        moveOffset,
         initSelection,
         applySelectionAction,
+        applyMove,
       } = state;
       if (selectedTool === tool) return {};
       if (showSelectionPreview) applySelectionAction();
       else initSelection();
+      if (moveOffset) applyMove();
       return { selectedTool: tool };
     }),
   getPixelColor: (x, y) => {
@@ -972,6 +991,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       points.pop();
       return { lassoPath: [...lassoPath, ...points] };
     }),
+  applyMove: () =>
+    set((state) => {
+      const { pixelData, gridSize, moveOffset, updateHistory } = state;
+      if (!moveOffset || (moveOffset.x === 0 && moveOffset.y === 0))
+        return { moveStartPos: null, moveOffset: null };
+
+      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+      for (let y = 0; y < gridSize.y; y++) {
+        for (let x = 0; x < gridSize.x; x++) {
+          const srcX = x - moveOffset.x;
+          const srcY = y - moveOffset.y;
+
+          if (isValidIndex(srcX, srcY, gridSize)) {
+            const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
+            const dstIndex = getBaseIndex(x, y, gridSize.x);
+            newData[dstIndex] = pixelData[srcIndex];
+            newData[dstIndex + 1] = pixelData[srcIndex + 1];
+            newData[dstIndex + 2] = pixelData[srcIndex + 2];
+            newData[dstIndex + 3] = pixelData[srcIndex + 3];
+          }
+        }
+      }
+
+      const action: MoveAction = {
+        action: "move",
+        pixels: pixelData,
+        offset: moveOffset,
+      };
+      updateHistory(action);
+
+      return { pixelData: newData, moveStartPos: null, moveOffset: null };
+    }),
   undo: () => {
     const { pixelData, gridSize, undoHistory, redoHistory, initSelection } =
       get();
@@ -1009,6 +1060,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       drawRectContent(dstRect, dstPixels, newData, gridSize, false, newMask);
       drawRectContent(srcRect, srcPixels, newData, gridSize, true, mask);
       set({ pixelData: newData });
+    } else if (action.action === "move") {
+      set({ pixelData: action.pixels });
     } else if (action.action === "delete") {
       const { area, pixels, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
@@ -1036,7 +1089,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     initSelection();
-    set({ undoHistory: newUndoHistory, redoHistory: newRedoHistory });
+    set({
+      moveStartPos: null,
+      moveOffset: null,
+      undoHistory: newUndoHistory,
+      redoHistory: newRedoHistory,
+    });
   },
   redo: () => {
     const {
@@ -1089,6 +1147,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       clearRectContent(srcRect, newData, gridSize, mask);
       drawRectContent(dstRect, pixelsToApply, newData, gridSize, true, newMask);
       set({ pixelData: newData });
+    } else if (action.action === "move") {
+      const { pixels, offset } = action;
+      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+
+      for (let y = 0; y < gridSize.y; y++) {
+        for (let x = 0; x < gridSize.x; x++) {
+          const srcX = x - offset.x;
+          const srcY = y - offset.y;
+
+          if (isValidIndex(srcX, srcY, gridSize)) {
+            const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
+            const dstIndex = getBaseIndex(x, y, gridSize.x);
+            newData[dstIndex] = pixels[srcIndex];
+            newData[dstIndex + 1] = pixels[srcIndex + 1];
+            newData[dstIndex + 2] = pixels[srcIndex + 2];
+            newData[dstIndex + 3] = pixels[srcIndex + 3];
+          }
+        }
+      }
+      set({ pixelData: newData });
     } else if (action.action === "delete") {
       const { area, mask } = action;
       const newData = new Uint8ClampedArray(pixelData);
@@ -1112,7 +1190,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     initSelection();
-    set({ undoHistory: newUndoHistory, redoHistory: newRedoHistory });
+    set({
+      moveStartPos: null,
+      moveOffset: null,
+      undoHistory: newUndoHistory,
+      redoHistory: newRedoHistory,
+    });
   },
   updateHistory: (action) =>
     set((state) => {
@@ -1185,10 +1268,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const {
         gridSize,
         showSelectionPreview,
+        moveOffset,
         mousePos,
         clipboard,
         initSelection,
         applySelectionAction,
+        applyMove,
         paste,
       } = state;
       if (!clipboard) return {};
@@ -1197,6 +1282,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         paste();
         return {};
       }
+      if (moveOffset) applyMove();
 
       const { pixels, width, height, mask } = clipboard;
       const clipboardX = Math.max(

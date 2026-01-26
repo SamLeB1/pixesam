@@ -44,6 +44,8 @@ export default function Canvas() {
     showSelectionPreview,
     isPasting,
     lassoPath,
+    moveStartPos,
+    moveOffset,
     setPanOffset,
     selectTool,
     setPrimaryColor,
@@ -55,6 +57,8 @@ export default function Canvas() {
     setActiveResizeHandle,
     setSelectedArea,
     setLassoPath,
+    setMoveStartPos,
+    setMoveOffset,
     setMousePos,
     getPixelColor,
     getEffectiveSelectionBounds,
@@ -65,6 +69,7 @@ export default function Canvas() {
     applySelectionAction,
     deleteSelection,
     performWandSelection,
+    applyMove,
     undo,
     redo,
     clearDrawBuffer,
@@ -97,6 +102,7 @@ export default function Canvas() {
     y: canvasSize.y / getPxSize(),
   };
   const showMoveCursor =
+    selectedTool === "move" ||
     (!selectionAction &&
       hoveredPixel &&
       isInSelectedArea(hoveredPixel.x, hoveredPixel.y)) ||
@@ -628,6 +634,29 @@ export default function Canvas() {
     }
   }
 
+  function handleMoveAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+    isInitialClick: boolean,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+
+    if (isInitialClick) {
+      setMoveStartPos({ x, y });
+      setMoveOffset({ x: 0, y: 0 });
+      return;
+    }
+    if (!moveStartPos) return;
+
+    setMoveOffset({
+      x: x - moveStartPos.x,
+      y: y - moveStartPos.y,
+    });
+  }
+
   function handlePanAction(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
     isInitialClick: boolean,
@@ -681,6 +710,9 @@ export default function Canvas() {
       case "select":
         if (btn === 0 || btn === 2) handleSelectAction(e, isInitialClick);
         break;
+      case "move":
+        if (btn === 0 || btn === 2) handleMoveAction(e, isInitialClick);
+        break;
       default:
         console.error("Selected tool is invalid.");
     }
@@ -700,6 +732,7 @@ export default function Canvas() {
     }
     activeMouseButton.current = null;
     if (selectionAction) endSelectionAction();
+    if (moveOffset) applyMove();
     updateHoveredPixel(e);
     clearDrawBuffer();
   }
@@ -713,6 +746,7 @@ export default function Canvas() {
   function handleMouseLeave() {
     activeMouseButton.current = null;
     if (selectionAction) endSelectionAction();
+    if (moveOffset) applyMove();
     setHoveredPixel(null);
     setHoveredResizeHandle(null);
     clearDrawBuffer();
@@ -748,11 +782,13 @@ export default function Canvas() {
         gridSize.y,
       );
       tempCtx.putImageData(imageData, 0, 0);
+
+      const currMoveOffset = moveOffset || { x: 0, y: 0 };
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(
         tempCanvas,
-        panOffset.x,
-        panOffset.y,
+        panOffset.x - currMoveOffset.x,
+        panOffset.y - currMoveOffset.y,
         visibleGridSize.x,
         visibleGridSize.y,
         0,
@@ -762,16 +798,18 @@ export default function Canvas() {
       );
     }
 
-    if (showSelectionPreview) {
-      drawSelectionPreview(ctx, !isPasting);
-      drawResizeHandles(ctx);
-    } else if (selectionAction === "select") {
-      drawSelectionDrag(ctx);
-    } else if (hoveredPixel) {
-      const offset = -Math.floor(brushSize / 2);
-      const x = hoveredPixel.x + offset;
-      const y = hoveredPixel.y + offset;
-      drawFilterRect(ctx, x, y, brushSize, brushSize);
+    if (selectedTool !== "move") {
+      if (showSelectionPreview) {
+        drawSelectionPreview(ctx, !isPasting);
+        drawResizeHandles(ctx);
+      } else if (selectionAction === "select") {
+        drawSelectionDrag(ctx);
+      } else if (hoveredPixel) {
+        const offset = -Math.floor(brushSize / 2);
+        const x = hoveredPixel.x + offset;
+        const y = hoveredPixel.y + offset;
+        drawFilterRect(ctx, x, y, brushSize, brushSize);
+      }
     }
 
     if (!showSelectionPreview) setHoveredResizeHandle(null);
@@ -798,6 +836,7 @@ export default function Canvas() {
     selectedArea,
     showSelectionPreview,
     lassoPath,
+    moveOffset,
   ]);
 
   useEffect(() => {
@@ -842,6 +881,9 @@ export default function Canvas() {
       } else if (key === "s") {
         e.preventDefault();
         selectTool("select");
+      } else if (key === "m") {
+        e.preventDefault();
+        selectTool("move");
       } else if (key === "+" || key === "=") {
         e.preventDefault();
         zoomStepTowardsCenter(true);
