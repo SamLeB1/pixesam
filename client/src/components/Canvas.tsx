@@ -732,7 +732,6 @@ export default function Canvas() {
     }
     activeMouseButton.current = null;
     if (selectionAction) endSelectionAction();
-    if (moveOffset) applyMove();
     updateHoveredPixel(e);
     clearDrawBuffer();
   }
@@ -746,7 +745,6 @@ export default function Canvas() {
   function handleMouseLeave() {
     activeMouseButton.current = null;
     if (selectionAction) endSelectionAction();
-    if (moveOffset) applyMove();
     setHoveredPixel(null);
     setHoveredResizeHandle(null);
     clearDrawBuffer();
@@ -902,6 +900,33 @@ export default function Canvas() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectTool, undo, redo, copy, paste, zoomStepTowardsCenter, resetZoom]);
+
+  useEffect(() => {
+    function handleGlobalMouseMove(e: MouseEvent) {
+      if (!moveStartPos || !moveOffset) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+      const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+      setMoveOffset({
+        x: x - moveStartPos.x,
+        y: y - moveStartPos.y,
+      });
+    }
+
+    function handleGlobalMouseUp() {
+      if (moveOffset) applyMove();
+    }
+
+    window.addEventListener("mousemove", handleGlobalMouseMove);
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleGlobalMouseMove);
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [panOffset, moveStartPos, moveOffset, applyMove]);
 
   return (
     <div
