@@ -1,3 +1,9 @@
+import BrushSizeInput from "./BrushSizeInput";
+
 export default function LineToolOptions() {
-  return <></>;
+  return (
+    <div className="flex h-full items-center">
+      <BrushSizeInput />
+    </div>
+  );
 }
