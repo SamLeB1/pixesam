@@ -104,7 +104,14 @@ type DrawActionPixel = {
   prevColor: RGBA;
 };
 
-type Tool = "pencil" | "eraser" | "color-picker" | "bucket" | "select" | "move";
+type Tool =
+  | "pencil"
+  | "eraser"
+  | "color-picker"
+  | "bucket"
+  | "line"
+  | "select"
+  | "move";
 
 type EditorState = {
   pixelData: Uint8ClampedArray;
@@ -115,6 +122,8 @@ type EditorState = {
   primaryColor: string;
   secondaryColor: string;
   brushSize: number;
+  lineStartPos: { x: number; y: number } | null;
+  lineEndPos: { x: number; y: number } | null;
   selectionMode: "rectangular" | "lasso" | "wand";
   selectionMask: Uint8Array | null;
   selectionAction: "select" | "move" | "resize" | null;
@@ -143,6 +152,8 @@ type EditorState = {
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setBrushSize: (n: number) => void;
+  setLineStartPos: (pos: { x: number; y: number } | null) => void;
+  setLineEndPos: (pos: { x: number; y: number } | null) => void;
   setSelectionMode: (mode: "rectangular" | "lasso" | "wand") => void;
   setSelectionMask: (mask: Uint8Array | null) => void;
   setSelectionAction: (action: "select" | "move" | "resize" | null) => void;
@@ -165,6 +176,11 @@ type EditorState = {
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
+  drawLine: (
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    color: RGBA,
+  ) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
     x: number,
@@ -210,6 +226,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
   brushSize: 1,
+  lineStartPos: null,
+  lineEndPos: null,
   selectionMode: "rectangular",
   selectionMask: null,
   selectionAction: null,
@@ -238,6 +256,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setBrushSize: (n) => set({ brushSize: n }),
+  setLineStartPos: (pos) => set({ lineStartPos: pos }),
+  setLineEndPos: (pos) => set({ lineEndPos: pos }),
   setSelectionMode: (mode) => set({ selectionMode: mode }),
   setSelectionMask: (mask) => set({ selectionMask: mask }),
   setSelectionAction: (action) => set({ selectionAction: action }),
@@ -372,6 +392,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         drawBuffer: newDrawBuffer,
         drawnPixels: newDrawnPixels,
         lastDrawPos: { x, y },
+      };
+    }),
+  drawLine: (start, end, color) =>
+    set((state) => {
+      const { pixelData, gridSize, brushSize, getPixelColor } = state;
+      const newData = new Uint8ClampedArray(pixelData);
+      const drawBuffer: DrawActionPixel[] = [];
+      const drawnPixels = new Set<string>();
+      const offset = -Math.floor(brushSize / 2);
+
+      const pointsToDraw = [
+        start,
+        ...interpolateBetweenPoints(start.x, start.y, end.x, end.y),
+      ];
+      for (const point of pointsToDraw) {
+        for (let i = 0; i < brushSize; i++) {
+          for (let j = 0; j < brushSize; j++) {
+            const pixelX = point.x + j + offset;
+            const pixelY = point.y + i + offset;
+            if (!isValidIndex(pixelX, pixelY, gridSize)) continue;
+            const key = `${pixelX},${pixelY}`;
+            if (drawnPixels.has(key)) continue;
+            drawnPixels.add(key);
+            drawBuffer.push({
+              x: pixelX,
+              y: pixelY,
+              color,
+              prevColor: getPixelColor(pixelX, pixelY),
+            });
+            setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
+          }
+        }
+      }
+      return {
+        pixelData: newData,
+        drawBuffer,
       };
     }),
   erase: (x, y) => get().draw(x, y, { r: 0, g: 0, b: 0, a: 0 }),

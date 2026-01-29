@@ -47,6 +47,14 @@ export default function SideBarLeft() {
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
+          title="Line tool (L)"
+          onClick={() => selectTool("line")}
+        >
+          <div className="h-8 w-8 bg-white"></div>
+        </button>
+        <button
+          className="cursor-pointer p-2 hover:bg-neutral-600"
+          type="button"
           title="Select tool (S)"
           onClick={() => selectTool("select")}
         >
