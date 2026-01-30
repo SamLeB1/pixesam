@@ -5,7 +5,7 @@ import useCanvasZoom from "../hooks/useCanvasZoom";
 import { isValidIndex } from "../utils/canvas";
 import { interpolateBetweenPoints } from "../utils/geometry";
 import { BASE_PX_SIZE } from "../constants";
-import type { Direction, Rect } from "../types";
+import type { Direction, Rect, RGBA } from "../types";
 
 const lightCheckerboardColor = "#ffffff";
 const darkCheckerboardColor = "#e5e5e5";
@@ -32,6 +32,8 @@ export default function Canvas() {
     primaryColor,
     secondaryColor,
     brushSize,
+    lineStartPos,
+    lineEndPos,
     selectionMode,
     selectionMask,
     selectionAction,
@@ -50,6 +52,8 @@ export default function Canvas() {
     selectTool,
     setPrimaryColor,
     setSecondaryColor,
+    setLineStartPos,
+    setLineEndPos,
     setSelectionAction,
     setSelectionStartPos,
     setSelectionMoveOffset,
@@ -63,6 +67,7 @@ export default function Canvas() {
     getPixelColor,
     getEffectiveSelectionBounds,
     draw,
+    drawLine,
     erase,
     floodFill,
     endSelectionAction,
@@ -167,6 +172,43 @@ export default function Canvas() {
           ctx.fillRect(
             (pixelX - panOffset.x) * pxSize,
             (pixelY - panOffset.y) * pxSize,
+            pxSize,
+            pxSize,
+          );
+        }
+      }
+    }
+  }
+
+  function drawLinePreview(ctx: CanvasRenderingContext2D) {
+    if (!lineStartPos || !lineEndPos) return;
+
+    ctx.fillStyle = getActiveColorHex();
+    const pxSize = getPxSize();
+    const drawnPixels = new Set<string>();
+    const offset = -Math.floor(brushSize / 2);
+
+    const pointsToDraw = [
+      lineStartPos,
+      ...interpolateBetweenPoints(
+        lineStartPos.x,
+        lineStartPos.y,
+        lineEndPos.x,
+        lineEndPos.y,
+      ),
+    ];
+    for (const point of pointsToDraw) {
+      for (let i = 0; i < brushSize; i++) {
+        for (let j = 0; j < brushSize; j++) {
+          const x = point.x + j + offset;
+          const y = point.y + i + offset;
+          if (!isValidIndex(x, y, gridSize)) continue;
+          const key = `${x},${y}`;
+          if (drawnPixels.has(key)) continue;
+          drawnPixels.add(key);
+          ctx.fillRect(
+            (x - panOffset.x) * pxSize,
+            (y - panOffset.y) * pxSize,
             pxSize,
             pxSize,
           );
@@ -330,6 +372,17 @@ export default function Canvas() {
     return BASE_PX_SIZE * zoomLevel;
   }
 
+  function getActiveColorHex(): string {
+    return activeMouseButton.current === 2 ? secondaryColor : primaryColor;
+  }
+
+  function getActiveColorRGBA(): RGBA {
+    const hex = activeMouseButton.current === 2 ? secondaryColor : primaryColor;
+    const rgba = tinycolor(hex).toRgb();
+    rgba.a *= 255;
+    return rgba;
+  }
+
   function getResizeStartPos() {
     const bounds = getEffectiveSelectionBounds();
     if (!bounds || !hoveredResizeHandle) return null;
@@ -444,12 +497,7 @@ export default function Canvas() {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
-    const color =
-      activeMouseButton.current === 0
-        ? tinycolor(primaryColor).toRgb()
-        : tinycolor(secondaryColor).toRgb();
-    color.a *= 255;
-    draw(x, y, color);
+    draw(x, y, getActiveColorRGBA());
   }
 
   function handleEraserAction(
@@ -489,12 +537,23 @@ export default function Canvas() {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
-    const color =
-      activeMouseButton.current === 0
-        ? tinycolor(primaryColor).toRgb()
-        : tinycolor(secondaryColor).toRgb();
-    color.a *= 255;
-    floodFill(x, y, color);
+    floodFill(x, y, getActiveColorRGBA());
+  }
+
+  function handleLineAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+    isInitialClick: boolean,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+
+    if (isInitialClick) {
+      setLineStartPos({ x, y });
+      setLineEndPos({ x, y });
+    } else setLineEndPos({ x, y });
   }
 
   function handleSelectAction(
@@ -707,6 +766,9 @@ export default function Canvas() {
       case "bucket":
         if (btn === 0 || btn === 2) handleBucketAction(e);
         break;
+      case "line":
+        if (btn === 0 || btn === 2) handleLineAction(e, isInitialClick);
+        break;
       case "select":
         if (btn === 0 || btn === 2) handleSelectAction(e, isInitialClick);
         break;
@@ -730,10 +792,11 @@ export default function Canvas() {
       activeMouseButton.current = 0;
       return;
     }
-    activeMouseButton.current = null;
+    if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
     if (selectionAction) endSelectionAction();
     updateHoveredPixel(e);
     clearDrawBuffer();
+    activeMouseButton.current = null;
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
@@ -743,11 +806,12 @@ export default function Canvas() {
   }
 
   function handleMouseLeave() {
-    activeMouseButton.current = null;
+    if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
     if (selectionAction) endSelectionAction();
     setHoveredPixel(null);
     setHoveredResizeHandle(null);
     clearDrawBuffer();
+    activeMouseButton.current = null;
   }
 
   function handleMouseWheel(e: WheelEvent) {
@@ -802,6 +866,8 @@ export default function Canvas() {
         drawResizeHandles(ctx);
       } else if (selectionAction === "select") {
         drawSelectionDrag(ctx);
+      } else if (lineStartPos && lineEndPos) {
+        drawLinePreview(ctx);
       } else if (hoveredPixel) {
         const offset = -Math.floor(brushSize / 2);
         const x = hoveredPixel.x + offset;
@@ -829,6 +895,8 @@ export default function Canvas() {
     hoveredResizeHandle,
     panOffset,
     brushSize,
+    lineStartPos,
+    lineEndPos,
     selectionMoveOffset,
     selectionResizeOffset,
     selectedArea,
@@ -876,6 +944,9 @@ export default function Canvas() {
       } else if (key === "b") {
         e.preventDefault();
         selectTool("bucket");
+      } else if (key === "l") {
+        e.preventDefault();
+        selectTool("line");
       } else if (key === "s") {
         e.preventDefault();
         selectTool("select");

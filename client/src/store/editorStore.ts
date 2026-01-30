@@ -176,11 +176,7 @@ type EditorState = {
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
-  drawLine: (
-    start: { x: number; y: number },
-    end: { x: number; y: number },
-    color: RGBA,
-  ) => void;
+  drawLine: (color: RGBA) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
     x: number,
@@ -394,17 +390,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastDrawPos: { x, y },
       };
     }),
-  drawLine: (start, end, color) =>
+  drawLine: (color) =>
     set((state) => {
-      const { pixelData, gridSize, brushSize, getPixelColor } = state;
+      const {
+        pixelData,
+        gridSize,
+        brushSize,
+        lineStartPos,
+        lineEndPos,
+        getPixelColor,
+      } = state;
+      if (!lineStartPos || !lineEndPos) return {};
       const newData = new Uint8ClampedArray(pixelData);
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
 
       const pointsToDraw = [
-        start,
-        ...interpolateBetweenPoints(start.x, start.y, end.x, end.y),
+        lineStartPos,
+        ...interpolateBetweenPoints(
+          lineStartPos.x,
+          lineStartPos.y,
+          lineEndPos.x,
+          lineEndPos.y,
+        ),
       ];
       for (const point of pointsToDraw) {
         for (let i = 0; i < brushSize; i++) {
@@ -427,6 +436,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       return {
         pixelData: newData,
+        lineStartPos: null,
+        lineEndPos: null,
         drawBuffer,
       };
     }),
