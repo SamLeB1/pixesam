@@ -171,6 +171,7 @@ type EditorState = {
   setMoveStartPos: (pos: { x: number; y: number } | null) => void;
   setMoveOffset: (offset: { x: number; y: number } | null) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
+  initActions: () => void;
   selectTool: (tool: Tool) => void;
   getPixelColor: (x: number, y: number) => RGBA;
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
@@ -269,6 +270,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setMoveStartPos: (pos) => set({ moveStartPos: pos }),
   setMoveOffset: (offset) => set({ moveOffset: offset }),
   setMousePos: (mousePos) => set({ mousePos }),
+  initActions: () =>
+    set((state) => {
+      const { initSelection } = state;
+      initSelection();
+      return {
+        lineStartPos: null,
+        lineEndPos: null,
+        moveStartPos: null,
+        moveOffset: null,
+        drawBuffer: [],
+        drawnPixels: new Set(),
+        lastDrawPos: null,
+      };
+    }),
   selectTool: (tool) =>
     set((state) => {
       const {
@@ -278,12 +293,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         initSelection,
         applySelectionAction,
         applyMove,
+        clearDrawBuffer,
       } = state;
       if (selectedTool === tool) return {};
+
       if (showSelectionPreview) applySelectionAction();
       else initSelection();
       if (moveOffset) applyMove();
-      return { selectedTool: tool };
+      clearDrawBuffer();
+
+      return { selectedTool: tool, lineStartPos: null, lineEndPos: null };
     }),
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();
@@ -478,7 +497,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   newCanvas: (size) =>
     set((state) => {
-      const { pixelData, gridSize, initSelection, updateHistory } = state;
+      const { pixelData, gridSize, initActions, updateHistory } = state;
       const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
       let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
@@ -495,7 +514,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      initSelection();
+      initActions();
       return {
         pixelData: newData,
         gridSize: size,
@@ -505,7 +524,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   clearCanvas: () =>
     set((state) => {
-      const { pixelData, gridSize, initSelection, updateHistory } = state;
+      const { pixelData, gridSize, initActions, updateHistory } = state;
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
 
       const action: ClearAction = {
@@ -514,7 +533,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      initSelection();
+      initActions();
       return { pixelData: newData };
     }),
   resizeCanvas: (size, anchor, resizeContent = false) =>
@@ -522,7 +541,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const {
         pixelData,
         gridSize: oldGridSize,
-        initSelection,
+        initActions,
         updateHistory,
       } = state;
       const newData = new Uint8ClampedArray(size.x * size.y * 4);
@@ -616,7 +635,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      initSelection();
+      initActions();
       return {
         pixelData: newData,
         gridSize: size,
@@ -632,7 +651,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         );
         return {};
       }
-      const { pixelData, gridSize, initSelection, updateHistory } = state;
+      const { pixelData, gridSize, initActions, updateHistory } = state;
       const newData = new Uint8ClampedArray(data.pixels);
       let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
@@ -649,7 +668,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory(action);
 
       toast.success("File imported successfully!");
-      initSelection();
+      initActions();
       return {
         pixelData: newData,
         gridSize: { x: data.width, y: data.height },
@@ -693,7 +712,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      const { pixelData, gridSize, initSelection, updateHistory } = get();
+      const { pixelData, gridSize, initActions, updateHistory } = get();
       const action: NewAction = {
         action: "new",
         pixelData: newData,
@@ -703,7 +722,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      initSelection();
+      initActions();
       set({
         pixelData: newData,
         gridSize: { x: width, y: height },
@@ -1091,7 +1110,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { pixelData: newData, moveStartPos: null, moveOffset: null };
     }),
   undo: () => {
-    const { pixelData, gridSize, undoHistory, redoHistory, initSelection } =
+    const { pixelData, gridSize, undoHistory, redoHistory, initActions } =
       get();
     if (undoHistory.length === 0) return;
 
@@ -1155,10 +1174,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ pixelData: action.prevPixelData });
     }
 
-    initSelection();
+    initActions();
     set({
-      moveStartPos: null,
-      moveOffset: null,
       undoHistory: newUndoHistory,
       redoHistory: newRedoHistory,
     });
@@ -1169,8 +1186,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       gridSize,
       undoHistory,
       redoHistory,
+      initActions,
       floodFill,
-      initSelection,
     } = get();
     if (redoHistory.length === 0) return;
 
@@ -1256,10 +1273,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ pixelData: newData });
     }
 
-    initSelection();
+    initActions();
     set({
-      moveStartPos: null,
-      moveOffset: null,
       undoHistory: newUndoHistory,
       redoHistory: newRedoHistory,
     });
@@ -1341,6 +1356,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         initSelection,
         applySelectionAction,
         applyMove,
+        clearDrawBuffer,
         paste,
       } = state;
       if (!clipboard) return {};
@@ -1350,6 +1366,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {};
       }
       if (moveOffset) applyMove();
+      clearDrawBuffer();
 
       const { pixels, width, height, mask } = clipboard;
       const clipboardX = Math.max(
@@ -1370,6 +1387,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       initSelection();
       return {
         selectedTool: "select",
+        lineStartPos: null,
+        lineEndPos: null,
         selectionMask: mask,
         selectedArea: newSelectedArea,
         selectedPixels: pixels,
