@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import tinycolor from "tinycolor2";
 import { toast } from "sonner";
 import {
   getBaseIndex,
@@ -121,6 +122,7 @@ type EditorState = {
   selectedTool: Tool;
   primaryColor: string;
   secondaryColor: string;
+  isPrimaryColorActive: boolean;
   brushSize: number;
   lineStartPos: { x: number; y: number } | null;
   lineEndPos: { x: number; y: number } | null;
@@ -151,6 +153,7 @@ type EditorState = {
   setZoomLevel: (n: number) => void;
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
+  setIsPrimaryColorActive: (active: boolean) => void;
   setBrushSize: (n: number) => void;
   setLineStartPos: (pos: { x: number; y: number } | null) => void;
   setLineEndPos: (pos: { x: number; y: number } | null) => void;
@@ -173,6 +176,8 @@ type EditorState = {
   setMousePos: (mousePos: { x: number; y: number }) => void;
   initActions: () => void;
   selectTool: (tool: Tool) => void;
+  getActiveColorHex: () => string;
+  getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number) => RGBA;
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
@@ -222,6 +227,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedTool: "pencil",
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
+  isPrimaryColorActive: true,
   brushSize: 1,
   lineStartPos: null,
   lineEndPos: null,
@@ -252,6 +258,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setZoomLevel: (n) => set({ zoomLevel: n }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
+  setIsPrimaryColorActive: (active) => set({ isPrimaryColorActive: active }),
   setBrushSize: (n) => set({ brushSize: n }),
   setLineStartPos: (pos) => set({ lineStartPos: pos }),
   setLineEndPos: (pos) => set({ lineEndPos: pos }),
@@ -288,8 +295,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const {
         selectedTool,
+        lineStartPos,
+        lineEndPos,
         showSelectionPreview,
         moveOffset,
+        getActiveColorRGBA,
+        drawLine,
         initSelection,
         applySelectionAction,
         applyMove,
@@ -300,10 +311,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (showSelectionPreview) applySelectionAction();
       else initSelection();
       if (moveOffset) applyMove();
+      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
       clearDrawBuffer();
 
-      return { selectedTool: tool, lineStartPos: null, lineEndPos: null };
+      return { selectedTool: tool };
     }),
+  getActiveColorHex: () => {
+    const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
+    return isPrimaryColorActive ? primaryColor : secondaryColor;
+  },
+  getActiveColorRGBA: () => {
+    const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
+    const hex = isPrimaryColorActive ? primaryColor : secondaryColor;
+    const rgba = tinycolor(hex).toRgb();
+    rgba.a *= 255;
+    return rgba;
+  },
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();
     const baseIndex = getBaseIndex(x, y, gridSize.x);
@@ -1349,10 +1372,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const {
         gridSize,
+        lineStartPos,
+        lineEndPos,
         showSelectionPreview,
         moveOffset,
         mousePos,
         clipboard,
+        getActiveColorRGBA,
+        drawLine,
         initSelection,
         applySelectionAction,
         applyMove,
@@ -1366,6 +1393,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {};
       }
       if (moveOffset) applyMove();
+      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
       clearDrawBuffer();
 
       const { pixels, width, height, mask } = clipboard;
@@ -1387,8 +1415,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       initSelection();
       return {
         selectedTool: "select",
-        lineStartPos: null,
-        lineEndPos: null,
         selectionMask: mask,
         selectedArea: newSelectedArea,
         selectedPixels: pixels,

@@ -5,7 +5,7 @@ import useCanvasZoom from "../hooks/useCanvasZoom";
 import { isValidIndex } from "../utils/canvas";
 import { interpolateBetweenPoints } from "../utils/geometry";
 import { BASE_PX_SIZE } from "../constants";
-import type { Direction, Rect, RGBA } from "../types";
+import type { Direction, Rect } from "../types";
 
 const lightCheckerboardColor = "#ffffff";
 const darkCheckerboardColor = "#e5e5e5";
@@ -29,8 +29,6 @@ export default function Canvas() {
     panOffset,
     zoomLevel,
     selectedTool,
-    primaryColor,
-    secondaryColor,
     brushSize,
     lineStartPos,
     lineEndPos,
@@ -52,6 +50,7 @@ export default function Canvas() {
     selectTool,
     setPrimaryColor,
     setSecondaryColor,
+    setIsPrimaryColorActive,
     setLineStartPos,
     setLineEndPos,
     setSelectionAction,
@@ -64,6 +63,8 @@ export default function Canvas() {
     setMoveStartPos,
     setMoveOffset,
     setMousePos,
+    getActiveColorHex,
+    getActiveColorRGBA,
     getPixelColor,
     getEffectiveSelectionBounds,
     draw,
@@ -370,17 +371,6 @@ export default function Canvas() {
 
   function getPxSize() {
     return BASE_PX_SIZE * zoomLevel;
-  }
-
-  function getActiveColorHex(): string {
-    return activeMouseButton.current === 2 ? secondaryColor : primaryColor;
-  }
-
-  function getActiveColorRGBA(): RGBA {
-    const hex = activeMouseButton.current === 2 ? secondaryColor : primaryColor;
-    const rgba = tinycolor(hex).toRgb();
-    rgba.a *= 255;
-    return rgba;
   }
 
   function getResizeStartPos() {
@@ -783,15 +773,13 @@ export default function Canvas() {
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     e.stopPropagation();
     activeMouseButton.current = e.button;
+    if (e.button === 0 || e.button === 2)
+      setIsPrimaryColorActive(e.button === 0);
     handleAction(e, true);
     setHoveredPixel(null);
   }
 
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
-    if (selectionAction && activeMouseButton.current === 1) {
-      activeMouseButton.current = 0;
-      return;
-    }
     if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
     if (selectionAction) endSelectionAction();
     updateHoveredPixel(e);
