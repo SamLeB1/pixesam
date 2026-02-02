@@ -1,4 +1,5 @@
 import { useEditorStore } from "../store/editorStore";
+import Tooltip from "./Tooltip";
 
 export default function SideBarLeft() {
   const {
@@ -12,14 +13,15 @@ export default function SideBarLeft() {
   return (
     <div className="min-w-28 bg-neutral-800 p-2">
       <div className="mb-2 grid grid-cols-2">
-        <button
-          className="cursor-pointer p-2 hover:bg-neutral-600"
-          type="button"
-          title="Pencil tool (P)"
-          onClick={() => selectTool("pencil")}
-        >
-          <div className="h-8 w-8 bg-white"></div>
-        </button>
+        <Tooltip content="Pencil tool (P)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("pencil")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
         <button
           className="cursor-pointer p-2 hover:bg-neutral-600"
           type="button"
