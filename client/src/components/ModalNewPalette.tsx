@@ -11,7 +11,7 @@ export default function ModalNewPalette() {
   const { addPalette } = usePaletteStore();
   const [name, setName] = useState("");
   const [colors, setColors] = useState<string[]>([]);
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [container, setContainer] = useState<HTMLDialogElement | null>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
 
   function resetForm() {
@@ -58,7 +58,7 @@ export default function ModalNewPalette() {
       isDefault: false,
     });
     resetForm();
-    dialogRef.current?.close();
+    container?.close();
   }
 
   function handleClose() {
@@ -66,7 +66,7 @@ export default function ModalNewPalette() {
   }
 
   return (
-    <dialog ref={dialogRef} id="modal-new-palette" className="modal">
+    <dialog ref={setContainer} id="modal-new-palette" className="modal">
       <div className="modal-box w-fit max-w-none">
         <form method="dialog">
           <button
@@ -93,11 +93,7 @@ export default function ModalNewPalette() {
           />
         </div>
         <div className="mb-2 flex items-center">
-          <Tooltip
-            content="Change color"
-            side="top"
-            container={dialogRef.current}
-          >
+          <Tooltip content="Change color" side="top" container={container}>
             <input
               className="mr-2 h-10 w-10 cursor-pointer"
               type="color"

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MdAdd, MdClose, MdDelete, MdColorLens } from "react-icons/md";
 import { usePaletteStore } from "../store/paletteStore";
 import { useEditorStore } from "../store/editorStore";
@@ -12,19 +12,18 @@ export default function ModalEditPalette() {
     usePaletteStore();
   const [name, setName] = useState("");
   const [colors, setColors] = useState<string[]>([]);
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [container, setContainer] = useState<HTMLDialogElement | null>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
 
   const selectedPalette = getSelectedPalette();
 
   // Sync form when modal opens via showModal()
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
+    if (!container) return;
 
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        if (mutation.attributeName === "open" && dialog.open) {
+        if (mutation.attributeName === "open" && container.open) {
           const palette = getSelectedPalette();
           setName(palette.name);
           setColors([...palette.colors]);
@@ -35,9 +34,9 @@ export default function ModalEditPalette() {
       });
     });
 
-    observer.observe(dialog, { attributes: true });
+    observer.observe(container, { attributes: true });
     return () => observer.disconnect();
-  }, [getSelectedPalette]);
+  }, [container, getSelectedPalette]);
 
   function resetForm() {
     setName("");
@@ -81,13 +80,13 @@ export default function ModalEditPalette() {
       colors,
     });
     resetForm();
-    dialogRef.current?.close();
+    container?.close();
   }
 
   function handleDelete() {
     deletePalette(selectedPalette.id);
     resetForm();
-    dialogRef.current?.close();
+    container?.close();
   }
 
   function handleClose() {
@@ -95,7 +94,7 @@ export default function ModalEditPalette() {
   }
 
   return (
-    <dialog ref={dialogRef} id="modal-edit-palette" className="modal">
+    <dialog ref={setContainer} id="modal-edit-palette" className="modal">
       <div className="modal-box w-fit max-w-none">
         <form method="dialog">
           <button
@@ -120,11 +119,7 @@ export default function ModalEditPalette() {
           />
         </div>
         <div className="mb-2 flex items-center">
-          <Tooltip
-            content="Change color"
-            side="top"
-            container={dialogRef.current}
-          >
+          <Tooltip content="Change color" side="top" container={container}>
             <input
               className="mr-2 h-10 w-10 cursor-pointer"
               type="color"
