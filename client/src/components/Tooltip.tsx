@@ -5,18 +5,20 @@ type TooltipProps = {
   children: ReactNode;
   content: ReactNode;
   side?: "top" | "right" | "bottom" | "left";
+  container?: HTMLElement | null;
 };
 
 export default function Tooltip({
   children,
   content,
   side = "top",
+  container,
 }: TooltipProps) {
   return (
     <RadixTooltip.Provider delayDuration={100}>
       <RadixTooltip.Root disableHoverableContent>
         <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
-        <RadixTooltip.Portal>
+        <RadixTooltip.Portal container={container}>
           <RadixTooltip.Content
             side={side}
             sideOffset={6}

@@ -1,5 +1,6 @@
 import { FaMinus, FaPlus } from "react-icons/fa";
 import { MdUndo, MdRedo } from "react-icons/md";
+import Tooltip from "./Tooltip";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import { MIN_ZOOM_LEVEL, MAX_ZOOM_LEVEL } from "../constants";
@@ -34,77 +35,82 @@ export default function BottomBar() {
       </div>
       <div className="mr-2 ml-auto flex items-center">
         {zoomLevel > MIN_ZOOM_LEVEL ? (
-          <button
-            className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-            type="button"
-            title="Zoom out (-)"
-            onClick={() => zoomStepTowardsCenter(false)}
-          >
-            <FaMinus size={20} color="oklch(87% 0 0)" />
-          </button>
+          <Tooltip content="Zoom out (-)" side="top">
+            <button
+              className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+              type="button"
+              onClick={() => zoomStepTowardsCenter(false)}
+            >
+              <FaMinus size={20} color="oklch(87% 0 0)" />
+            </button>
+          </Tooltip>
         ) : (
-          <button className="rounded-lg p-1" type="button" title="Zoom out (-)">
-            <FaMinus size={20} color="oklch(55.6% 0 0)" />
-          </button>
+          <Tooltip content="Zoom out (-)" side="top">
+            <button className="rounded-lg p-1" type="button">
+              <FaMinus size={20} color="oklch(55.6% 0 0)" />
+            </button>
+          </Tooltip>
         )}
-        <span
-          className="cursor-pointer rounded-lg p-1 text-sm text-neutral-300 hover:bg-neutral-600"
-          title="Reset zoom (Ctrl + 0)"
-          onClick={resetZoom}
-        >
-          {Math.round(zoomLevel * 100)}%
-        </span>
-        {zoomLevel < MAX_ZOOM_LEVEL ? (
-          <button
-            className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-            type="button"
-            title="Zoom in (+)"
-            onClick={() => zoomStepTowardsCenter(true)}
+        <Tooltip content="Reset zoom (Ctrl + 0)" side="top">
+          <span
+            className="cursor-pointer rounded-lg p-1 text-sm text-neutral-300 hover:bg-neutral-600"
+            onClick={resetZoom}
           >
-            <FaPlus size={20} color="oklch(87% 0 0)" />
-          </button>
+            {Math.round(zoomLevel * 100)}%
+          </span>
+        </Tooltip>
+        {zoomLevel < MAX_ZOOM_LEVEL ? (
+          <Tooltip content="Zoom in (+)" side="top">
+            <button
+              className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+              type="button"
+              onClick={() => zoomStepTowardsCenter(true)}
+            >
+              <FaPlus size={20} color="oklch(87% 0 0)" />
+            </button>
+          </Tooltip>
         ) : (
-          <button className="rounded-lg p-1" type="button" title="Zoom in (+)">
-            <FaPlus size={20} color="oklch(55.6% 0 0)" />
-          </button>
+          <Tooltip content="Zoom in (+)" side="top">
+            <button className="rounded-lg p-1" type="button">
+              <FaPlus size={20} color="oklch(55.6% 0 0)" />
+            </button>
+          </Tooltip>
         )}
       </div>
       <div>
         {isEmptyUndoHistory ? (
-          <button
-            className="rounded-lg p-1"
-            type="button"
-            title="Undo (Ctrl + Z)"
-          >
-            <MdUndo size={20} color="oklch(55.6% 0 0)" />
-          </button>
+          <Tooltip content="Undo (Ctrl + Z)" side="top">
+            <button className="rounded-lg p-1" type="button">
+              <MdUndo size={20} color="oklch(55.6% 0 0)" />
+            </button>
+          </Tooltip>
         ) : (
-          <button
-            className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-            type="button"
-            title="Undo (Ctrl + Z)"
-            onClick={undo}
-          >
-            <MdUndo size={20} color="oklch(87% 0 0)" />
-          </button>
+          <Tooltip content="Undo (Ctrl + Z)" side="top">
+            <button
+              className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+              type="button"
+              onClick={undo}
+            >
+              <MdUndo size={20} color="oklch(87% 0 0)" />
+            </button>
+          </Tooltip>
         )}
         {isEmptyRedoHistory ? (
-          <button
-            className="rounded-lg p-1"
-            type="button"
-            title="Redo (Ctrl + Y)"
-          >
-            <MdRedo size={20} color="oklch(55.6% 0 0)" />
-          </button>
+          <Tooltip content="Redo (Ctrl + Y)" side="top">
+            <button className="rounded-lg p-1" type="button">
+              <MdRedo size={20} color="oklch(55.6% 0 0)" />
+            </button>
+          </Tooltip>
         ) : (
-          <button
-            className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-            type="button"
-            title="Redo (Ctrl + Y)"
-            onClick={redo}
-          >
-            <MdRedo size={20} color="oklch(87% 0 0)" />
-          </button>
+          <Tooltip content="Redo (Ctrl + Y)" side="top">
+            <button
+              className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+              type="button"
+              onClick={redo}
+            >
+              <MdRedo size={20} color="oklch(87% 0 0)" />
+            </button>
+          </Tooltip>
         )}
       </div>
     </div>

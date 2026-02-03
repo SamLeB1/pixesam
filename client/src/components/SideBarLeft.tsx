@@ -22,72 +22,80 @@ export default function SideBarLeft() {
             <div className="h-8 w-8 bg-white"></div>
           </button>
         </Tooltip>
-        <button
-          className="cursor-pointer p-2 hover:bg-neutral-600"
-          type="button"
-          title="Eraser tool (E)"
-          onClick={() => selectTool("eraser")}
-        >
-          <div className="h-8 w-8 bg-white"></div>
-        </button>
-        <button
-          className="cursor-pointer p-2 hover:bg-neutral-600"
-          type="button"
-          title="Color picker tool (C)"
-          onClick={() => selectTool("color-picker")}
-        >
-          <div className="h-8 w-8 bg-white"></div>
-        </button>
-        <button
-          className="cursor-pointer p-2 hover:bg-neutral-600"
-          type="button"
-          title="Bucket tool (B)"
-          onClick={() => selectTool("bucket")}
-        >
-          <div className="h-8 w-8 bg-white"></div>
-        </button>
-        <button
-          className="cursor-pointer p-2 hover:bg-neutral-600"
-          type="button"
-          title="Line tool (L)"
-          onClick={() => selectTool("line")}
-        >
-          <div className="h-8 w-8 bg-white"></div>
-        </button>
-        <button
-          className="cursor-pointer p-2 hover:bg-neutral-600"
-          type="button"
-          title="Select tool (S)"
-          onClick={() => selectTool("select")}
-        >
-          <div className="h-8 w-8 bg-white"></div>
-        </button>
-        <button
-          className="cursor-pointer p-2 hover:bg-neutral-600"
-          type="button"
-          title="Move tool (M)"
-          onClick={() => selectTool("move")}
-        >
-          <div className="h-8 w-8 bg-white"></div>
-        </button>
+        <Tooltip content="Eraser tool (E)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("eraser")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
+        <Tooltip content="Color picker tool (C)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("color-picker")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
+        <Tooltip content="Bucket tool (B)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("bucket")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
+        <Tooltip content="Line tool (L)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("line")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
+        <Tooltip content="Select tool (S)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("select")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
+        <Tooltip content="Move tool (M)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("move")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
       </div>
       <div className="relative mx-auto h-18 w-18">
-        <input
-          className="absolute top-0 left-0 z-1 h-2/3 w-2/3 cursor-pointer"
-          type="color"
-          id="color-primary"
-          title="Primary color - Left mouse button"
-          value={primaryColor}
-          onChange={(e) => setPrimaryColor(e.target.value)}
-        />
-        <input
-          className="absolute right-0 bottom-0 z-0 h-2/3 w-2/3 cursor-pointer"
-          type="color"
-          id="color-secondary"
-          title="Secondary color - Right mouse button"
-          value={secondaryColor}
-          onChange={(e) => setSecondaryColor(e.target.value)}
-        />
+        <Tooltip content="Primary color - Left mouse button" side="right">
+          <input
+            className="absolute top-0 left-0 z-1 h-2/3 w-2/3 cursor-pointer"
+            type="color"
+            id="color-primary"
+            value={primaryColor}
+            onChange={(e) => setPrimaryColor(e.target.value)}
+          />
+        </Tooltip>
+        <Tooltip content="Secondary color - Right mouse button" side="right">
+          <input
+            className="absolute right-0 bottom-0 z-0 h-2/3 w-2/3 cursor-pointer"
+            type="color"
+            id="color-secondary"
+            value={secondaryColor}
+            onChange={(e) => setSecondaryColor(e.target.value)}
+          />
+        </Tooltip>
       </div>
     </div>
   );

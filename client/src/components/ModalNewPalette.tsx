@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { MdAdd, MdClose, MdColorLens } from "react-icons/md";
 import { usePaletteStore } from "../store/paletteStore";
 import { useEditorStore } from "../store/editorStore";
+import Tooltip from "./Tooltip";
 import { extractColorsFromPixelData } from "../utils/colorExtractor";
 
 const DEFAULT_COLOR_PICKER_VALUE = "#000000";
@@ -92,13 +93,18 @@ export default function ModalNewPalette() {
           />
         </div>
         <div className="mb-2 flex items-center">
-          <input
-            className="mr-2 h-10 w-10 cursor-pointer"
-            type="color"
-            ref={colorInputRef}
-            title="Change color"
-            defaultValue={DEFAULT_COLOR_PICKER_VALUE}
-          />
+          <Tooltip
+            content="Change color"
+            side="top"
+            container={dialogRef.current}
+          >
+            <input
+              className="mr-2 h-10 w-10 cursor-pointer"
+              type="color"
+              ref={colorInputRef}
+              defaultValue={DEFAULT_COLOR_PICKER_VALUE}
+            />
+          </Tooltip>
           <button
             className="btn btn-sm btn-primary mr-2"
             type="button"

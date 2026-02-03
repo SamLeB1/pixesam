@@ -6,6 +6,7 @@ import { paletteToGpl, parseGpl } from "../utils/gplConverter";
 import PaletteColors from "./PaletteColors";
 import ModalNewPalette from "./ModalNewPalette";
 import ModalEditPalette from "./ModalEditPalette";
+import Tooltip from "./Tooltip";
 
 export default function ColorPaletteMenu() {
   const {
@@ -87,58 +88,60 @@ export default function ColorPaletteMenu() {
             </option>
           ))}
         </select>
-        <button
-          className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-          type="button"
-          title="New palette"
-          onClick={() => {
-            const modal = document.getElementById(
-              "modal-new-palette",
-            ) as HTMLDialogElement;
-            if (modal) modal.showModal();
-          }}
-        >
-          <MdAdd size={20} color="oklch(87% 0 0)" />
-        </button>
-        {selectedPalette.isDefault ? (
-          <button
-            className="cursor-not-allowed rounded-lg p-1"
-            type="button"
-            title="Cannot edit default palettes"
-          >
-            <MdEdit size={20} color="oklch(55.6% 0 0)" />
-          </button>
-        ) : (
+        <Tooltip content="New palette" side="bottom">
           <button
             className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
             type="button"
-            title="Edit palette"
             onClick={() => {
               const modal = document.getElementById(
-                "modal-edit-palette",
+                "modal-new-palette",
               ) as HTMLDialogElement;
               if (modal) modal.showModal();
             }}
           >
-            <MdEdit size={20} color="oklch(87% 0 0)" />
+            <MdAdd size={20} color="oklch(87% 0 0)" />
           </button>
+        </Tooltip>
+        {selectedPalette.isDefault ? (
+          <Tooltip content="Cannot edit default palettes" side="bottom">
+            <button className="cursor-not-allowed rounded-lg p-1" type="button">
+              <MdEdit size={20} color="oklch(55.6% 0 0)" />
+            </button>
+          </Tooltip>
+        ) : (
+          <Tooltip content="Edit palette" side="bottom">
+            <button
+              className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+              type="button"
+              onClick={() => {
+                const modal = document.getElementById(
+                  "modal-edit-palette",
+                ) as HTMLDialogElement;
+                if (modal) modal.showModal();
+              }}
+            >
+              <MdEdit size={20} color="oklch(87% 0 0)" />
+            </button>
+          </Tooltip>
         )}
-        <button
-          className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-          type="button"
-          title="Import palette (.gpl)"
-          onClick={() => gplFileInputRef.current?.click()}
-        >
-          <MdFileDownload size={20} color="oklch(87% 0 0)" />
-        </button>
-        <button
-          className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-          type="button"
-          title="Export palette (.gpl)"
-          onClick={handleExportGpl}
-        >
-          <MdFileUpload size={20} color="oklch(87% 0 0)" />
-        </button>
+        <Tooltip content="Import palette (.gpl)" side="bottom">
+          <button
+            className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+            type="button"
+            onClick={() => gplFileInputRef.current?.click()}
+          >
+            <MdFileDownload size={20} color="oklch(87% 0 0)" />
+          </button>
+        </Tooltip>
+        <Tooltip content="Export palette (.gpl)" side="bottom">
+          <button
+            className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+            type="button"
+            onClick={handleExportGpl}
+          >
+            <MdFileUpload size={20} color="oklch(87% 0 0)" />
+          </button>
+        </Tooltip>
       </div>
       <PaletteColors colors={selectedPalette.colors} />
       <ModalNewPalette />
