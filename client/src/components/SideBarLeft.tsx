@@ -58,6 +58,26 @@ export default function SideBarLeft() {
             <div className="h-8 w-8 bg-white"></div>
           </button>
         </Tooltip>
+        <Tooltip
+          content={
+            <>
+              <h3>Shade tool (D)</h3>
+              <ul className="list-inside list-disc">
+                <li className="text-neutral-300">Left-button: Darken</li>
+                <li className="text-neutral-300">Right-button: Lighten</li>
+              </ul>
+            </>
+          }
+          side="right"
+        >
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("shade")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
         <Tooltip content="Select tool (S)" side="right">
           <button
             className="cursor-pointer p-2 hover:bg-neutral-600"
@@ -78,7 +98,7 @@ export default function SideBarLeft() {
         </Tooltip>
       </div>
       <div className="relative mx-auto h-18 w-18">
-        <Tooltip content="Primary color - Left mouse button" side="right">
+        <Tooltip content="Primary color - Left-button to use" side="right">
           <input
             className="absolute top-0 left-0 z-1 h-2/3 w-2/3 cursor-pointer"
             type="color"
@@ -87,7 +107,7 @@ export default function SideBarLeft() {
             onChange={(e) => setPrimaryColor(e.target.value)}
           />
         </Tooltip>
-        <Tooltip content="Secondary color - Right mouse button" side="right">
+        <Tooltip content="Secondary color - Right-button to use" side="right">
           <input
             className="absolute right-0 bottom-0 z-0 h-2/3 w-2/3 cursor-pointer"
             type="color"

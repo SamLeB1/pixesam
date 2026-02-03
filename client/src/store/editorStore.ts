@@ -111,6 +111,7 @@ type Tool =
   | "color-picker"
   | "bucket"
   | "line"
+  | "shade"
   | "select"
   | "move";
 
