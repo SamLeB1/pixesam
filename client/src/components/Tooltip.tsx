@@ -1,5 +1,5 @@
 import * as RadixTooltip from "@radix-ui/react-tooltip";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 type TooltipProps = {
   children: ReactNode;
@@ -14,10 +14,19 @@ export default function Tooltip({
   side = "top",
   container,
 }: TooltipProps) {
+  const [open, setOpen] = useState(false);
+
   return (
     <RadixTooltip.Provider delayDuration={100}>
-      <RadixTooltip.Root disableHoverableContent>
-        <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
+      <RadixTooltip.Root open={open} disableHoverableContent>
+        <RadixTooltip.Trigger
+          asChild
+          onPointerEnter={() => setOpen(true)}
+          onPointerLeave={() => setOpen(false)}
+          onClick={() => setOpen(false)}
+        >
+          {children}
+        </RadixTooltip.Trigger>
         <RadixTooltip.Portal container={container}>
           <RadixTooltip.Content
             side={side}
