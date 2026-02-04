@@ -127,6 +127,8 @@ type EditorState = {
   brushSize: number;
   lineStartPos: { x: number; y: number } | null;
   lineEndPos: { x: number; y: number } | null;
+  switchDarkenAndLighten: boolean;
+  shadeStrength: number;
   selectionMode: "rectangular" | "lasso" | "wand";
   selectionMask: Uint8Array | null;
   selectionAction: "select" | "move" | "resize" | null;
@@ -158,6 +160,8 @@ type EditorState = {
   setBrushSize: (n: number) => void;
   setLineStartPos: (pos: { x: number; y: number } | null) => void;
   setLineEndPos: (pos: { x: number; y: number } | null) => void;
+  setSwitchDarkenAndLighten: (isSwitch: boolean) => void;
+  setShadeStrength: (strength: number) => void;
   setSelectionMode: (mode: "rectangular" | "lasso" | "wand") => void;
   setSelectionMask: (mask: Uint8Array | null) => void;
   setSelectionAction: (action: "select" | "move" | "resize" | null) => void;
@@ -232,6 +236,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   brushSize: 1,
   lineStartPos: null,
   lineEndPos: null,
+  switchDarkenAndLighten: false,
+  shadeStrength: 10,
   selectionMode: "rectangular",
   selectionMask: null,
   selectionAction: null,
@@ -263,6 +269,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setBrushSize: (n) => set({ brushSize: n }),
   setLineStartPos: (pos) => set({ lineStartPos: pos }),
   setLineEndPos: (pos) => set({ lineEndPos: pos }),
+  setSwitchDarkenAndLighten: (isSwitch) =>
+    set({ switchDarkenAndLighten: isSwitch }),
+  setShadeStrength: (strength) => set({ shadeStrength: strength }),
   setSelectionMode: (mode) => set({ selectionMode: mode }),
   setSelectionMask: (mask) => set({ selectionMask: mask }),
   setSelectionAction: (action) => set({ selectionAction: action }),
