@@ -68,6 +68,7 @@ export default function Canvas() {
     getPixelColor,
     getEffectiveSelectionBounds,
     draw,
+    drawShade,
     drawLine,
     erase,
     floodFill,
@@ -546,6 +547,19 @@ export default function Canvas() {
     } else setLineEndPos({ x, y });
   }
 
+  function handleShadeAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+    if (activeMouseButton.current === 0) drawShade(x, y, true);
+    else if (activeMouseButton.current === 2) drawShade(x, y, false);
+  }
+
   function handleSelectAction(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
     isInitialClick: boolean,
@@ -759,6 +773,9 @@ export default function Canvas() {
       case "line":
         if (btn === 0 || btn === 2) handleLineAction(e, isInitialClick);
         break;
+      case "shade":
+        if (btn === 0 || btn === 2) handleShadeAction(e);
+        break;
       case "select":
         if (btn === 0 || btn === 2) handleSelectAction(e, isInitialClick);
         break;
@@ -857,10 +874,16 @@ export default function Canvas() {
       } else if (lineStartPos && lineEndPos) {
         drawLinePreview(ctx);
       } else if (hoveredPixel) {
-        const offset = -Math.floor(brushSize / 2);
-        const x = hoveredPixel.x + offset;
-        const y = hoveredPixel.y + offset;
-        drawFilterRect(ctx, x, y, brushSize, brushSize);
+        if (
+          selectedTool === "pencil" ||
+          selectedTool === "eraser" ||
+          selectedTool === "line"
+        ) {
+          const offset = -Math.floor(brushSize / 2);
+          const x = hoveredPixel.x + offset;
+          const y = hoveredPixel.y + offset;
+          drawFilterRect(ctx, x, y, brushSize, brushSize);
+        } else drawFilterRect(ctx, hoveredPixel.x, hoveredPixel.y, 1, 1);
       }
     }
 
@@ -935,6 +958,9 @@ export default function Canvas() {
       } else if (key === "l") {
         e.preventDefault();
         selectTool("line");
+      } else if (key === "d") {
+        e.preventDefault();
+        selectTool("shade");
       } else if (key === "s") {
         e.preventDefault();
         selectTool("select");

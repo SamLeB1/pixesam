@@ -187,6 +187,7 @@ type EditorState = {
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
+  drawShade: (x: number, y: number, darken: boolean) => void;
   drawLine: (color: RGBA) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
@@ -434,6 +435,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
         }
+      }
+      return {
+        pixelData: newData,
+        drawBuffer: newDrawBuffer,
+        drawnPixels: newDrawnPixels,
+        lastDrawPos: { x, y },
+      };
+    }),
+  drawShade: (x, y, darken) =>
+    set((state) => {
+      const {
+        pixelData,
+        gridSize,
+        switchDarkenAndLighten,
+        shadeStrength,
+        drawBuffer,
+        drawnPixels,
+        lastDrawPos,
+        getPixelColor,
+      } = state;
+      if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
+      const newData = new Uint8ClampedArray(pixelData);
+      const newDrawBuffer = [...drawBuffer];
+      const newDrawnPixels = new Set(drawnPixels);
+      darken = switchDarkenAndLighten ? !darken : darken;
+
+      const pointsToDraw = lastDrawPos
+        ? interpolateBetweenPoints(lastDrawPos.x, lastDrawPos.y, x, y)
+        : [{ x, y }];
+      for (const point of pointsToDraw) {
+        if (!isValidIndex(point.x, point.y, gridSize)) continue;
+        const currColor = getPixelColor(point.x, point.y);
+        if (currColor.a === 0) continue;
+        currColor.a /= 255;
+        const newColor = darken
+          ? tinycolor(currColor).darken(shadeStrength).toRgb()
+          : tinycolor(currColor).lighten(shadeStrength).toRgb();
+        currColor.a *= 255;
+        newColor.a *= 255;
+
+        const key = `${point.x},${point.y}`;
+        if (newDrawnPixels.has(key)) continue;
+        newDrawnPixels.add(key);
+        newDrawBuffer.push({
+          x: point.x,
+          y: point.y,
+          color: newColor,
+          prevColor: currColor,
+        });
+        setPixelColor(point.x, point.y, gridSize.x, newColor, newData);
       }
       return {
         pixelData: newData,
