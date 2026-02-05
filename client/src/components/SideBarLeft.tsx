@@ -58,6 +58,15 @@ export default function SideBarLeft() {
             <div className="h-8 w-8 bg-white"></div>
           </button>
         </Tooltip>
+        <Tooltip content="Shape tool (H)" side="right">
+          <button
+            className="cursor-pointer p-2 hover:bg-neutral-600"
+            type="button"
+            onClick={() => selectTool("shape")}
+          >
+            <div className="h-8 w-8 bg-white"></div>
+          </button>
+        </Tooltip>
         <Tooltip
           content={
             <>

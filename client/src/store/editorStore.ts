@@ -111,6 +111,7 @@ type Tool =
   | "color-picker"
   | "bucket"
   | "line"
+  | "shape"
   | "shade"
   | "select"
   | "move";
@@ -127,6 +128,8 @@ type EditorState = {
   brushSize: number;
   lineStartPos: { x: number; y: number } | null;
   lineEndPos: { x: number; y: number } | null;
+  shapeMode: "rectangle" | "ellipse";
+  shapeFill: boolean;
   switchDarkenAndLighten: boolean;
   shadeStrength: number;
   selectionMode: "rectangular" | "lasso" | "wand";
@@ -160,6 +163,8 @@ type EditorState = {
   setBrushSize: (n: number) => void;
   setLineStartPos: (pos: { x: number; y: number } | null) => void;
   setLineEndPos: (pos: { x: number; y: number } | null) => void;
+  setShapeMode: (mode: "rectangle" | "ellipse") => void;
+  setShapeFill: (fill: boolean) => void;
   setSwitchDarkenAndLighten: (isSwitch: boolean) => void;
   setShadeStrength: (strength: number) => void;
   setSelectionMode: (mode: "rectangular" | "lasso" | "wand") => void;
@@ -237,6 +242,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   brushSize: 1,
   lineStartPos: null,
   lineEndPos: null,
+  shapeMode: "rectangle",
+  shapeFill: false,
   switchDarkenAndLighten: false,
   shadeStrength: 10,
   selectionMode: "rectangular",
@@ -270,6 +277,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setBrushSize: (n) => set({ brushSize: n }),
   setLineStartPos: (pos) => set({ lineStartPos: pos }),
   setLineEndPos: (pos) => set({ lineEndPos: pos }),
+  setShapeMode: (mode) => set({ shapeMode: mode }),
+  setShapeFill: (fill) => set({ shapeFill: fill }),
   setSwitchDarkenAndLighten: (isSwitch) =>
     set({ switchDarkenAndLighten: isSwitch }),
   setShadeStrength: (strength) => set({ shadeStrength: strength }),
