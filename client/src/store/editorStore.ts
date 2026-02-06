@@ -12,7 +12,12 @@ import {
   resizePixelsWithNearestNeighbor,
   resizeMaskWithNearestNeighbor,
 } from "../utils/canvas";
-import { interpolateBetweenPoints, isInPolygon } from "../utils/geometry";
+import {
+  interpolateBetweenPoints,
+  isInPolygon,
+  getEllipseOutlinePoints,
+  getEllipseFillPoints,
+} from "../utils/geometry";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
@@ -130,6 +135,8 @@ type EditorState = {
   lineEndPos: { x: number; y: number } | null;
   shapeMode: "rectangle" | "ellipse";
   shapeFill: boolean;
+  shapeStartPos: { x: number; y: number } | null;
+  shapeEndPos: { x: number; y: number } | null;
   switchDarkenAndLighten: boolean;
   shadeStrength: number;
   selectionMode: "rectangular" | "lasso" | "wand";
@@ -165,6 +172,8 @@ type EditorState = {
   setLineEndPos: (pos: { x: number; y: number } | null) => void;
   setShapeMode: (mode: "rectangle" | "ellipse") => void;
   setShapeFill: (fill: boolean) => void;
+  setShapeStartPos: (pos: { x: number; y: number } | null) => void;
+  setShapeEndPos: (pos: { x: number; y: number } | null) => void;
   setSwitchDarkenAndLighten: (isSwitch: boolean) => void;
   setShadeStrength: (strength: number) => void;
   setSelectionMode: (mode: "rectangular" | "lasso" | "wand") => void;
@@ -194,6 +203,7 @@ type EditorState = {
   draw: (x: number, y: number, color: RGBA) => void;
   drawShade: (x: number, y: number, darken: boolean) => void;
   drawLine: (color: RGBA) => void;
+  drawShape: (color: RGBA) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
     x: number,
@@ -244,6 +254,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   lineEndPos: null,
   shapeMode: "rectangle",
   shapeFill: false,
+  shapeStartPos: null,
+  shapeEndPos: null,
   switchDarkenAndLighten: false,
   shadeStrength: 10,
   selectionMode: "rectangular",
@@ -279,6 +291,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setLineEndPos: (pos) => set({ lineEndPos: pos }),
   setShapeMode: (mode) => set({ shapeMode: mode }),
   setShapeFill: (fill) => set({ shapeFill: fill }),
+  setShapeStartPos: (pos) => set({ shapeStartPos: pos }),
+  setShapeEndPos: (pos) => set({ shapeEndPos: pos }),
   setSwitchDarkenAndLighten: (isSwitch) =>
     set({ switchDarkenAndLighten: isSwitch }),
   setShadeStrength: (strength) => set({ shadeStrength: strength }),
@@ -304,6 +318,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         lineStartPos: null,
         lineEndPos: null,
+        shapeStartPos: null,
+        shapeEndPos: null,
         moveStartPos: null,
         moveOffset: null,
         drawBuffer: [],
@@ -317,10 +333,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedTool,
         lineStartPos,
         lineEndPos,
+        shapeStartPos,
+        shapeEndPos,
         showSelectionPreview,
         moveOffset,
         getActiveColorRGBA,
         drawLine,
+        drawShape,
         initSelection,
         applySelectionAction,
         applyMove,
@@ -332,6 +351,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       else initSelection();
       if (moveOffset) applyMove();
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+      if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
       clearDrawBuffer();
 
       return { selectedTool: tool };
@@ -550,6 +570,93 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         pixelData: newData,
         lineStartPos: null,
         lineEndPos: null,
+        drawBuffer,
+      };
+    }),
+  drawShape: (color) =>
+    set((state) => {
+      const {
+        pixelData,
+        gridSize,
+        brushSize,
+        shapeStartPos,
+        shapeEndPos,
+        shapeMode,
+        shapeFill,
+        getPixelColor,
+      } = state;
+      if (!shapeStartPos || !shapeEndPos) return {};
+      const newData = new Uint8ClampedArray(pixelData);
+      const drawBuffer: DrawActionPixel[] = [];
+      const drawnPixels = new Set<string>();
+      const offset = -Math.floor(brushSize / 2);
+
+      const x1 = Math.min(shapeStartPos.x, shapeEndPos.x);
+      const y1 = Math.min(shapeStartPos.y, shapeEndPos.y);
+      const x2 = Math.max(shapeStartPos.x, shapeEndPos.x);
+      const y2 = Math.max(shapeStartPos.y, shapeEndPos.y);
+
+      function setPixel(px: number, py: number) {
+        if (!isValidIndex(px, py, gridSize)) return;
+        const key = `${px},${py}`;
+        if (drawnPixels.has(key)) return;
+        drawnPixels.add(key);
+        drawBuffer.push({
+          x: px,
+          y: py,
+          color,
+          prevColor: getPixelColor(px, py),
+        });
+        setPixelColor(px, py, gridSize.x, color, newData);
+      }
+
+      function drawBrushAt(px: number, py: number) {
+        for (let i = 0; i < brushSize; i++) {
+          for (let j = 0; j < brushSize; j++) {
+            setPixel(px + j + offset, py + i + offset);
+          }
+        }
+      }
+
+      let outlinePoints: { x: number; y: number }[];
+
+      if (shapeMode === "rectangle") {
+        outlinePoints = [
+          { x: x1, y: y1 },
+          ...interpolateBetweenPoints(x1, y1, x2, y1),
+          ...interpolateBetweenPoints(x2, y1, x2, y2),
+          ...interpolateBetweenPoints(x2, y2, x1, y2),
+          ...interpolateBetweenPoints(x1, y2, x1, y1),
+        ];
+      } else {
+        outlinePoints = getEllipseOutlinePoints(x1, y1, x2, y2);
+      }
+
+      for (const point of outlinePoints) {
+        drawBrushAt(point.x, point.y);
+      }
+
+      if (shapeFill) {
+        let fillPoints: { x: number; y: number }[];
+        if (shapeMode === "rectangle") {
+          fillPoints = [];
+          for (let fy = y1; fy <= y2; fy++) {
+            for (let fx = x1; fx <= x2; fx++) {
+              fillPoints.push({ x: fx, y: fy });
+            }
+          }
+        } else {
+          fillPoints = getEllipseFillPoints(x1, y1, x2, y2);
+        }
+        for (const point of fillPoints) {
+          setPixel(point.x, point.y);
+        }
+      }
+
+      return {
+        pixelData: newData,
+        shapeStartPos: null,
+        shapeEndPos: null,
         drawBuffer,
       };
     }),
@@ -1444,12 +1551,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         gridSize,
         lineStartPos,
         lineEndPos,
+        shapeStartPos,
+        shapeEndPos,
         showSelectionPreview,
         moveOffset,
         mousePos,
         clipboard,
         getActiveColorRGBA,
         drawLine,
+        drawShape,
         initSelection,
         applySelectionAction,
         applyMove,
@@ -1464,6 +1574,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       if (moveOffset) applyMove();
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+      if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
       clearDrawBuffer();
 
       const { pixels, width, height, mask } = clipboard;

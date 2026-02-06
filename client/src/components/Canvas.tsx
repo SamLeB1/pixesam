@@ -3,7 +3,11 @@ import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import { isValidIndex } from "../utils/canvas";
-import { interpolateBetweenPoints } from "../utils/geometry";
+import {
+  interpolateBetweenPoints,
+  getEllipseOutlinePoints,
+  getEllipseFillPoints,
+} from "../utils/geometry";
 import { BASE_PX_SIZE } from "../constants";
 import type { Direction, Rect } from "../types";
 
@@ -32,6 +36,10 @@ export default function Canvas() {
     brushSize,
     lineStartPos,
     lineEndPos,
+    shapeMode,
+    shapeFill,
+    shapeStartPos,
+    shapeEndPos,
     selectionMode,
     selectionMask,
     selectionAction,
@@ -53,6 +61,8 @@ export default function Canvas() {
     setIsPrimaryColorActive,
     setLineStartPos,
     setLineEndPos,
+    setShapeStartPos,
+    setShapeEndPos,
     setSelectionAction,
     setSelectionStartPos,
     setSelectionMoveOffset,
@@ -70,6 +80,7 @@ export default function Canvas() {
     draw,
     drawShade,
     drawLine,
+    drawShape,
     erase,
     floodFill,
     endSelectionAction,
@@ -215,6 +226,71 @@ export default function Canvas() {
             pxSize,
           );
         }
+      }
+    }
+  }
+
+  function drawShapePreview(ctx: CanvasRenderingContext2D) {
+    if (!shapeStartPos || !shapeEndPos) return;
+
+    ctx.fillStyle = getActiveColorHex();
+    const pxSize = getPxSize();
+    const drawnPixels = new Set<string>();
+    const offset = -Math.floor(brushSize / 2);
+
+    const x1 = Math.min(shapeStartPos.x, shapeEndPos.x);
+    const y1 = Math.min(shapeStartPos.y, shapeEndPos.y);
+    const x2 = Math.max(shapeStartPos.x, shapeEndPos.x);
+    const y2 = Math.max(shapeStartPos.y, shapeEndPos.y);
+
+    function drawPixel(px: number, py: number) {
+      if (!isValidIndex(px, py, gridSize)) return;
+      const key = `${px},${py}`;
+      if (drawnPixels.has(key)) return;
+      drawnPixels.add(key);
+      ctx.fillRect(
+        (px - panOffset.x) * pxSize,
+        (py - panOffset.y) * pxSize,
+        pxSize,
+        pxSize,
+      );
+    }
+
+    let outlinePoints: { x: number; y: number }[];
+    if (shapeMode === "rectangle") {
+      outlinePoints = [
+        { x: x1, y: y1 },
+        ...interpolateBetweenPoints(x1, y1, x2, y1),
+        ...interpolateBetweenPoints(x2, y1, x2, y2),
+        ...interpolateBetweenPoints(x2, y2, x1, y2),
+        ...interpolateBetweenPoints(x1, y2, x1, y1),
+      ];
+    } else {
+      outlinePoints = getEllipseOutlinePoints(x1, y1, x2, y2);
+    }
+
+    for (const point of outlinePoints) {
+      for (let i = 0; i < brushSize; i++) {
+        for (let j = 0; j < brushSize; j++) {
+          drawPixel(point.x + j + offset, point.y + i + offset);
+        }
+      }
+    }
+
+    if (shapeFill) {
+      let fillPoints: { x: number; y: number }[];
+      if (shapeMode === "rectangle") {
+        fillPoints = [];
+        for (let fy = y1; fy <= y2; fy++) {
+          for (let fx = x1; fx <= x2; fx++) {
+            fillPoints.push({ x: fx, y: fy });
+          }
+        }
+      } else {
+        fillPoints = getEllipseFillPoints(x1, y1, x2, y2);
+      }
+      for (const point of fillPoints) {
+        drawPixel(point.x, point.y);
       }
     }
   }
@@ -547,6 +623,22 @@ export default function Canvas() {
     } else setLineEndPos({ x, y });
   }
 
+  function handleShapeAction(
+    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+    isInitialClick: boolean,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
+    const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+
+    if (isInitialClick) {
+      setShapeStartPos({ x, y });
+      setShapeEndPos({ x, y });
+    } else setShapeEndPos({ x, y });
+  }
+
   function handleShadeAction(
     e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
   ) {
@@ -773,6 +865,9 @@ export default function Canvas() {
       case "line":
         if (btn === 0 || btn === 2) handleLineAction(e, isInitialClick);
         break;
+      case "shape":
+        if (btn === 0 || btn === 2) handleShapeAction(e, isInitialClick);
+        break;
       case "shade":
         if (btn === 0 || btn === 2) handleShadeAction(e);
         break;
@@ -798,6 +893,7 @@ export default function Canvas() {
 
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
     if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+    if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
     if (selectionAction) endSelectionAction();
     updateHoveredPixel(e);
     clearDrawBuffer();
@@ -812,6 +908,7 @@ export default function Canvas() {
 
   function handleMouseLeave() {
     if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+    if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
     if (selectionAction) endSelectionAction();
     setHoveredPixel(null);
     setHoveredResizeHandle(null);
@@ -873,11 +970,14 @@ export default function Canvas() {
         drawSelectionDrag(ctx);
       } else if (lineStartPos && lineEndPos) {
         drawLinePreview(ctx);
+      } else if (shapeStartPos && shapeEndPos) {
+        drawShapePreview(ctx);
       } else if (hoveredPixel) {
         if (
           selectedTool === "pencil" ||
           selectedTool === "eraser" ||
-          selectedTool === "line"
+          selectedTool === "line" ||
+          selectedTool === "shape"
         ) {
           const offset = -Math.floor(brushSize / 2);
           const x = hoveredPixel.x + offset;
@@ -908,6 +1008,8 @@ export default function Canvas() {
     brushSize,
     lineStartPos,
     lineEndPos,
+    shapeStartPos,
+    shapeEndPos,
     selectionMoveOffset,
     selectionResizeOffset,
     selectedArea,
@@ -958,6 +1060,9 @@ export default function Canvas() {
       } else if (key === "l") {
         e.preventDefault();
         selectTool("line");
+      } else if (key === "h") {
+        e.preventDefault();
+        selectTool("shape");
       } else if (key === "d") {
         e.preventDefault();
         selectTool("shade");
