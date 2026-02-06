@@ -26,6 +26,33 @@ export function interpolateBetweenPoints(
   return points;
 }
 
+export function getRectOutlinePoints(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+) {
+  if (x1 === x2 && y1 === y2) return [{ x: x1, y: y1 }];
+  const points: { x: number; y: number }[] = [];
+  for (let i = x1; i < x2; i++) points.push({ x: i, y: y1 });
+  for (let i = y1; i < y2; i++) points.push({ x: x2, y: i });
+  for (let i = x2; i > x1; i--) points.push({ x: i, y: y2 });
+  for (let i = y2; i > y1; i--) points.push({ x: x1, y: i });
+  return points;
+}
+
+export function getRectFillPoints(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+) {
+  const points: { x: number; y: number }[] = [];
+  for (let i = y1; i <= y2; i++)
+    for (let j = x1; j <= x2; j++) points.push({ x: j, y: i });
+  return points;
+}
+
 export function getEllipseOutlinePoints(
   x1: number,
   y1: number,

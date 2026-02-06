@@ -5,6 +5,8 @@ import useCanvasZoom from "../hooks/useCanvasZoom";
 import { isValidIndex } from "../utils/canvas";
 import {
   interpolateBetweenPoints,
+  getRectOutlinePoints,
+  getRectFillPoints,
   getEllipseOutlinePoints,
   getEllipseFillPoints,
 } from "../utils/geometry";
@@ -256,42 +258,21 @@ export default function Canvas() {
       );
     }
 
-    let outlinePoints: { x: number; y: number }[];
-    if (shapeMode === "rectangle") {
-      outlinePoints = [
-        { x: x1, y: y1 },
-        ...interpolateBetweenPoints(x1, y1, x2, y1),
-        ...interpolateBetweenPoints(x2, y1, x2, y2),
-        ...interpolateBetweenPoints(x2, y2, x1, y2),
-        ...interpolateBetweenPoints(x1, y2, x1, y1),
-      ];
-    } else {
-      outlinePoints = getEllipseOutlinePoints(x1, y1, x2, y2);
-    }
-
-    for (const point of outlinePoints) {
-      for (let i = 0; i < brushSize; i++) {
-        for (let j = 0; j < brushSize; j++) {
+    const outlinePoints =
+      shapeMode === "rectangle"
+        ? getRectOutlinePoints(x1, y1, x2, y2)
+        : getEllipseOutlinePoints(x1, y1, x2, y2);
+    for (const point of outlinePoints)
+      for (let i = 0; i < brushSize; i++)
+        for (let j = 0; j < brushSize; j++)
           drawPixel(point.x + j + offset, point.y + i + offset);
-        }
-      }
-    }
 
     if (shapeFill) {
-      let fillPoints: { x: number; y: number }[];
-      if (shapeMode === "rectangle") {
-        fillPoints = [];
-        for (let fy = y1; fy <= y2; fy++) {
-          for (let fx = x1; fx <= x2; fx++) {
-            fillPoints.push({ x: fx, y: fy });
-          }
-        }
-      } else {
-        fillPoints = getEllipseFillPoints(x1, y1, x2, y2);
-      }
-      for (const point of fillPoints) {
-        drawPixel(point.x, point.y);
-      }
+      const fillPoints =
+        shapeMode === "rectangle"
+          ? getRectFillPoints(x1, y1, x2, y2)
+          : getEllipseFillPoints(x1, y1, x2, y2);
+      for (const point of fillPoints) drawPixel(point.x, point.y);
     }
   }
 
