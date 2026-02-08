@@ -371,6 +371,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   getPixelColor: (x, y) => {
     const { pixelData, gridSize } = get();
+    if (!isValidIndex(x, y, gridSize)) return { r: 0, g: 0, b: 0, a: 0 };
     const baseIndex = getBaseIndex(x, y, gridSize.x);
     return {
       r: pixelData[baseIndex],
@@ -644,6 +645,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   floodFill: (x, y, color, isUpdateHistory = true) =>
     set((state) => {
       const { pixelData, gridSize, updateHistory } = state;
+      if (!isValidIndex(x, y, gridSize)) return {};
       const targetColor = getPixelColor(x, y, gridSize.x, pixelData);
       if (isEqualColor(targetColor, color)) return {};
 
@@ -1486,16 +1488,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectedArea,
         selectedPixels,
         showSelectionPreview,
-        getPixelsInRect,
         getEffectiveSelectionBounds,
       } = state;
-      if (!selectedArea) return {};
+      if (!selectedArea || !showSelectionPreview) return {};
 
       const bounds = getEffectiveSelectionBounds() as Rect;
       let newMask = selectionMask;
-      let pixelsToCopy = showSelectionPreview
-        ? selectedPixels
-        : getPixelsInRect(selectedArea);
+      let pixelsToCopy = selectedPixels;
       if (
         selectedArea.width !== bounds.width ||
         selectedArea.height !== bounds.height

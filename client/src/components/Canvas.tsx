@@ -448,9 +448,7 @@ export default function Canvas() {
     return { x, y };
   }
 
-  function updateHoveredPixel(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) {
+  function updateHoveredPixel(e: MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -536,9 +534,7 @@ export default function Canvas() {
     );
   }
 
-  function handlePencilAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) {
+  function handlePencilAction(e: MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -548,9 +544,7 @@ export default function Canvas() {
     draw(x, y, getActiveColorRGBA());
   }
 
-  function handleEraserAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) {
+  function handleEraserAction(e: MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -560,15 +554,15 @@ export default function Canvas() {
     erase(x, y);
   }
 
-  function handleColorPickerAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) {
+  function handleColorPickerAction(e: MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
+    if (!isValidIndex(x, y, gridSize)) return;
+
     const rgba = getPixelColor(x, y);
     const hex = tinycolor(rgba).toHexString();
     activeMouseButton.current === 0
@@ -576,9 +570,7 @@ export default function Canvas() {
       : setSecondaryColor(hex);
   }
 
-  function handleBucketAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) {
+  function handleBucketAction(e: MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -588,10 +580,7 @@ export default function Canvas() {
     floodFill(x, y, getActiveColorRGBA());
   }
 
-  function handleLineAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-    isInitialClick: boolean,
-  ) {
+  function handleLineAction(e: MouseEvent, isInitialClick: boolean) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -604,10 +593,7 @@ export default function Canvas() {
     } else setLineEndPos({ x, y });
   }
 
-  function handleShapeAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-    isInitialClick: boolean,
-  ) {
+  function handleShapeAction(e: MouseEvent, isInitialClick: boolean) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -620,9 +606,7 @@ export default function Canvas() {
     } else setShapeEndPos({ x, y });
   }
 
-  function handleShadeAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-  ) {
+  function handleShadeAction(e: MouseEvent) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -633,10 +617,7 @@ export default function Canvas() {
     else if (activeMouseButton.current === 2) drawShade(x, y, false);
   }
 
-  function handleSelectAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-    isInitialClick: boolean,
-  ) {
+  function handleSelectAction(e: MouseEvent, isInitialClick: boolean) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -770,10 +751,7 @@ export default function Canvas() {
     }
   }
 
-  function handleMoveAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-    isInitialClick: boolean,
-  ) {
+  function handleMoveAction(e: MouseEvent, isInitialClick: boolean) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -793,10 +771,7 @@ export default function Canvas() {
     });
   }
 
-  function handlePanAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-    isInitialClick: boolean,
-  ) {
+  function handlePanAction(e: MouseEvent, isInitialClick: boolean) {
     if (isInitialClick) {
       prevPanMousePos.current = { x: e.clientX, y: e.clientY };
       return;
@@ -821,10 +796,7 @@ export default function Canvas() {
     prevPanMousePos.current = { x: e.clientX, y: e.clientY };
   }
 
-  function handleAction(
-    e: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
-    isInitialClick = false,
-  ) {
+  function handleAction(e: MouseEvent, isInitialClick = false) {
     const btn = activeMouseButton.current;
     if (btn === 1) {
       handlePanAction(e, isInitialClick);
@@ -861,50 +833,6 @@ export default function Canvas() {
       default:
         console.error("Selected tool is invalid.");
     }
-  }
-
-  function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
-    e.stopPropagation();
-    activeMouseButton.current = e.button;
-    if (e.button === 0 || e.button === 2)
-      setIsPrimaryColorActive(e.button === 0);
-    handleAction(e, true);
-    setHoveredPixel(null);
-  }
-
-  function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
-    if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
-    if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
-    if (selectionAction) endSelectionAction();
-    updateHoveredPixel(e);
-    clearDrawBuffer();
-    activeMouseButton.current = null;
-  }
-
-  function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>) {
-    if (activeMouseButton.current !== null) handleAction(e);
-    else updateHoveredPixel(e);
-    updateHoveredResizeHandle(e.clientX, e.clientY);
-  }
-
-  function handleMouseLeave() {
-    if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
-    if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
-    if (selectionAction) endSelectionAction();
-    setHoveredPixel(null);
-    setHoveredResizeHandle(null);
-    clearDrawBuffer();
-    activeMouseButton.current = null;
-  }
-
-  function handleMouseWheel(e: WheelEvent) {
-    e.preventDefault();
-    if (e.deltaY < 0) zoomStepTowardsCursor(e.clientX, e.clientY, true);
-    else if (e.deltaY > 0) zoomStepTowardsCursor(e.clientX, e.clientY, false);
-  }
-
-  function handleMouseDownContainer() {
-    if (showSelectionPreview) applySelectionAction();
   }
 
   useEffect(() => {
@@ -969,16 +897,6 @@ export default function Canvas() {
     }
 
     if (!showSelectionPreview) setHoveredResizeHandle(null);
-
-    const parentContainer = parentContainerRef.current;
-    if (parentContainer)
-      parentContainer.addEventListener("wheel", handleMouseWheel, {
-        passive: false,
-      });
-    return () => {
-      if (parentContainer)
-        parentContainer.removeEventListener("wheel", handleMouseWheel);
-    };
   }, [
     pixelData,
     gridSize,
@@ -1070,61 +988,106 @@ export default function Canvas() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectTool, undo, redo, copy, paste, zoomStepTowardsCenter, resetZoom]);
+  }, [
+    selectTool,
+    undo,
+    redo,
+    copy,
+    paste,
+    zoomStepTowardsCenter,
+    resetZoom,
+    deleteSelection,
+  ]);
+
+  function handleMouseDown(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
+    activeMouseButton.current = e.button;
+    if (e.button === 0 || e.button === 2)
+      setIsPrimaryColorActive(e.button === 0);
+    setHoveredPixel(null);
+    handleAction(e as unknown as MouseEvent, true);
+  }
 
   useEffect(() => {
-    function handleGlobalMouseMove(e: MouseEvent) {
-      if (!moveStartPos || !moveOffset) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    function handleMouseWheel(e: WheelEvent) {
+      e.preventDefault();
+      if (e.deltaY < 0) zoomStepTowardsCursor(e.clientX, e.clientY, true);
+      else if (e.deltaY > 0) zoomStepTowardsCursor(e.clientX, e.clientY, false);
+    }
 
-      const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
-      const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
-      setMoveOffset({
-        x: x - moveStartPos.x,
-        y: y - moveStartPos.y,
+    const parentContainer = parentContainerRef.current;
+    if (parentContainer)
+      parentContainer.addEventListener("wheel", handleMouseWheel, {
+        passive: false,
       });
-    }
-
-    function handleGlobalMouseUp() {
-      if (moveOffset) applyMove();
-    }
-
-    window.addEventListener("mousemove", handleGlobalMouseMove);
-    window.addEventListener("mouseup", handleGlobalMouseUp);
     return () => {
-      window.removeEventListener("mousemove", handleGlobalMouseMove);
-      window.removeEventListener("mouseup", handleGlobalMouseUp);
+      if (parentContainer)
+        parentContainer.removeEventListener("wheel", handleMouseWheel);
     };
-  }, [panOffset, moveStartPos, moveOffset, applyMove]);
+  }, [zoomStepTowardsCursor]);
+
+  useEffect(() => {
+    function handleMouseUp(e: MouseEvent) {
+      clearDrawBuffer();
+      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+      if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
+      if (selectionAction) endSelectionAction();
+      if (moveOffset) applyMove();
+      updateHoveredPixel(e);
+      activeMouseButton.current = null;
+    }
+
+    function handleMouseMove(e: MouseEvent) {
+      if (activeMouseButton.current !== null) handleAction(e);
+      else updateHoveredPixel(e);
+      updateHoveredResizeHandle(e.clientX, e.clientY);
+    }
+
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => {
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [
+    lineStartPos,
+    lineEndPos,
+    shapeStartPos,
+    shapeEndPos,
+    selectionAction,
+    moveOffset,
+    drawLine,
+    drawShape,
+    endSelectionAction,
+    applyMove,
+    clearDrawBuffer,
+    handleAction,
+    getActiveColorRGBA,
+    updateHoveredPixel,
+    updateHoveredResizeHandle,
+  ]);
 
   return (
     <div
       className="flex flex-grow items-center justify-center"
+      style={{
+        ...(showMoveCursor && { cursor: "move" }),
+        ...(!selectionAction &&
+          hoveredResizeHandle && {
+            cursor: `${hoveredResizeHandle}-resize`,
+          }),
+      }}
       ref={parentContainerRef}
       id="parent-container"
-      onMouseDown={handleMouseDownContainer}
+      onMouseDown={handleMouseDown}
       onMouseMove={updateMousePos}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <canvas
         className="bg-white"
-        style={{
-          ...(showMoveCursor && { cursor: "move" }),
-          ...(!selectionAction &&
-            hoveredResizeHandle && {
-              cursor: `${hoveredResizeHandle}-resize`,
-            }),
-        }}
         ref={canvasRef}
         id="canvas"
         width={canvasSize.x}
         height={canvasSize.y}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onContextMenu={(e) => e.preventDefault()}
       ></canvas>
     </div>
   );
