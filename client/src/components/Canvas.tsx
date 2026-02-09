@@ -79,6 +79,7 @@ export default function Canvas() {
     getActiveColorRGBA,
     getPixelColor,
     getEffectiveSelectionBounds,
+    getRectInBounds,
     draw,
     drawShade,
     drawLine,
@@ -666,12 +667,14 @@ export default function Canvas() {
         const areaY = dy >= 0 ? selectionStartPos.y : selectionStartPos.y + dy;
         const areaWidth = Math.abs(dx) + 1;
         const areaHeight = Math.abs(dy) + 1;
-        setSelectedArea({
-          x: areaX,
-          y: areaY,
-          width: areaWidth,
-          height: areaHeight,
-        });
+        setSelectedArea(
+          getRectInBounds({
+            x: areaX,
+            y: areaY,
+            width: areaWidth,
+            height: areaHeight,
+          }),
+        );
       } else if (selectionMode === "lasso") {
         if (!isValidIndex(x, y, gridSize)) return;
         const newLassoPath = [...lassoPath];
@@ -1027,11 +1030,11 @@ export default function Canvas() {
 
   useEffect(() => {
     function handleMouseUp(e: MouseEvent) {
-      clearDrawBuffer();
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
       if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
       if (selectionAction) endSelectionAction();
       if (moveOffset) applyMove();
+      clearDrawBuffer();
       updateHoveredPixel(e);
       activeMouseButton.current = null;
     }

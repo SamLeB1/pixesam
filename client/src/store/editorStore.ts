@@ -202,6 +202,7 @@ type EditorState = {
   getPixelColor: (x: number, y: number) => RGBA;
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
+  getRectInBounds: (rect: Rect) => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
   drawShade: (x: number, y: number, darken: boolean) => void;
   drawLine: (color: RGBA) => void;
@@ -428,6 +429,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       width,
       height,
     };
+  },
+  getRectInBounds: (rect) => {
+    const { gridSize } = get();
+    const x1 = Math.max(0, rect.x);
+    const y1 = Math.max(0, rect.y);
+    const x2 = Math.min(gridSize.x, rect.x + rect.width);
+    const y2 = Math.min(gridSize.y, rect.y + rect.height);
+    if (x1 >= x2 || y1 >= y2) return null;
+    return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
   },
   draw: (x, y, color) =>
     set((state) => {
