@@ -136,6 +136,41 @@ export function getEllipseFillPoints(
   return points;
 }
 
+export function getModdedShapeBounds(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  mod1: boolean,
+  mod2: boolean,
+): { x1: number; y1: number; x2: number; y2: number } {
+  let dx = end.x - start.x;
+  let dy = end.y - start.y;
+
+  if (mod1) {
+    const size = Math.min(Math.abs(dx), Math.abs(dy));
+    dx = Math.sign(dx) * size;
+    dy = Math.sign(dy) * size;
+  }
+
+  let x1: number, y1: number, x2: number, y2: number;
+
+  if (mod2) {
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    x1 = start.x - absDx;
+    y1 = start.y - absDy;
+    x2 = start.x + absDx;
+    y2 = start.y + absDy;
+  } else {
+    const adjustedEnd = { x: start.x + dx, y: start.y + dy };
+    x1 = Math.min(start.x, adjustedEnd.x);
+    y1 = Math.min(start.y, adjustedEnd.y);
+    x2 = Math.max(start.x, adjustedEnd.x);
+    y2 = Math.max(start.y, adjustedEnd.y);
+  }
+
+  return { x1, y1, x2, y2 };
+}
+
 export function isInPolygon(
   x: number,
   y: number,

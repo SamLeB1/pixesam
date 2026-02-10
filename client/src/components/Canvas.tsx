@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
+import useModifierKeys from "../hooks/useModifierKeys";
 import { isValidIndex } from "../utils/canvas";
 import {
   interpolateBetweenPoints,
@@ -9,6 +10,7 @@ import {
   getRectFillPoints,
   getEllipseOutlinePoints,
   getEllipseFillPoints,
+  getModdedShapeBounds,
 } from "../utils/geometry";
 import { BASE_PX_SIZE } from "../constants";
 import type { Direction, Rect } from "../types";
@@ -131,6 +133,7 @@ export default function Canvas() {
     selectionAction === "resize";
   const { zoomStepTowardsCursor, zoomStepTowardsCenter, resetZoom } =
     useCanvasZoom();
+  const modifierKeys = useModifierKeys();
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = darkCheckerboardColor;
@@ -240,11 +243,12 @@ export default function Canvas() {
     const pxSize = getPxSize();
     const drawnPixels = new Set<string>();
     const offset = -Math.floor(brushSize / 2);
-
-    const x1 = Math.min(shapeStartPos.x, shapeEndPos.x);
-    const y1 = Math.min(shapeStartPos.y, shapeEndPos.y);
-    const x2 = Math.max(shapeStartPos.x, shapeEndPos.x);
-    const y2 = Math.max(shapeStartPos.y, shapeEndPos.y);
+    const { x1, y1, x2, y2 } = getModdedShapeBounds(
+      shapeStartPos,
+      shapeEndPos,
+      modifierKeys.shift,
+      modifierKeys.ctrl || modifierKeys.meta,
+    );
 
     function drawPixel(px: number, py: number) {
       if (!isValidIndex(px, py, gridSize)) return;
@@ -918,6 +922,7 @@ export default function Canvas() {
     showSelectionPreview,
     lassoPath,
     moveOffset,
+    modifierKeys,
   ]);
 
   useEffect(() => {
@@ -1031,7 +1036,12 @@ export default function Canvas() {
   useEffect(() => {
     function handleMouseUp(e: MouseEvent) {
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
-      if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
+      if (shapeStartPos && shapeEndPos)
+        drawShape(
+          getActiveColorRGBA(),
+          modifierKeys.shift,
+          modifierKeys.ctrl || modifierKeys.meta,
+        );
       if (selectionAction) endSelectionAction();
       if (moveOffset) applyMove();
       clearDrawBuffer();

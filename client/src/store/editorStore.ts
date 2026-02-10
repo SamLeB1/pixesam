@@ -18,6 +18,7 @@ import {
   getRectFillPoints,
   getEllipseOutlinePoints,
   getEllipseFillPoints,
+  getModdedShapeBounds,
   isInPolygon,
 } from "../utils/geometry";
 import { isValidPxsmData } from "../utils/pxsmValidator";
@@ -206,7 +207,7 @@ type EditorState = {
   draw: (x: number, y: number, color: RGBA) => void;
   drawShade: (x: number, y: number, darken: boolean) => void;
   drawLine: (color: RGBA) => void;
-  drawShape: (color: RGBA) => void;
+  drawShape: (color: RGBA, mod1: boolean, mod2: boolean) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
     x: number,
@@ -354,7 +355,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       else initSelection();
       if (moveOffset) applyMove();
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
-      if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
+      if (shapeStartPos && shapeEndPos)
+        drawShape(getActiveColorRGBA(), false, false);
       clearDrawBuffer();
 
       return { selectedTool: tool };
@@ -586,7 +588,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         drawBuffer,
       };
     }),
-  drawShape: (color) =>
+  drawShape: (color, mod1, mod2) =>
     set((state) => {
       const {
         pixelData,
@@ -603,11 +605,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
-
-      const x1 = Math.min(shapeStartPos.x, shapeEndPos.x);
-      const y1 = Math.min(shapeStartPos.y, shapeEndPos.y);
-      const x2 = Math.max(shapeStartPos.x, shapeEndPos.x);
-      const y2 = Math.max(shapeStartPos.y, shapeEndPos.y);
+      const { x1, y1, x2, y2 } = getModdedShapeBounds(
+        shapeStartPos,
+        shapeEndPos,
+        mod1,
+        mod2,
+      );
 
       function setPixel(px: number, py: number) {
         if (!isValidIndex(px, py, gridSize)) return;
@@ -1563,7 +1566,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       if (moveOffset) applyMove();
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
-      if (shapeStartPos && shapeEndPos) drawShape(getActiveColorRGBA());
+      if (shapeStartPos && shapeEndPos)
+        drawShape(getActiveColorRGBA(), false, false);
       clearDrawBuffer();
 
       const { pixels, width, height, mask } = clipboard;
