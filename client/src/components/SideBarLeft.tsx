@@ -49,7 +49,17 @@ export default function SideBarLeft() {
             <div className="h-8 w-8 bg-white"></div>
           </button>
         </Tooltip>
-        <Tooltip content="Line tool (L)" side="right">
+        <Tooltip
+          content={
+            <>
+              <h3>Line tool (L)</h3>
+              <ul className="list-inside list-disc">
+                <li className="text-neutral-300">Shift: Constrain angle</li>
+              </ul>
+            </>
+          }
+          side="right"
+        >
           <button
             className="cursor-pointer p-2 hover:bg-neutral-600"
             type="button"

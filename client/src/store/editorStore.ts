@@ -18,6 +18,7 @@ import {
   getRectFillPoints,
   getEllipseOutlinePoints,
   getEllipseFillPoints,
+  constrainLineAngle,
   getModdedShapeBounds,
   isInPolygon,
 } from "../utils/geometry";
@@ -206,7 +207,7 @@ type EditorState = {
   getRectInBounds: (rect: Rect) => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
   drawShade: (x: number, y: number, darken: boolean) => void;
-  drawLine: (color: RGBA) => void;
+  drawLine: (color: RGBA, mod: boolean) => void;
   drawShape: (color: RGBA, mod1: boolean, mod2: boolean) => void;
   erase: (x: number, y: number) => void;
   floodFill: (
@@ -354,7 +355,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (showSelectionPreview) applySelectionAction();
       else initSelection();
       if (moveOffset) applyMove();
-      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
       if (shapeStartPos && shapeEndPos)
         drawShape(getActiveColorRGBA(), false, false);
       clearDrawBuffer();
@@ -537,7 +538,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastDrawPos: { x, y },
       };
     }),
-  drawLine: (color) =>
+  drawLine: (color, mod) =>
     set((state) => {
       const {
         pixelData,
@@ -548,6 +549,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       if (!lineStartPos || !lineEndPos) return {};
+      const effectiveEnd = mod
+        ? constrainLineAngle(lineStartPos, lineEndPos)
+        : lineEndPos;
       const newData = new Uint8ClampedArray(pixelData);
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
@@ -558,8 +562,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...interpolateBetweenPoints(
           lineStartPos.x,
           lineStartPos.y,
-          lineEndPos.x,
-          lineEndPos.y,
+          effectiveEnd.x,
+          effectiveEnd.y,
         ),
       ];
       for (const point of pointsToDraw) {
@@ -1565,7 +1569,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return {};
       }
       if (moveOffset) applyMove();
-      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
       if (shapeStartPos && shapeEndPos)
         drawShape(getActiveColorRGBA(), false, false);
       clearDrawBuffer();

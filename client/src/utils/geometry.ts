@@ -136,6 +136,22 @@ export function getEllipseFillPoints(
   return points;
 }
 
+export function constrainLineAngle(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const angle = Math.atan2(dy, dx);
+  const increment = Math.PI / 8;
+  const snapped = Math.round(angle / increment) * increment;
+  return {
+    x: start.x + Math.round(Math.cos(snapped) * distance),
+    y: start.y + Math.round(Math.sin(snapped) * distance),
+  };
+}
+
 export function getModdedShapeBounds(
   start: { x: number; y: number },
   end: { x: number; y: number },

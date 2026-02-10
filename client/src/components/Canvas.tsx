@@ -11,6 +11,7 @@ import {
   getRectFillPoints,
   getEllipseOutlinePoints,
   getEllipseFillPoints,
+  constrainLineAngle,
   getModdedShapeBounds,
 } from "../utils/geometry";
 import { BASE_PX_SIZE } from "../constants";
@@ -197,6 +198,10 @@ export default function Canvas() {
   function drawLinePreview(ctx: CanvasRenderingContext2D) {
     if (!lineStartPos || !lineEndPos) return;
 
+    const effectiveEnd = modifierKeys.shift
+      ? constrainLineAngle(lineStartPos, lineEndPos)
+      : lineEndPos;
+
     ctx.fillStyle = getActiveColorHex();
     const pxSize = getPxSize();
     const drawnPixels = new Set<string>();
@@ -207,8 +212,8 @@ export default function Canvas() {
       ...interpolateBetweenPoints(
         lineStartPos.x,
         lineStartPos.y,
-        lineEndPos.x,
-        lineEndPos.y,
+        effectiveEnd.x,
+        effectiveEnd.y,
       ),
     ];
     for (const point of pointsToDraw) {
@@ -948,7 +953,8 @@ export default function Canvas() {
 
   useEffect(() => {
     function handleMouseUp(e: MouseEvent) {
-      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA());
+      if (lineStartPos && lineEndPos)
+        drawLine(getActiveColorRGBA(), modifierKeys.shift);
       if (shapeStartPos && shapeEndPos)
         drawShape(
           getActiveColorRGBA(),
