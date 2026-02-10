@@ -3,6 +3,7 @@ import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import useModifierKeys from "../hooks/useModifierKeys";
+import useKeyboardShortcuts from "../hooks/useKeyboardShortcuts";
 import { isValidIndex } from "../utils/canvas";
 import {
   interpolateBetweenPoints,
@@ -59,7 +60,6 @@ export default function Canvas() {
     moveStartPos,
     moveOffset,
     setPanOffset,
-    selectTool,
     setPrimaryColor,
     setSecondaryColor,
     setIsPrimaryColorActive,
@@ -90,14 +90,9 @@ export default function Canvas() {
     floodFill,
     endSelectionAction,
     applySelectionAction,
-    deleteSelection,
     performWandSelection,
     applyMove,
-    undo,
-    redo,
     clearDrawBuffer,
-    copy,
-    paste,
   } = useEditorStore();
   const parentContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -131,9 +126,9 @@ export default function Canvas() {
       isInSelectedArea(hoveredPixel.x, hoveredPixel.y)) ||
     selectionAction === "move" ||
     selectionAction === "resize";
-  const { zoomStepTowardsCursor, zoomStepTowardsCenter, resetZoom } =
-    useCanvasZoom();
+  const { zoomStepTowardsCursor } = useCanvasZoom();
   const modifierKeys = useModifierKeys();
+  useKeyboardShortcuts();
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = darkCheckerboardColor;
@@ -923,88 +918,6 @@ export default function Canvas() {
     lassoPath,
     moveOffset,
     modifierKeys,
-  ]);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const target = e.target as HTMLElement;
-      const tag = target.tagName.toLowerCase();
-      const editable =
-        tag === "input" ||
-        tag === "textarea" ||
-        target.contentEditable === "true";
-      if (editable) return;
-
-      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      const key = e.key.toLowerCase();
-      if (isCmdOrCtrl && !e.shiftKey && key === "z") {
-        e.preventDefault();
-        undo();
-      } else if (isCmdOrCtrl && e.shiftKey && key === "z") {
-        e.preventDefault();
-        redo();
-      } else if (isCmdOrCtrl && key === "y") {
-        e.preventDefault();
-        redo();
-      } else if (isCmdOrCtrl && key === "c") {
-        e.preventDefault();
-        copy();
-      } else if (isCmdOrCtrl && key === "v") {
-        e.preventDefault();
-        paste();
-      } else if (key === "p") {
-        e.preventDefault();
-        selectTool("pencil");
-      } else if (key === "e") {
-        e.preventDefault();
-        selectTool("eraser");
-      } else if (key === "c") {
-        e.preventDefault();
-        selectTool("color-picker");
-      } else if (key === "b") {
-        e.preventDefault();
-        selectTool("bucket");
-      } else if (key === "l") {
-        e.preventDefault();
-        selectTool("line");
-      } else if (key === "h") {
-        e.preventDefault();
-        selectTool("shape");
-      } else if (key === "d") {
-        e.preventDefault();
-        selectTool("shade");
-      } else if (key === "s") {
-        e.preventDefault();
-        selectTool("select");
-      } else if (key === "m") {
-        e.preventDefault();
-        selectTool("move");
-      } else if (key === "+" || key === "=") {
-        e.preventDefault();
-        zoomStepTowardsCenter(true);
-      } else if (key === "-") {
-        e.preventDefault();
-        zoomStepTowardsCenter(false);
-      } else if (key === "0") {
-        e.preventDefault();
-        resetZoom();
-      } else if (key === "delete" || key === "backspace") {
-        e.preventDefault();
-        deleteSelection();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    selectTool,
-    undo,
-    redo,
-    copy,
-    paste,
-    zoomStepTowardsCenter,
-    resetZoom,
-    deleteSelection,
   ]);
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
