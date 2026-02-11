@@ -234,7 +234,7 @@ type EditorState = {
   performWandSelection: (x: number, y: number) => void;
   generateSelectionMask: () => Uint8Array | null;
   closeLassoPath: () => void;
-  applyMove: () => void;
+  applyMove: (mod: boolean) => void;
   undo: () => void;
   redo: () => void;
   updateHistory: (action: Action) => void;
@@ -354,7 +354,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (showSelectionPreview) applySelectionAction();
       else initSelection();
-      if (moveOffset) applyMove();
+      if (moveOffset) applyMove(false);
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
       if (shapeStartPos && shapeEndPos)
         drawShape(getActiveColorRGBA(), false, false);
@@ -1275,17 +1275,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       points.pop();
       return { lassoPath: [...lassoPath, ...points] };
     }),
-  applyMove: () =>
+  applyMove: (mod) =>
     set((state) => {
       const { pixelData, gridSize, moveOffset, updateHistory } = state;
       if (!moveOffset || (moveOffset.x === 0 && moveOffset.y === 0))
         return { moveStartPos: null, moveOffset: null };
 
+      const newMoveOffset = { ...moveOffset };
+      if (mod) {
+        if (Math.abs(moveOffset.x) >= Math.abs(moveOffset.y))
+          newMoveOffset.y = 0;
+        else newMoveOffset.x = 0;
+      }
+
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       for (let y = 0; y < gridSize.y; y++) {
         for (let x = 0; x < gridSize.x; x++) {
-          const srcX = x - moveOffset.x;
-          const srcY = y - moveOffset.y;
+          const srcX = x - newMoveOffset.x;
+          const srcY = y - newMoveOffset.y;
 
           if (isValidIndex(srcX, srcY, gridSize)) {
             const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
@@ -1301,7 +1308,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const action: MoveAction = {
         action: "move",
         pixels: pixelData,
-        offset: moveOffset,
+        offset: newMoveOffset,
       };
       updateHistory(action);
 
@@ -1567,7 +1574,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         paste();
         return {};
       }
-      if (moveOffset) applyMove();
+      if (moveOffset) applyMove(false);
       if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
       if (shapeStartPos && shapeEndPos)
         drawShape(getActiveColorRGBA(), false, false);

@@ -861,7 +861,15 @@ export default function Canvas() {
       );
       tempCtx.putImageData(imageData, 0, 0);
 
-      const currMoveOffset = moveOffset || { x: 0, y: 0 };
+      let currMoveOffset = { x: 0, y: 0 };
+      if (moveOffset) {
+        currMoveOffset = { ...moveOffset };
+        if (modifierKeys.shift) {
+          if (Math.abs(moveOffset.x) >= Math.abs(moveOffset.y))
+            currMoveOffset.y = 0;
+          else currMoveOffset.x = 0;
+        }
+      }
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(
         tempCanvas,
@@ -960,7 +968,7 @@ export default function Canvas() {
           modifierKeys.ctrl || modifierKeys.meta,
         );
       if (selectionAction) endSelectionAction();
-      if (moveOffset) applyMove();
+      if (moveOffset) applyMove(modifierKeys.shift);
       clearDrawBuffer();
       updateHoveredPixel(e);
       activeMouseButton.current = null;
