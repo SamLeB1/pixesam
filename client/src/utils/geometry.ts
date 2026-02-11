@@ -26,6 +26,74 @@ export function interpolateBetweenPoints(
   return points;
 }
 
+export function getConstrainedLinePoints(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) return [];
+
+  const angle = Math.atan2(dy, dx);
+  const increment = Math.PI / 8;
+  const snappedIndex = ((Math.round(angle / increment) % 16) + 16) % 16;
+
+  // Normalize to 0-4 to get the base pattern
+  const half = snappedIndex <= 8 ? snappedIndex : 16 - snappedIndex;
+  const octant = half <= 4 ? half : 8 - half;
+
+  // Stepping patterns for octants 0-4:
+  // 0 = 0°:    (1,0)           - horizontal
+  // 1 = 22.5°: (1,0),(1,1)     - 2 x-steps per 1 y-step
+  // 2 = 45°:   (1,1)           - diagonal
+  // 3 = 67.5°: (0,1),(1,1)     - 2 y-steps per 1 x-step
+  // 4 = 90°:   (0,1)           - vertical
+  type Step = [number, number];
+  const patterns: Step[][] = [
+    [[1, 0]],
+    [
+      [1, 0],
+      [1, 1],
+    ],
+    [[1, 1]],
+    [
+      [0, 1],
+      [1, 1],
+    ],
+    [[0, 1]],
+  ];
+
+  const pattern = patterns[octant];
+  const sx = dx >= 0 ? 1 : -1;
+  const sy = dy >= 0 ? 1 : -1;
+
+  // Terminate based on whether the angle is more horizontal or vertical
+  // For 45° diagonals, use the closer coordinate so the line stops at the first one reached
+  const target =
+    octant === 2
+      ? Math.min(Math.abs(dx), Math.abs(dy))
+      : octant < 2
+        ? Math.abs(dx)
+        : Math.abs(dy);
+
+  const points: { x: number; y: number }[] = [];
+  let cx = 0;
+  let cy = 0;
+  let stepIndex = 0;
+
+  while (true) {
+    const [pdx, pdy] = pattern[stepIndex % pattern.length];
+    cx += pdx;
+    cy += pdy;
+    const progress = octant <= 2 ? cx : cy;
+    if (progress > target) break;
+    points.push({ x: start.x + cx * sx, y: start.y + cy * sy });
+    stepIndex++;
+  }
+
+  return points;
+}
+
 export function getRectOutlinePoints(
   x1: number,
   y1: number,
@@ -134,22 +202,6 @@ export function getEllipseFillPoints(
     }
   }
   return points;
-}
-
-export function constrainLineAngle(
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const angle = Math.atan2(dy, dx);
-  const increment = Math.PI / 8;
-  const snapped = Math.round(angle / increment) * increment;
-  return {
-    x: start.x + Math.round(Math.cos(snapped) * distance),
-    y: start.y + Math.round(Math.sin(snapped) * distance),
-  };
 }
 
 export function getModdedShapeBounds(

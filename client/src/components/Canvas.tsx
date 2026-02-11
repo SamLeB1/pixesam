@@ -7,11 +7,11 @@ import useKeyboardShortcuts from "../hooks/useKeyboardShortcuts";
 import { isValidIndex } from "../utils/canvas";
 import {
   interpolateBetweenPoints,
+  getConstrainedLinePoints,
   getRectOutlinePoints,
   getRectFillPoints,
   getEllipseOutlinePoints,
   getEllipseFillPoints,
-  constrainLineAngle,
   getModdedShapeBounds,
 } from "../utils/geometry";
 import { BASE_PX_SIZE } from "../constants";
@@ -198,24 +198,22 @@ export default function Canvas() {
   function drawLinePreview(ctx: CanvasRenderingContext2D) {
     if (!lineStartPos || !lineEndPos) return;
 
-    const effectiveEnd = modifierKeys.shift
-      ? constrainLineAngle(lineStartPos, lineEndPos)
-      : lineEndPos;
-
     ctx.fillStyle = getActiveColorHex();
     const pxSize = getPxSize();
     const drawnPixels = new Set<string>();
     const offset = -Math.floor(brushSize / 2);
 
-    const pointsToDraw = [
-      lineStartPos,
-      ...interpolateBetweenPoints(
-        lineStartPos.x,
-        lineStartPos.y,
-        effectiveEnd.x,
-        effectiveEnd.y,
-      ),
-    ];
+    const pointsToDraw = modifierKeys.shift
+      ? [lineStartPos, ...getConstrainedLinePoints(lineStartPos, lineEndPos)]
+      : [
+          lineStartPos,
+          ...interpolateBetweenPoints(
+            lineStartPos.x,
+            lineStartPos.y,
+            lineEndPos.x,
+            lineEndPos.y,
+          ),
+        ];
     for (const point of pointsToDraw) {
       for (let i = 0; i < brushSize; i++) {
         for (let j = 0; j < brushSize; j++) {

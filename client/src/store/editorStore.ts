@@ -14,11 +14,11 @@ import {
 } from "../utils/canvas";
 import {
   interpolateBetweenPoints,
+  getConstrainedLinePoints,
   getRectOutlinePoints,
   getRectFillPoints,
   getEllipseOutlinePoints,
   getEllipseFillPoints,
-  constrainLineAngle,
   getModdedShapeBounds,
   isInPolygon,
 } from "../utils/geometry";
@@ -549,23 +549,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       if (!lineStartPos || !lineEndPos) return {};
-      const effectiveEnd = mod
-        ? constrainLineAngle(lineStartPos, lineEndPos)
-        : lineEndPos;
       const newData = new Uint8ClampedArray(pixelData);
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
 
-      const pointsToDraw = [
-        lineStartPos,
-        ...interpolateBetweenPoints(
-          lineStartPos.x,
-          lineStartPos.y,
-          effectiveEnd.x,
-          effectiveEnd.y,
-        ),
-      ];
+      const pointsToDraw = mod
+        ? [lineStartPos, ...getConstrainedLinePoints(lineStartPos, lineEndPos)]
+        : [
+            lineStartPos,
+            ...interpolateBetweenPoints(
+              lineStartPos.x,
+              lineStartPos.y,
+              lineEndPos.x,
+              lineEndPos.y,
+            ),
+          ];
       for (const point of pointsToDraw) {
         for (let i = 0; i < brushSize; i++) {
           for (let j = 0; j < brushSize; j++) {
