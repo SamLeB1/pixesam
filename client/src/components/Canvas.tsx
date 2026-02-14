@@ -14,11 +14,9 @@ import {
   getEllipseFillPoints,
   getModdedShapeBounds,
 } from "../utils/geometry";
-import { BASE_PX_SIZE } from "../constants";
+import { BASE_PX_SIZE, CHECKER_LIGHT, CHECKER_DARK } from "../constants";
 import type { Direction, Rect } from "../types";
 
-const lightCheckerboardColor = "#ffffff";
-const darkCheckerboardColor = "#e5e5e5";
 const FILTER_STRENGTH = 25;
 const RESIZE_HANDLES: { name: Direction; x: number; y: number }[] = [
   { name: "nw", x: 0, y: 0 },
@@ -132,7 +130,7 @@ export default function Canvas() {
   useKeyboardShortcuts();
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = darkCheckerboardColor;
+    ctx.fillStyle = CHECKER_DARK;
     const pxSize = getPxSize();
 
     const startX = Math.floor(panOffset.x);
@@ -174,11 +172,11 @@ export default function Canvas() {
           let hoverColor;
           if (a === 0) {
             if (pixelY % 2 === pixelX % 2)
-              hoverColor = tinycolor(darkCheckerboardColor)
+              hoverColor = tinycolor(CHECKER_DARK)
                 .darken(FILTER_STRENGTH)
                 .toHexString();
             else
-              hoverColor = tinycolor(lightCheckerboardColor)
+              hoverColor = tinycolor(CHECKER_LIGHT)
                 .darken(FILTER_STRENGTH)
                 .toHexString();
           } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
@@ -289,11 +287,11 @@ export default function Canvas() {
       let hoverColor;
       if (a === 0) {
         if (y % 2 === x % 2)
-          hoverColor = tinycolor(darkCheckerboardColor)
+          hoverColor = tinycolor(CHECKER_DARK)
             .darken(FILTER_STRENGTH)
             .toHexString();
         else
-          hoverColor = tinycolor(lightCheckerboardColor)
+          hoverColor = tinycolor(CHECKER_LIGHT)
             .darken(FILTER_STRENGTH)
             .toHexString();
       } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
@@ -340,9 +338,7 @@ export default function Canvas() {
           const sourceY = selectedArea.y + i;
           if (isValidIndex(sourceX, sourceY, gridSize)) {
             ctx.fillStyle =
-              sourceY % 2 === sourceX % 2
-                ? darkCheckerboardColor
-                : lightCheckerboardColor;
+              sourceY % 2 === sourceX % 2 ? CHECKER_DARK : CHECKER_LIGHT;
             ctx.fillRect(
               (sourceX - panOffset.x) * pxSize,
               (sourceY - panOffset.y) * pxSize,
@@ -382,11 +378,11 @@ export default function Canvas() {
           let hoverColor;
           if (a === 0) {
             if (destY % 2 === destX % 2)
-              hoverColor = tinycolor(darkCheckerboardColor)
+              hoverColor = tinycolor(CHECKER_DARK)
                 .darken(FILTER_STRENGTH)
                 .toHexString();
             else
-              hoverColor = tinycolor(lightCheckerboardColor)
+              hoverColor = tinycolor(CHECKER_LIGHT)
                 .darken(FILTER_STRENGTH)
                 .toHexString();
           } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
