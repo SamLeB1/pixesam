@@ -58,6 +58,7 @@ export default function Canvas() {
     lassoPath,
     moveStartPos,
     moveOffset,
+    setVisibleGridSize,
     setPanOffset,
     setPrimaryColor,
     setSecondaryColor,
@@ -128,6 +129,10 @@ export default function Canvas() {
   const { zoomStepTowardsCursor } = useCanvasZoom();
   const modifierKeys = useModifierKeys();
   useKeyboardShortcuts();
+
+  useEffect(() => {
+    setVisibleGridSize(visibleGridSize);
+  }, [visibleGridSize.x, visibleGridSize.y]);
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = CHECKER_DARK;

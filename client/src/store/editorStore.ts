@@ -128,6 +128,7 @@ type Tool =
 type EditorState = {
   pixelData: Uint8ClampedArray;
   gridSize: { x: number; y: number };
+  visibleGridSize: { x: number; y: number };
   panOffset: { x: number; y: number };
   zoomLevel: number;
   selectedTool: Tool;
@@ -166,6 +167,7 @@ type EditorState = {
   clipboard: Clipboard | null;
   setPixelData: (pixelData: Uint8ClampedArray) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
+  setVisibleGridSize: (size: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
   setZoomLevel: (n: number) => void;
   setPrimaryColor: (hex: string) => void;
@@ -248,6 +250,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     DEFAULT_GRID_SIZE.x * DEFAULT_GRID_SIZE.y * 4,
   ),
   gridSize: DEFAULT_GRID_SIZE,
+  visibleGridSize: DEFAULT_GRID_SIZE,
   panOffset: { x: 0, y: 0 },
   zoomLevel: 1,
   selectedTool: "pencil",
@@ -286,6 +289,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clipboard: null,
   setPixelData: (pixelData) => set({ pixelData }),
   setGridSize: (gridSize) => set({ gridSize }),
+  setVisibleGridSize: (size) => set({ visibleGridSize: size }),
   setPanOffset: (panOffset) => set({ panOffset }),
   setZoomLevel: (n) => set({ zoomLevel: n }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
