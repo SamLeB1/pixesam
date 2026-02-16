@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
@@ -130,33 +130,84 @@ export default function Canvas() {
   const modifierKeys = useModifierKeys();
   useKeyboardShortcuts();
 
+  const checkerCanvas = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = gridSize.x;
+    canvas.height = gridSize.y;
+    const ctx = canvas.getContext("2d")!;
+    const imageData = ctx.createImageData(gridSize.x, gridSize.y);
+    const d = imageData.data;
+    for (let y = 0; y < gridSize.y; y++) {
+      for (let x = 0; x < gridSize.x; x++) {
+        const i = (y * gridSize.x + x) * 4;
+        if ((x + y) % 2 === 0) {
+          d[i] = 229;
+          d[i + 1] = 229;
+          d[i + 2] = 229; // CHECKER_DARK #e5e5e5
+        } else {
+          d[i] = 255;
+          d[i + 1] = 255;
+          d[i + 2] = 255; // CHECKER_LIGHT #ffffff
+        }
+        d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  }, [gridSize.x, gridSize.y]);
+
   useEffect(() => {
     setVisibleGridSize(visibleGridSize);
   }, [visibleGridSize.x, visibleGridSize.y]);
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = CHECKER_DARK;
-    const pxSize = getPxSize();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      checkerCanvas,
+      panOffset.x,
+      panOffset.y,
+      visibleGridSize.x,
+      visibleGridSize.y,
+      0,
+      0,
+      canvasSize.x,
+      canvasSize.y,
+    );
+  }
 
-    const startX = Math.floor(panOffset.x);
-    const startY = Math.floor(panOffset.y);
-    const endX = Math.min(
+  function drawPixelData(ctx: CanvasRenderingContext2D) {
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = gridSize.x;
+    tempCanvas.height = gridSize.y;
+    const tempCtx = tempCanvas.getContext("2d")!;
+    const imageData = new ImageData(
+      pixelData as ImageDataArray,
       gridSize.x,
-      startX + Math.ceil(visibleGridSize.x) + 1,
-    );
-    const endY = Math.min(
       gridSize.y,
-      startY + Math.ceil(visibleGridSize.y) + 1,
     );
-    for (let i = startY; i < endY; i++)
-      for (let j = startX; j < endX; j++)
-        if (i % 2 === j % 2)
-          ctx.fillRect(
-            (j - panOffset.x) * pxSize,
-            (i - panOffset.y) * pxSize,
-            pxSize,
-            pxSize,
-          );
+    tempCtx.putImageData(imageData, 0, 0);
+
+    let currMoveOffset = { x: 0, y: 0 };
+    if (moveOffset) {
+      currMoveOffset = { ...moveOffset };
+      if (modifierKeys.shift) {
+        if (Math.abs(moveOffset.x) >= Math.abs(moveOffset.y))
+          currMoveOffset.y = 0;
+        else currMoveOffset.x = 0;
+      }
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      tempCanvas,
+      panOffset.x - currMoveOffset.x,
+      panOffset.y - currMoveOffset.y,
+      visibleGridSize.x,
+      visibleGridSize.y,
+      0,
+      0,
+      canvasSize.x,
+      canvasSize.y,
+    );
   }
 
   function drawFilterRect(
@@ -849,41 +900,7 @@ export default function Canvas() {
 
     ctx.clearRect(0, 0, canvasSize.x, canvasSize.y);
     drawCheckerboard(ctx);
-
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = gridSize.x;
-    tempCanvas.height = gridSize.y;
-    const tempCtx = tempCanvas.getContext("2d");
-    if (tempCtx) {
-      const imageData = new ImageData(
-        pixelData as ImageDataArray,
-        gridSize.x,
-        gridSize.y,
-      );
-      tempCtx.putImageData(imageData, 0, 0);
-
-      let currMoveOffset = { x: 0, y: 0 };
-      if (moveOffset) {
-        currMoveOffset = { ...moveOffset };
-        if (modifierKeys.shift) {
-          if (Math.abs(moveOffset.x) >= Math.abs(moveOffset.y))
-            currMoveOffset.y = 0;
-          else currMoveOffset.x = 0;
-        }
-      }
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(
-        tempCanvas,
-        panOffset.x - currMoveOffset.x,
-        panOffset.y - currMoveOffset.y,
-        visibleGridSize.x,
-        visibleGridSize.y,
-        0,
-        0,
-        canvasSize.x,
-        canvasSize.y,
-      );
-    }
+    drawPixelData(ctx);
 
     if (selectedTool !== "move") {
       if (showSelectionPreview) {
