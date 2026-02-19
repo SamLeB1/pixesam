@@ -1,2 +1,9 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
+@utility bg-main-semi-light {
+  background-color: #373737;
+}
+@utility bg-main-semi-dark {
+  background-color: #232323;
+}
