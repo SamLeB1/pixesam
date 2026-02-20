@@ -45,3 +45,11 @@ export type ColorPalette = {
   colors: string[];
   isDefault: boolean;
 };
+
+export type Layer = {
+  id: string;
+  data: Uint8ClampedArray;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+};

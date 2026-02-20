@@ -39,6 +39,7 @@ import type {
   Rect,
   Clipboard,
   PxsmData,
+  Layer,
 } from "../types";
 
 type Action =
@@ -126,7 +127,7 @@ type Tool =
   | "move";
 
 type EditorState = {
-  pixelData: Uint8ClampedArray;
+  layers: Layer[];
   gridSize: { x: number; y: number };
   visibleGridSize: { x: number; y: number };
   panOffset: { x: number; y: number };
@@ -165,7 +166,7 @@ type EditorState = {
   lastDrawPos: { x: number; y: number } | null;
   mousePos: { x: number; y: number };
   clipboard: Clipboard | null;
-  setPixelData: (pixelData: Uint8ClampedArray) => void;
+  setLayers: (layers: Layer[]) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setVisibleGridSize: (size: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
@@ -245,10 +246,16 @@ type EditorState = {
   paste: () => void;
 };
 
+const INITIAL_LAYER: Layer = {
+  id: crypto.randomUUID(),
+  data: new Uint8ClampedArray(DEFAULT_GRID_SIZE.x * DEFAULT_GRID_SIZE.y * 4),
+  name: "Layer 1",
+  visible: true,
+  locked: false,
+};
+
 export const useEditorStore = create<EditorState>((set, get) => ({
-  pixelData: new Uint8ClampedArray(
-    DEFAULT_GRID_SIZE.x * DEFAULT_GRID_SIZE.y * 4,
-  ),
+  layers: [INITIAL_LAYER],
   gridSize: DEFAULT_GRID_SIZE,
   visibleGridSize: DEFAULT_GRID_SIZE,
   panOffset: { x: 0, y: 0 },
@@ -287,7 +294,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   lastDrawPos: null,
   mousePos: { x: 0, y: 0 },
   clipboard: null,
-  setPixelData: (pixelData) => set({ pixelData }),
+  setLayers: (layers) => set({ layers }),
   setGridSize: (gridSize) => set({ gridSize }),
   setVisibleGridSize: (size) => set({ visibleGridSize: size }),
   setPanOffset: (panOffset) => set({ panOffset }),
