@@ -52,4 +52,5 @@ export type Layer = {
   name: string;
   visible: boolean;
   locked: boolean;
+  opacity: number;
 };

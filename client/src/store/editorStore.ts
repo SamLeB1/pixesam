@@ -128,6 +128,7 @@ type Tool =
 
 type EditorState = {
   layers: Layer[];
+  activeLayerId: string;
   gridSize: { x: number; y: number };
   visibleGridSize: { x: number; y: number };
   panOffset: { x: number; y: number };
@@ -167,6 +168,7 @@ type EditorState = {
   mousePos: { x: number; y: number };
   clipboard: Clipboard | null;
   setLayers: (layers: Layer[]) => void;
+  setActiveLayerId: (id: string) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setVisibleGridSize: (size: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
@@ -202,9 +204,12 @@ type EditorState = {
   setMousePos: (mousePos: { x: number; y: number }) => void;
   initActions: () => void;
   selectTool: (tool: Tool) => void;
+  getLayer: (id: string) => Layer | null;
+  setLayerData: (data: Uint8ClampedArray, id: string) => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number) => RGBA;
+  getPixelColorFromLayer: (x: number, y: number, id: string) => RGBA;
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
   getRectInBounds: (rect: Rect) => Rect | null;
@@ -252,10 +257,12 @@ const INITIAL_LAYER: Layer = {
   name: "Layer 1",
   visible: true,
   locked: false,
+  opacity: 1.0,
 };
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   layers: [INITIAL_LAYER],
+  activeLayerId: INITIAL_LAYER.id,
   gridSize: DEFAULT_GRID_SIZE,
   visibleGridSize: DEFAULT_GRID_SIZE,
   panOffset: { x: 0, y: 0 },
@@ -295,6 +302,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mousePos: { x: 0, y: 0 },
   clipboard: null,
   setLayers: (layers) => set({ layers }),
+  setActiveLayerId: (id) => set({ activeLayerId: id }),
   setGridSize: (gridSize) => set({ gridSize }),
   setVisibleGridSize: (size) => set({ visibleGridSize: size }),
   setPanOffset: (panOffset) => set({ panOffset }),
@@ -373,6 +381,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return { selectedTool: tool };
     }),
+  getLayer: (id) => {
+    const layer = get().layers.find((l) => l.id === id);
+    return layer ? layer : null;
+  },
+  setLayerData: (data, id) =>
+    set((state) => {
+      return {
+        layers: state.layers.map((l) => (l.id === id ? { ...l, data } : l)),
+      };
+    }),
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;
@@ -393,6 +411,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       g: pixelData[baseIndex + 1],
       b: pixelData[baseIndex + 2],
       a: pixelData[baseIndex + 3],
+    };
+  },
+  getPixelColorFromLayer: (x, y, id) => {
+    const { gridSize, getLayer } = get();
+    const layer = getLayer(id);
+    if (!layer || !isValidIndex(x, y, gridSize))
+      return { r: 0, g: 0, b: 0, a: 0 };
+
+    const baseIndex = getBaseIndex(x, y, gridSize.x);
+    return {
+      r: layer.data[baseIndex],
+      g: layer.data[baseIndex + 1],
+      b: layer.data[baseIndex + 2],
+      a: layer.data[baseIndex + 3],
     };
   },
   getPixelsInRect: (rect, mask = null) => {
@@ -456,16 +488,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   draw: (x, y, color) =>
     set((state) => {
       const {
-        pixelData,
+        activeLayerId,
         gridSize,
         brushSize,
         drawBuffer,
         drawnPixels,
         lastDrawPos,
-        getPixelColor,
+        getLayer,
+        setLayerData,
+        getPixelColorFromLayer,
       } = state;
+      const layer = getLayer(activeLayerId) as Layer;
+      if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
-      const newData = new Uint8ClampedArray(pixelData);
+
+      const newData = new Uint8ClampedArray(layer.data);
       const newDrawBuffer = [...drawBuffer];
       const newDrawnPixels = new Set(drawnPixels);
       const offset = -Math.floor(brushSize / 2);
@@ -486,14 +523,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               x: pixelX,
               y: pixelY,
               color,
-              prevColor: getPixelColor(pixelX, pixelY),
+              prevColor: getPixelColorFromLayer(pixelX, pixelY, activeLayerId),
             });
             setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
         }
       }
+      setLayerData(newData, activeLayerId);
       return {
-        pixelData: newData,
         drawBuffer: newDrawBuffer,
         drawnPixels: newDrawnPixels,
         lastDrawPos: { x, y },
@@ -502,17 +539,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawShade: (x, y, darken) =>
     set((state) => {
       const {
-        pixelData,
+        activeLayerId,
         gridSize,
         switchDarkenAndLighten,
         shadeStrength,
         drawBuffer,
         drawnPixels,
         lastDrawPos,
-        getPixelColor,
+        getLayer,
+        setLayerData,
+        getPixelColorFromLayer,
       } = state;
+      const layer = getLayer(activeLayerId) as Layer;
+      if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
-      const newData = new Uint8ClampedArray(pixelData);
+
+      const newData = new Uint8ClampedArray(layer.data);
       const newDrawBuffer = [...drawBuffer];
       const newDrawnPixels = new Set(drawnPixels);
       darken = switchDarkenAndLighten ? !darken : darken;
@@ -522,7 +564,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         : [{ x, y }];
       for (const point of pointsToDraw) {
         if (!isValidIndex(point.x, point.y, gridSize)) continue;
-        const currColor = getPixelColor(point.x, point.y);
+        const currColor = getPixelColorFromLayer(
+          point.x,
+          point.y,
+          activeLayerId,
+        );
         if (currColor.a === 0) continue;
         currColor.a /= 255;
         const newColor = darken
@@ -542,8 +588,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         });
         setPixelColor(point.x, point.y, gridSize.x, newColor, newData);
       }
+      setLayerData(newData, activeLayerId);
       return {
-        pixelData: newData,
         drawBuffer: newDrawBuffer,
         drawnPixels: newDrawnPixels,
         lastDrawPos: { x, y },
@@ -552,15 +598,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawLine: (color, mod) =>
     set((state) => {
       const {
-        pixelData,
+        activeLayerId,
         gridSize,
         brushSize,
         lineStartPos,
         lineEndPos,
-        getPixelColor,
+        getLayer,
+        setLayerData,
+        getPixelColorFromLayer,
       } = state;
+      const layer = getLayer(activeLayerId) as Layer;
+      if (layer.locked) return {};
       if (!lineStartPos || !lineEndPos) return {};
-      const newData = new Uint8ClampedArray(pixelData);
+
+      const newData = new Uint8ClampedArray(layer.data);
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
@@ -589,14 +640,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               x: pixelX,
               y: pixelY,
               color,
-              prevColor: getPixelColor(pixelX, pixelY),
+              prevColor: getPixelColorFromLayer(pixelX, pixelY, activeLayerId),
             });
             setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
         }
       }
+      setLayerData(newData, activeLayerId);
       return {
-        pixelData: newData,
         lineStartPos: null,
         lineEndPos: null,
         drawBuffer,
@@ -605,17 +656,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawShape: (color, mod1, mod2) =>
     set((state) => {
       const {
-        pixelData,
+        activeLayerId,
         gridSize,
         brushSize,
         shapeStartPos,
         shapeEndPos,
         shapeMode,
         shapeFill,
-        getPixelColor,
+        getLayer,
+        setLayerData,
+        getPixelColorFromLayer,
       } = state;
+      const layer = getLayer(activeLayerId) as Layer;
+      if (layer.locked) return {};
       if (!shapeStartPos || !shapeEndPos) return {};
-      const newData = new Uint8ClampedArray(pixelData);
+
+      const newData = new Uint8ClampedArray(layer.data);
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
@@ -635,7 +691,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           x: px,
           y: py,
           color,
-          prevColor: getPixelColor(px, py),
+          prevColor: getPixelColorFromLayer(px, py, activeLayerId),
         });
         setPixelColor(px, py, gridSize.x, color, newData);
       }
@@ -661,49 +717,51 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         for (const point of fillPoints) setPixel(point.x, point.y);
       }
 
+      setLayerData(newData, activeLayerId);
       return {
-        pixelData: newData,
         shapeStartPos: null,
         shapeEndPos: null,
         drawBuffer,
       };
     }),
   erase: (x, y) => get().draw(x, y, { r: 0, g: 0, b: 0, a: 0 }),
-  floodFill: (x, y, color, isUpdateHistory = true) =>
-    set((state) => {
-      const { pixelData, gridSize, updateHistory } = state;
-      if (!isValidIndex(x, y, gridSize)) return {};
-      const targetColor = getPixelColor(x, y, gridSize.x, pixelData);
-      if (isEqualColor(targetColor, color)) return {};
+  floodFill: (x, y, color, isUpdateHistory = true) => {
+    const { activeLayerId, gridSize, getLayer, setLayerData, updateHistory } =
+      get();
+    if (!isValidIndex(x, y, gridSize)) return;
+    const layer = getLayer(activeLayerId) as Layer;
+    if (layer.locked) return;
+    const targetColor = getPixelColor(x, y, gridSize.x, layer.data);
+    if (isEqualColor(targetColor, color)) return;
 
-      const newData = new Uint8ClampedArray(pixelData);
-      const queue: { x: number; y: number }[] = [];
-      queue.push({ x, y });
-      while (queue.length > 0) {
-        const { x, y } = queue.shift()!;
-        const currentColor = getPixelColor(x, y, gridSize.x, newData);
+    const newData = new Uint8ClampedArray(layer.data);
+    const queue: { x: number; y: number }[] = [];
+    queue.push({ x, y });
+    while (queue.length > 0) {
+      const { x, y } = queue.shift()!;
+      const currentColor = getPixelColor(x, y, gridSize.x, newData);
 
-        if (isEqualColor(currentColor, targetColor)) {
-          setPixelColor(x, y, gridSize.x, color, newData);
-          if (isValidIndex(x + 1, y, gridSize)) queue.push({ x: x + 1, y });
-          if (isValidIndex(x - 1, y, gridSize)) queue.push({ x: x - 1, y });
-          if (isValidIndex(x, y + 1, gridSize)) queue.push({ x, y: y + 1 });
-          if (isValidIndex(x, y - 1, gridSize)) queue.push({ x, y: y - 1 });
-        }
+      if (isEqualColor(currentColor, targetColor)) {
+        setPixelColor(x, y, gridSize.x, color, newData);
+        if (isValidIndex(x + 1, y, gridSize)) queue.push({ x: x + 1, y });
+        if (isValidIndex(x - 1, y, gridSize)) queue.push({ x: x - 1, y });
+        if (isValidIndex(x, y + 1, gridSize)) queue.push({ x, y: y + 1 });
+        if (isValidIndex(x, y - 1, gridSize)) queue.push({ x, y: y - 1 });
       }
+    }
 
-      if (isUpdateHistory) {
-        const action: BucketAction = {
-          action: "bucket",
-          x,
-          y,
-          color,
-          prevPixelData: pixelData,
-        };
-        updateHistory(action);
-      }
-      return { pixelData: newData };
-    }),
+    if (isUpdateHistory) {
+      const action: BucketAction = {
+        action: "bucket",
+        x,
+        y,
+        color,
+        prevPixelData: layer.data,
+      };
+      updateHistory(action);
+    }
+    setLayerData(newData, activeLayerId);
+  },
   newCanvas: (size) =>
     set((state) => {
       const { pixelData, gridSize, initActions, updateHistory } = state;
