@@ -54,19 +54,22 @@ type Action =
 
 type DrawAction = {
   action: "draw";
+  layerId: string;
   pixels: DrawActionPixel[];
 };
 
 type BucketAction = {
   action: "bucket";
+  layerId: string;
   x: number;
   y: number;
   color: RGBA;
-  prevPixelData: Uint8ClampedArray;
+  prevData: Uint8ClampedArray;
 };
 
 type TransformAction = {
   action: "transform";
+  layerId: string;
   srcRect: Rect;
   dstRect: Rect;
   srcPixels: RGBA[];
@@ -76,12 +79,14 @@ type TransformAction = {
 
 type MoveAction = {
   action: "move";
-  pixels: Uint8ClampedArray;
+  layerId: string;
+  data: Uint8ClampedArray;
   offset: { x: number; y: number };
 };
 
 type DeleteAction = {
   action: "delete";
+  layerId: string;
   area: Rect;
   pixels: RGBA[];
   mask: Uint8Array | null;
@@ -89,6 +94,7 @@ type DeleteAction = {
 
 type PasteAction = {
   action: "paste";
+  layerId: string;
   area: Rect;
   pixels: RGBA[];
   prevPixels: RGBA[];
@@ -97,15 +103,18 @@ type PasteAction = {
 
 type NewAction = {
   action: "new";
-  pixelData: Uint8ClampedArray;
-  prevPixelData: Uint8ClampedArray;
-  gridSize: { x: number; y: number };
-  prevGridSize: { x: number; y: number };
+  layers: Layer[];
+  prevLayers: Layer[];
+  activeLayerId: string;
+  prevActiveLayerId: string;
+  size: { x: number; y: number };
+  prevSize: { x: number; y: number };
 };
 
 type ClearAction = {
   action: "clear";
-  prevPixelData: Uint8ClampedArray;
+  layerId: string;
+  prevData: Uint8ClampedArray;
 };
 
 type DrawActionPixel = {
@@ -499,7 +508,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColorFromLayer,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (layer.locked) return {};
+      if (!layer.visible || layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -551,7 +560,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColorFromLayer,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (layer.locked) return {};
+      if (!layer.visible || layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -608,7 +617,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColorFromLayer,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (layer.locked) return {};
+      if (!layer.visible || layer.locked) return {};
       if (!lineStartPos || !lineEndPos) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -668,7 +677,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColorFromLayer,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (layer.locked) return {};
+      if (!layer.visible || layer.locked) return {};
       if (!shapeStartPos || !shapeEndPos) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -730,7 +739,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       get();
     if (!isValidIndex(x, y, gridSize)) return;
     const layer = getLayer(activeLayerId) as Layer;
-    if (layer.locked) return;
+    if (!layer.visible || layer.locked) return;
     const targetColor = getPixelColor(x, y, gridSize.x, layer.data);
     if (isEqualColor(targetColor, color)) return;
 
@@ -1384,8 +1393,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { pixelData: newData, moveStartPos: null, moveOffset: null };
     }),
   undo: () => {
-    const { pixelData, gridSize, undoHistory, redoHistory, initActions } =
-      get();
+    const {
+      gridSize,
+      undoHistory,
+      redoHistory,
+      initActions,
+      getLayer,
+      setLayerData,
+    } = get();
     if (undoHistory.length === 0) return;
 
     const newUndoHistory = [...undoHistory];
@@ -1393,7 +1408,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newRedoHistory = [action, ...redoHistory];
 
     if (action.action === "draw") {
-      const newData = new Uint8ClampedArray(pixelData);
+      const layer = getLayer(action.layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       for (let i = 0; i < action.pixels.length; i++) {
         const { x, y, prevColor } = action.pixels[i];
         const baseIndex = getBaseIndex(x, y, gridSize.x);
@@ -1402,12 +1418,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newData[baseIndex + 2] = prevColor.b;
         newData[baseIndex + 3] = prevColor.a;
       }
-      set({ pixelData: newData });
+      setLayerData(newData, action.layerId);
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "bucket") {
-      set({ pixelData: action.prevPixelData });
+      setLayerData(action.prevData, action.layerId);
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "transform") {
-      const { srcRect, dstRect, srcPixels, dstPixels, mask } = action;
-      const newData = new Uint8ClampedArray(pixelData);
+      const { layerId, srcRect, dstRect, srcPixels, dstPixels, mask } = action;
+      const layer = getLayer(layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       const newMask = mask
         ? resizeMaskWithNearestNeighbor(
             mask,
@@ -1419,33 +1438,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         : null;
       drawRectContent(dstRect, dstPixels, newData, gridSize, false, newMask);
       drawRectContent(srcRect, srcPixels, newData, gridSize, true, mask);
-      set({ pixelData: newData });
+      setLayerData(newData, layerId);
+      set({ activeLayerId: layerId });
     } else if (action.action === "move") {
-      set({ pixelData: action.pixels });
+      setLayerData(action.data, action.layerId);
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "delete") {
-      const { area, pixels, mask } = action;
-      const newData = new Uint8ClampedArray(pixelData);
+      const { layerId, area, pixels, mask } = action;
+      const layer = getLayer(layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       drawRectContent(area, pixels, newData, gridSize, true, mask);
-      set({ pixelData: newData });
+      setLayerData(newData, layerId);
+      set({ activeLayerId: layerId });
     } else if (action.action === "paste") {
-      const { area, prevPixels, mask } = action;
-      const newData = new Uint8ClampedArray(pixelData);
+      const { layerId, area, prevPixels, mask } = action;
+      const layer = getLayer(layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       drawRectContent(area, prevPixels, newData, gridSize, false, mask);
-      set({ pixelData: newData });
+      setLayerData(newData, layerId);
+      set({ activeLayerId: layerId });
     } else if (action.action === "new") {
-      const { prevPixelData, prevGridSize } = action;
-      let pxSize = BASE_CANVAS_SIZE / Math.max(prevGridSize.x, prevGridSize.y);
+      const { prevLayers, prevActiveLayerId, prevSize } = action;
+      let pxSize = BASE_CANVAS_SIZE / Math.max(prevSize.x, prevSize.y);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
       set({
-        pixelData: prevPixelData,
-        gridSize: prevGridSize,
+        layers: prevLayers,
+        activeLayerId: prevActiveLayerId,
+        gridSize: prevSize,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       });
     } else if (action.action === "clear") {
-      set({ pixelData: action.prevPixelData });
+      setLayerData(action.prevData, action.layerId);
+      set({ activeLayerId: action.layerId });
     }
 
     initActions();
@@ -1456,11 +1483,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   redo: () => {
     const {
-      pixelData,
       gridSize,
       undoHistory,
       redoHistory,
       initActions,
+      getLayer,
+      setLayerData,
       floodFill,
     } = get();
     if (redoHistory.length === 0) return;
@@ -1470,7 +1498,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newUndoHistory = [action, ...undoHistory];
 
     if (action.action === "draw") {
-      const newData = new Uint8ClampedArray(pixelData);
+      const layer = getLayer(action.layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       for (let i = action.pixels.length - 1; i >= 0; i--) {
         const { x, y, color } = action.pixels[i];
         const baseIndex = getBaseIndex(x, y, gridSize.x);
@@ -1479,13 +1508,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newData[baseIndex + 2] = color.b;
         newData[baseIndex + 3] = color.a;
       }
-      set({ pixelData: newData });
+      setLayerData(newData, action.layerId);
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "bucket") {
-      const { x, y, color } = action;
+      const { layerId, x, y, color } = action;
+      set({ activeLayerId: layerId });
       floodFill(x, y, color, false);
     } else if (action.action === "transform") {
-      const { srcRect, dstRect, srcPixels, mask } = action;
-      const newData = new Uint8ClampedArray(pixelData);
+      const { layerId, srcRect, dstRect, srcPixels, mask } = action;
+      const layer = getLayer(layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       const newMask = mask
         ? resizeMaskWithNearestNeighbor(
             mask,
@@ -1504,47 +1536,60 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       clearRectContent(srcRect, newData, gridSize, mask);
       drawRectContent(dstRect, pixelsToApply, newData, gridSize, true, newMask);
-      set({ pixelData: newData });
+      setLayerData(newData, layerId);
+      set({ activeLayerId: layerId });
     } else if (action.action === "move") {
-      const { pixels, offset } = action;
+      const { layerId, offset } = action;
+      const layer = getLayer(layerId) as Layer;
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
 
       for (let y = 0; y < gridSize.y; y++) {
         for (let x = 0; x < gridSize.x; x++) {
           const srcX = x - offset.x;
           const srcY = y - offset.y;
-
           if (isValidIndex(srcX, srcY, gridSize)) {
             const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
             const dstIndex = getBaseIndex(x, y, gridSize.x);
-            newData[dstIndex] = pixels[srcIndex];
-            newData[dstIndex + 1] = pixels[srcIndex + 1];
-            newData[dstIndex + 2] = pixels[srcIndex + 2];
-            newData[dstIndex + 3] = pixels[srcIndex + 3];
+            newData[dstIndex] = layer.data[srcIndex];
+            newData[dstIndex + 1] = layer.data[srcIndex + 1];
+            newData[dstIndex + 2] = layer.data[srcIndex + 2];
+            newData[dstIndex + 3] = layer.data[srcIndex + 3];
           }
         }
       }
-      set({ pixelData: newData });
+      setLayerData(newData, layerId);
+      set({ activeLayerId: layerId });
     } else if (action.action === "delete") {
-      const { area, mask } = action;
-      const newData = new Uint8ClampedArray(pixelData);
+      const { layerId, area, mask } = action;
+      const layer = getLayer(layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       clearRectContent(area, newData, gridSize, mask);
-      set({ pixelData: newData });
+      setLayerData(newData, layerId);
+      set({ activeLayerId: layerId });
     } else if (action.action === "paste") {
-      const { area, pixels, mask } = action;
-      const newData = new Uint8ClampedArray(pixelData);
+      const { layerId, area, pixels, mask } = action;
+      const layer = getLayer(layerId) as Layer;
+      const newData = new Uint8ClampedArray(layer.data);
       drawRectContent(area, pixels, newData, gridSize, true, mask);
-      set({ pixelData: newData });
+      setLayerData(newData, layerId);
+      set({ activeLayerId: layerId });
     } else if (action.action === "new") {
-      const { pixelData, gridSize } = action;
-      let pxSize = BASE_CANVAS_SIZE / Math.max(gridSize.x, gridSize.y);
+      const { layers, activeLayerId, size } = action;
+      let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
-      set({ pixelData, gridSize, panOffset: { x: 0, y: 0 }, zoomLevel });
+      set({
+        layers,
+        activeLayerId,
+        gridSize: size,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      });
     } else if (action.action === "clear") {
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
-      set({ pixelData: newData });
+      setLayerData(newData, action.layerId);
+      set({ activeLayerId: action.layerId });
     }
 
     initActions();
