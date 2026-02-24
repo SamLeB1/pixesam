@@ -22,7 +22,7 @@ import {
   getModdedShapeBounds,
   isInPolygon,
 } from "../utils/geometry";
-import { createNewLayer } from "../utils/layers";
+import { compositeLayers, createNewLayer } from "../utils/layers";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
@@ -40,6 +40,7 @@ import type {
   Rect,
   Clipboard,
   PxsmData,
+  PxsmLayerData,
   Layer,
 } from "../types";
 
@@ -1042,31 +1043,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
   },
   exportToPxsm: () => {
-    const { pixelData, gridSize } = get();
-    const newPixelData = Array.from(pixelData);
-    const pxsmData = {
+    const { layers, activeLayerId, gridSize } = get();
+    const newLayers: PxsmLayerData[] = layers.map((layer) => ({
+      ...layer,
+      data: Array.from(layer.data),
+    }));
+    const pxsmData: PxsmData = {
       version: "1.0.0",
       width: gridSize.x,
       height: gridSize.y,
-      pixels: newPixelData,
+      layers: newLayers,
+      activeLayerId,
     };
-    const id = Math.random().toString(36).substring(2, 15);
 
+    const id = Math.random().toString(36).substring(2, 15);
     const dataStr = JSON.stringify(pxsmData);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
     link.href = url;
     link.download = `new-pixesam-${id}.pxsm`;
     document.body.appendChild(link);
     link.click();
-
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   },
   exportToImage: (scale) => {
-    const { pixelData, gridSize } = get();
+    const { layers, gridSize } = get();
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -1078,11 +1081,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     canvas.height = Math.floor(gridSize.y * scale);
 
     const imageData = new ImageData(
-      pixelData as ImageDataArray,
+      compositeLayers(layers, gridSize.x, gridSize.y) as ImageDataArray,
       gridSize.x,
       gridSize.y,
     );
-
     const tempCanvas = document.createElement("canvas");
     const tempCtx = tempCanvas.getContext("2d");
     if (!tempCtx) {
