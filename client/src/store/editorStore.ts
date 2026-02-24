@@ -22,6 +22,7 @@ import {
   getModdedShapeBounds,
   isInPolygon,
 } from "../utils/geometry";
+import { createNewLayer } from "../utils/layers";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
@@ -260,18 +261,15 @@ type EditorState = {
   paste: () => void;
 };
 
-const INITIAL_LAYER: Layer = {
-  id: crypto.randomUUID(),
-  data: new Uint8ClampedArray(DEFAULT_GRID_SIZE.x * DEFAULT_GRID_SIZE.y * 4),
-  name: "Layer 1",
-  visible: true,
-  locked: false,
-  opacity: 1.0,
-};
+const initialLayer = createNewLayer(
+  DEFAULT_GRID_SIZE.x,
+  DEFAULT_GRID_SIZE.y,
+  "Layer 1",
+);
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  layers: [INITIAL_LAYER],
-  activeLayerId: INITIAL_LAYER.id,
+  layers: [initialLayer],
+  activeLayerId: initialLayer.id,
   gridSize: DEFAULT_GRID_SIZE,
   visibleGridSize: DEFAULT_GRID_SIZE,
   panOffset: { x: 0, y: 0 },
@@ -762,10 +760,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (isUpdateHistory) {
       const action: BucketAction = {
         action: "bucket",
+        layerId: activeLayerId,
         x,
         y,
         color,
-        prevPixelData: layer.data,
+        prevData: layer.data,
       };
       updateHistory(action);
     }
@@ -773,9 +772,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   newCanvas: (size) =>
     set((state) => {
-      const { pixelData, gridSize, initActions, updateHistory } = state;
-      const newData = new Uint8ClampedArray(size.x * size.y * 4);
-
+      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+        state;
+      const newLayer = createNewLayer(size.x, size.y, "Layer 1");
       let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
@@ -783,137 +782,155 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const action: NewAction = {
         action: "new",
-        pixelData: newData,
-        prevPixelData: pixelData,
-        gridSize: size,
-        prevGridSize: gridSize,
+        layers: [newLayer],
+        prevLayers: layers,
+        activeLayerId: newLayer.id,
+        prevActiveLayerId: activeLayerId,
+        size,
+        prevSize: gridSize,
       };
       updateHistory(action);
 
       initActions();
       return {
-        pixelData: newData,
+        layers: [newLayer],
+        activeLayerId: newLayer.id,
         gridSize: size,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       };
     }),
-  clearCanvas: () =>
-    set((state) => {
-      const { pixelData, gridSize, initActions, updateHistory } = state;
-      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+  clearCanvas: () => {
+    const {
+      activeLayerId,
+      gridSize,
+      initActions,
+      getLayer,
+      setLayerData,
+      updateHistory,
+    } = get();
+    const layer = getLayer(activeLayerId) as Layer;
+    if (!layer.visible || layer.locked) return;
 
-      const action: ClearAction = {
-        action: "clear",
-        prevPixelData: pixelData,
-      };
-      updateHistory(action);
+    const action: ClearAction = {
+      action: "clear",
+      layerId: activeLayerId,
+      prevData: layer.data,
+    };
+    updateHistory(action);
 
-      initActions();
-      return { pixelData: newData };
-    }),
+    initActions();
+    const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+    setLayerData(newData, activeLayerId);
+  },
   resizeCanvas: (size, anchor, resizeContent = false) =>
     set((state) => {
       const {
-        pixelData,
+        layers,
+        activeLayerId,
         gridSize: oldGridSize,
         initActions,
         updateHistory,
       } = state;
-      const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
-      if (resizeContent) {
-        const scaleX = size.x / oldGridSize.x;
-        const scaleY = size.y / oldGridSize.y;
+      const newLayers: Layer[] = layers.map((layer) => {
+        const newData = new Uint8ClampedArray(size.x * size.y * 4);
+        if (resizeContent) {
+          const scaleX = size.x / oldGridSize.x;
+          const scaleY = size.y / oldGridSize.y;
 
-        for (let newY = 0; newY < size.y; newY++) {
-          for (let newX = 0; newX < size.x; newX++) {
-            const oldX = Math.floor(newX / scaleX);
-            const oldY = Math.floor(newY / scaleY);
+          for (let newY = 0; newY < size.y; newY++) {
+            for (let newX = 0; newX < size.x; newX++) {
+              const oldX = Math.floor(newX / scaleX);
+              const oldY = Math.floor(newY / scaleY);
 
-            if (isValidIndex(oldX, oldY, oldGridSize)) {
-              const oldBaseIndex = getBaseIndex(oldX, oldY, oldGridSize.x);
-              const newBaseIndex = getBaseIndex(newX, newY, size.x);
-              newData[newBaseIndex] = pixelData[oldBaseIndex];
-              newData[newBaseIndex + 1] = pixelData[oldBaseIndex + 1];
-              newData[newBaseIndex + 2] = pixelData[oldBaseIndex + 2];
-              newData[newBaseIndex + 3] = pixelData[oldBaseIndex + 3];
+              if (isValidIndex(oldX, oldY, oldGridSize)) {
+                const oldBaseIndex = getBaseIndex(oldX, oldY, oldGridSize.x);
+                const newBaseIndex = getBaseIndex(newX, newY, size.x);
+                newData[newBaseIndex] = layer.data[oldBaseIndex];
+                newData[newBaseIndex + 1] = layer.data[oldBaseIndex + 1];
+                newData[newBaseIndex + 2] = layer.data[oldBaseIndex + 2];
+                newData[newBaseIndex + 3] = layer.data[oldBaseIndex + 3];
+              }
+            }
+          }
+        } else {
+          let offsetX = 0;
+          let offsetY = 0;
+          switch (anchor) {
+            case "top-left":
+              break;
+            case "top-center":
+              offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+              offsetY = 0;
+              break;
+            case "top-right":
+              offsetX = size.x - oldGridSize.x;
+              offsetY = 0;
+              break;
+            case "middle-left":
+              offsetX = 0;
+              offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+              break;
+            case "middle-center":
+              offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+              offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+              break;
+            case "middle-right":
+              offsetX = size.x - oldGridSize.x;
+              offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+              break;
+            case "bottom-left":
+              offsetX = 0;
+              offsetY = size.y - oldGridSize.y;
+              break;
+            case "bottom-center":
+              offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+              offsetY = size.y - oldGridSize.y;
+              break;
+            case "bottom-right":
+              offsetX = size.x - oldGridSize.x;
+              offsetY = size.y - oldGridSize.y;
+          }
+
+          for (let y = 0; y < oldGridSize.y; y++) {
+            for (let x = 0; x < oldGridSize.x; x++) {
+              const oldBaseIndex = getBaseIndex(x, y, oldGridSize.x);
+              const newX = x + offsetX;
+              const newY = y + offsetY;
+
+              if (newX >= 0 && newX < size.x && newY >= 0 && newY < size.y) {
+                const newBaseIndex = getBaseIndex(newX, newY, size.x);
+                newData[newBaseIndex] = layer.data[oldBaseIndex];
+                newData[newBaseIndex + 1] = layer.data[oldBaseIndex + 1];
+                newData[newBaseIndex + 2] = layer.data[oldBaseIndex + 2];
+                newData[newBaseIndex + 3] = layer.data[oldBaseIndex + 3];
+              }
             }
           }
         }
-      } else {
-        let offsetX = 0;
-        let offsetY = 0;
-        switch (anchor) {
-          case "top-left":
-            break;
-          case "top-center":
-            offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-            offsetY = 0;
-            break;
-          case "top-right":
-            offsetX = size.x - oldGridSize.x;
-            offsetY = 0;
-            break;
-          case "middle-left":
-            offsetX = 0;
-            offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-            break;
-          case "middle-center":
-            offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-            offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-            break;
-          case "middle-right":
-            offsetX = size.x - oldGridSize.x;
-            offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-            break;
-          case "bottom-left":
-            offsetX = 0;
-            offsetY = size.y - oldGridSize.y;
-            break;
-          case "bottom-center":
-            offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-            offsetY = size.y - oldGridSize.y;
-            break;
-          case "bottom-right":
-            offsetX = size.x - oldGridSize.x;
-            offsetY = size.y - oldGridSize.y;
-        }
+        return { ...layer, data: newData };
+      });
 
-        for (let y = 0; y < oldGridSize.y; y++) {
-          for (let x = 0; x < oldGridSize.x; x++) {
-            const oldBaseIndex = getBaseIndex(x, y, oldGridSize.x);
-            const newX = x + offsetX;
-            const newY = y + offsetY;
-
-            if (newX >= 0 && newX < size.x && newY >= 0 && newY < size.y) {
-              const newBaseIndex = getBaseIndex(newX, newY, size.x);
-              newData[newBaseIndex] = pixelData[oldBaseIndex];
-              newData[newBaseIndex + 1] = pixelData[oldBaseIndex + 1];
-              newData[newBaseIndex + 2] = pixelData[oldBaseIndex + 2];
-              newData[newBaseIndex + 3] = pixelData[oldBaseIndex + 3];
-            }
-          }
-        }
-      }
+      const action: NewAction = {
+        action: "new",
+        layers: newLayers,
+        prevLayers: layers,
+        activeLayerId,
+        prevActiveLayerId: activeLayerId,
+        size,
+        prevSize: oldGridSize,
+      };
+      updateHistory(action);
 
       let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      const action: NewAction = {
-        action: "new",
-        pixelData: newData,
-        prevPixelData: pixelData,
-        gridSize: size,
-        prevGridSize: oldGridSize,
-      };
-      updateHistory(action);
-
       initActions();
       return {
-        pixelData: newData,
+        layers: newLayers,
         gridSize: size,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
@@ -921,14 +938,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   importFromPxsm: (data) =>
     set((state) => {
-      if (!isValidPxsmData(data)) {
+      /* if (!isValidPxsmData(data)) {
         toast.error(
           "The imported file is invalid and may have been corrupted.",
         );
         return {};
-      }
-      const { pixelData, gridSize, initActions, updateHistory } = state;
-      const newData = new Uint8ClampedArray(data.pixels);
+      } */
+      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+        state;
+      const newLayers: Layer[] = data.layers.map((layer) => ({
+        ...layer,
+        data: new Uint8ClampedArray(layer.data),
+      }));
       let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
@@ -936,17 +957,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const action: NewAction = {
         action: "new",
-        pixelData: newData,
-        prevPixelData: pixelData,
-        gridSize: { x: data.width, y: data.height },
-        prevGridSize: gridSize,
+        layers: newLayers,
+        prevLayers: layers,
+        activeLayerId: data.activeLayerId,
+        prevActiveLayerId: activeLayerId,
+        size: { x: data.width, y: data.height },
+        prevSize: gridSize,
       };
       updateHistory(action);
 
       toast.success("File imported successfully!");
       initActions();
       return {
-        pixelData: newData,
+        layers: newLayers,
+        activeLayerId: data.activeLayerId,
         gridSize: { x: data.width, y: data.height },
         panOffset: { x: 0, y: 0 },
         zoomLevel,
@@ -981,26 +1005,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       tempCtx.imageSmoothingEnabled = false;
       tempCtx.drawImage(img, 0, 0, width, height);
       const imageData = tempCtx.getImageData(0, 0, width, height);
-      const newData = new Uint8ClampedArray(imageData.data);
 
+      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+        get();
+      const data = new Uint8ClampedArray(imageData.data);
+      const layer = createNewLayer(width, height, "Layer 1", data);
       let pxSize = BASE_CANVAS_SIZE / Math.max(width, height);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      const { pixelData, gridSize, initActions, updateHistory } = get();
       const action: NewAction = {
         action: "new",
-        pixelData: newData,
-        prevPixelData: pixelData,
-        gridSize: { x: width, y: height },
-        prevGridSize: gridSize,
+        layers: [layer],
+        prevLayers: layers,
+        activeLayerId: layer.id,
+        prevActiveLayerId: activeLayerId,
+        size: { x: width, y: height },
+        prevSize: gridSize,
       };
       updateHistory(action);
 
       initActions();
       set({
-        pixelData: newData,
+        layers: [layer],
+        activeLayerId: layer.id,
         gridSize: { x: width, y: height },
         panOffset: { x: 0, y: 0 },
         zoomLevel,

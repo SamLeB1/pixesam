@@ -32,13 +32,6 @@ export type Clipboard = {
   mask: Uint8Array | null;
 };
 
-export type PxsmData = {
-  version: string;
-  width: number;
-  height: number;
-  pixels: number[];
-};
-
 export type ColorPalette = {
   id: string;
   name: string;
@@ -53,4 +46,21 @@ export type Layer = {
   visible: boolean;
   locked: boolean;
   opacity: number;
+};
+
+export type PxsmLayerData = {
+  id: string;
+  data: number[];
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  opacity: number;
+};
+
+export type PxsmData = {
+  version: string;
+  width: number;
+  height: number;
+  layers: PxsmLayerData[];
+  activeLayerId: string;
 };
