@@ -219,8 +219,7 @@ type EditorState = {
   setLayerData: (data: Uint8ClampedArray, id: string) => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
-  getPixelColor: (x: number, y: number) => RGBA;
-  getPixelColorFromLayer: (x: number, y: number, id: string) => RGBA;
+  getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
   getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
   getRectInBounds: (rect: Rect) => Rect | null;
@@ -410,30 +409,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     rgba.a *= 255;
     return rgba;
   },
-  getPixelColor: (x, y) => {
-    const { pixelData, gridSize } = get();
+  getPixelColor: (x, y, layerId) => {
+    const { layers, gridSize, getLayer } = get();
     if (!isValidIndex(x, y, gridSize)) return { r: 0, g: 0, b: 0, a: 0 };
     const baseIndex = getBaseIndex(x, y, gridSize.x);
-    return {
-      r: pixelData[baseIndex],
-      g: pixelData[baseIndex + 1],
-      b: pixelData[baseIndex + 2],
-      a: pixelData[baseIndex + 3],
-    };
-  },
-  getPixelColorFromLayer: (x, y, id) => {
-    const { gridSize, getLayer } = get();
-    const layer = getLayer(id);
-    if (!layer || !isValidIndex(x, y, gridSize))
-      return { r: 0, g: 0, b: 0, a: 0 };
-
-    const baseIndex = getBaseIndex(x, y, gridSize.x);
-    return {
-      r: layer.data[baseIndex],
-      g: layer.data[baseIndex + 1],
-      b: layer.data[baseIndex + 2],
-      a: layer.data[baseIndex + 3],
-    };
+    if (layerId) {
+      const layer = getLayer(layerId);
+      if (!layer) return { r: 0, g: 0, b: 0, a: 0 };
+      return {
+        r: layer.data[baseIndex],
+        g: layer.data[baseIndex + 1],
+        b: layer.data[baseIndex + 2],
+        a: layer.data[baseIndex + 3],
+      };
+    } else {
+      const pxLayers: Layer[] = layers.map((layer) => {
+        const r = layer.data[baseIndex];
+        const g = layer.data[baseIndex + 1];
+        const b = layer.data[baseIndex + 2];
+        const a = layer.data[baseIndex + 3];
+        const px = new Uint8ClampedArray([r, g, b, a]);
+        return { ...layer, data: px };
+      });
+      const composited = compositeLayers(pxLayers, 1, 1);
+      return {
+        r: composited[0],
+        g: composited[1],
+        b: composited[2],
+        a: composited[3],
+      };
+    }
   },
   getPixelsInRect: (rect, mask = null) => {
     const { gridSize, getPixelColor } = get();
@@ -504,7 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastDrawPos,
         getLayer,
         setLayerData,
-        getPixelColorFromLayer,
+        getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
       if (!layer.visible || layer.locked) return {};
@@ -531,7 +536,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               x: pixelX,
               y: pixelY,
               color,
-              prevColor: getPixelColorFromLayer(pixelX, pixelY, activeLayerId),
+              prevColor: getPixelColor(pixelX, pixelY, activeLayerId),
             });
             setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
@@ -556,7 +561,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastDrawPos,
         getLayer,
         setLayerData,
-        getPixelColorFromLayer,
+        getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
       if (!layer.visible || layer.locked) return {};
@@ -572,11 +577,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         : [{ x, y }];
       for (const point of pointsToDraw) {
         if (!isValidIndex(point.x, point.y, gridSize)) continue;
-        const currColor = getPixelColorFromLayer(
-          point.x,
-          point.y,
-          activeLayerId,
-        );
+        const currColor = getPixelColor(point.x, point.y, activeLayerId);
         if (currColor.a === 0) continue;
         currColor.a /= 255;
         const newColor = darken
@@ -613,7 +614,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lineEndPos,
         getLayer,
         setLayerData,
-        getPixelColorFromLayer,
+        getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
       if (!layer.visible || layer.locked) return {};
@@ -648,7 +649,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               x: pixelX,
               y: pixelY,
               color,
-              prevColor: getPixelColorFromLayer(pixelX, pixelY, activeLayerId),
+              prevColor: getPixelColor(pixelX, pixelY, activeLayerId),
             });
             setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
@@ -673,7 +674,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shapeFill,
         getLayer,
         setLayerData,
-        getPixelColorFromLayer,
+        getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
       if (!layer.visible || layer.locked) return {};
@@ -699,7 +700,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           x: px,
           y: py,
           color,
-          prevColor: getPixelColorFromLayer(px, py, activeLayerId),
+          prevColor: getPixelColor(px, py, activeLayerId),
         });
         setPixelColor(px, py, gridSize.x, color, newData);
       }
