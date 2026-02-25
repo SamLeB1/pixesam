@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useCallback, useRef } from "react";
 import { useEditorStore } from "../store/editorStore";
+import { compositeLayers } from "../utils/layers";
 import { CHECKER_LIGHT, CHECKER_DARK } from "../constants";
 import type { Rect } from "../types";
 
@@ -7,7 +8,7 @@ const CONTAINER_WIDTH = 256;
 const CONTAINER_HEIGHT = 128;
 
 export default function CanvasPreview() {
-  const { pixelData, gridSize, visibleGridSize, panOffset, setPanOffset } =
+  const { layers, gridSize, visibleGridSize, panOffset, setPanOffset } =
     useEditorStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDragging = useRef(false);
@@ -45,6 +46,11 @@ export default function CanvasPreview() {
     return tile;
   }, [gridSize, canvasSize]);
 
+  const composited = useMemo(
+    () => compositeLayers(layers, gridSize.x, gridSize.y),
+    [layers, gridSize.x, gridSize.y],
+  );
+
   const viewportRect: Rect | null = useMemo(() => {
     const showsAll =
       visibleGridSize.x >= gridSize.x && visibleGridSize.y >= gridSize.y;
@@ -79,7 +85,7 @@ export default function CanvasPreview() {
     const tempCtx = tempCanvas.getContext("2d");
     if (tempCtx) {
       const imageData = new ImageData(
-        pixelData as ImageDataArray,
+        composited as ImageDataArray,
         gridSize.x,
         gridSize.y,
       );
@@ -106,7 +112,7 @@ export default function CanvasPreview() {
         viewportRect.height - 2,
       );
     }
-  }, [pixelData, gridSize, canvasSize, checkerPattern, viewportRect]);
+  }, [gridSize, canvasSize, checkerPattern, composited, viewportRect]);
 
   const clampPanOffset = useCallback(
     (offset: { x: number; y: number }) => {

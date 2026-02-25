@@ -14,6 +14,7 @@ import {
   getEllipseFillPoints,
   getModdedShapeBounds,
 } from "../utils/geometry";
+import { compositeLayers } from "../utils/layers";
 import { BASE_PX_SIZE, CHECKER_LIGHT, CHECKER_DARK } from "../constants";
 import type { Direction, Rect } from "../types";
 
@@ -32,7 +33,7 @@ const RESIZE_HANDLE_RADIUS = 8;
 
 export default function Canvas() {
   const {
-    pixelData,
+    layers,
     gridSize,
     panOffset,
     zoomLevel,
@@ -156,6 +157,11 @@ export default function Canvas() {
     return canvas;
   }, [gridSize.x, gridSize.y]);
 
+  const composited = useMemo(
+    () => compositeLayers(layers, gridSize.x, gridSize.y),
+    [layers, gridSize.x, gridSize.y],
+  );
+
   useEffect(() => {
     setVisibleGridSize(visibleGridSize);
   }, [visibleGridSize.x, visibleGridSize.y]);
@@ -175,13 +181,13 @@ export default function Canvas() {
     );
   }
 
-  function drawPixelData(ctx: CanvasRenderingContext2D) {
+  function drawCompositedLayers(ctx: CanvasRenderingContext2D) {
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = gridSize.x;
     tempCanvas.height = gridSize.y;
     const tempCtx = tempCanvas.getContext("2d")!;
     const imageData = new ImageData(
-      pixelData as ImageDataArray,
+      composited as ImageDataArray,
       gridSize.x,
       gridSize.y,
     );
@@ -900,7 +906,7 @@ export default function Canvas() {
 
     ctx.clearRect(0, 0, canvasSize.x, canvasSize.y);
     drawCheckerboard(ctx);
-    drawPixelData(ctx);
+    drawCompositedLayers(ctx);
 
     if (selectedTool !== "move") {
       if (showSelectionPreview) {
@@ -929,7 +935,7 @@ export default function Canvas() {
 
     if (!showSelectionPreview) setHoveredResizeHandle(null);
   }, [
-    pixelData,
+    layers,
     gridSize,
     zoomLevel,
     hoveredPixel,
