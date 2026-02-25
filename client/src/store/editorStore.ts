@@ -217,6 +217,8 @@ type EditorState = {
   selectTool: (tool: Tool) => void;
   getLayer: (id: string) => Layer | null;
   setLayerData: (data: Uint8ClampedArray, id: string) => void;
+  toggleLayerVisibility: (id: string) => void;
+  toggleLayerLock: (id: string) => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
@@ -402,6 +404,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: state.layers.map((l) => (l.id === id ? { ...l, data } : l)),
       };
     }),
+  toggleLayerVisibility: (id) =>
+    set((state) => ({
+      layers: state.layers.map((l) =>
+        l.id === id ? { ...l, visible: !l.visible } : l,
+      ),
+    })),
+  toggleLayerLock: (id) =>
+    set((state) => ({
+      layers: state.layers.map((l) =>
+        l.id === id ? { ...l, locked: !l.locked } : l,
+      ),
+    })),
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;

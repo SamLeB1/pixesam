@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   MdSettings,
   MdVisibility,
@@ -13,42 +12,23 @@ import {
   MdKeyboardDoubleArrowDown,
   MdDelete,
 } from "react-icons/md";
+import { useEditorStore } from "../store/editorStore";
 import Tooltip from "./Tooltip";
 
-type Layer = {
-  id: number;
-  name: string;
-  visible: boolean;
-  locked: boolean;
-};
-
-const initialLayers: Layer[] = [
-  { id: 1, name: "Layer 1", visible: true, locked: false },
-];
-
 export default function LayersMenu() {
-  const [layers, setLayers] = useState<Layer[]>(initialLayers);
-  const [selectedLayerId, setSelectedLayerId] = useState(
-    initialLayers[initialLayers.length - 1].id,
-  );
+  const {
+    layers,
+    activeLayerId,
+    setActiveLayerId,
+    toggleLayerVisibility,
+    toggleLayerLock,
+  } = useEditorStore();
 
-  function toggleVisibility(id: number) {
-    setLayers((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
-    );
-  }
-
-  function toggleLock(id: number) {
-    setLayers((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, locked: !l.locked } : l)),
-    );
-  }
-
-  function isTopLayer(id: number) {
+  function isTopLayer(id: string) {
     return layers.length > 0 && layers[layers.length - 1].id === id;
   }
 
-  function isBottomLayer(id: number) {
+  function isBottomLayer(id: string) {
     return layers.length > 0 && layers[0].id === id;
   }
 
@@ -90,16 +70,16 @@ export default function LayersMenu() {
           {[...layers].reverse().map((layer) => (
             <div
               key={layer.id}
-              className={`flex cursor-pointer items-center ${selectedLayerId === layer.id ? "bg-neutral-700" : "hover:bg-main-semi-dark"}`}
-              onClick={() => setSelectedLayerId(layer.id)}
+              className={`flex cursor-pointer items-center ${activeLayerId === layer.id ? "bg-neutral-700" : "hover:bg-main-semi-dark"}`}
+              onClick={() => setActiveLayerId(layer.id)}
             >
               <button
-                className={`mr-2 cursor-pointer p-2 ${selectedLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}
+                className={`mr-2 cursor-pointer p-2 ${activeLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}
                 type="button"
                 title="Visibility"
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleVisibility(layer.id);
+                  toggleLayerVisibility(layer.id);
                 }}
               >
                 {layer.visible ? (
@@ -115,12 +95,12 @@ export default function LayersMenu() {
                 {layer.name}
               </p>
               <button
-                className={`cursor-pointer p-2 ${selectedLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}
+                className={`cursor-pointer p-2 ${activeLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}
                 type="button"
                 title="Lock/unlock"
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleLock(layer.id);
+                  toggleLayerLock(layer.id);
                 }}
               >
                 {layer.locked ? (
@@ -150,7 +130,7 @@ export default function LayersMenu() {
             <MdContentCopy size={20} color="oklch(87% 0 0)" />
           </button>
         </Tooltip>
-        {isTopLayer(selectedLayerId) ? (
+        {isTopLayer(activeLayerId) ? (
           <Tooltip content="Move layer up" side="bottom">
             <button className="rounded-lg p-1" type="button" disabled>
               <MdArrowUpward size={20} color="oklch(55.6% 0 0)" />
@@ -166,7 +146,7 @@ export default function LayersMenu() {
             </button>
           </Tooltip>
         )}
-        {isBottomLayer(selectedLayerId) ? (
+        {isBottomLayer(activeLayerId) ? (
           <Tooltip content="Move layer down" side="bottom">
             <button className="rounded-lg p-1" type="button" disabled>
               <MdArrowDownward size={20} color="oklch(55.6% 0 0)" />
@@ -182,7 +162,7 @@ export default function LayersMenu() {
             </button>
           </Tooltip>
         )}
-        {isBottomLayer(selectedLayerId) ? (
+        {isBottomLayer(activeLayerId) ? (
           <Tooltip content="Merge layer down" side="bottom">
             <button className="rounded-lg p-1" type="button" disabled>
               <MdKeyboardArrowDown size={20} color="oklch(55.6% 0 0)" />
