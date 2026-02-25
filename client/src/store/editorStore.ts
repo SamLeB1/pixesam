@@ -220,7 +220,11 @@ type EditorState = {
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
-  getPixelsInRect: (rect: Rect, mask?: Uint8Array | null) => RGBA[];
+  getPixelsInRect: (
+    rect: Rect,
+    mask: Uint8Array | null,
+    layerId?: string,
+  ) => RGBA[];
   getEffectiveSelectionBounds: () => Rect | null;
   getRectInBounds: (rect: Rect) => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
@@ -440,7 +444,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }
   },
-  getPixelsInRect: (rect, mask = null) => {
+  getPixelsInRect: (rect, mask, layerId) => {
     const { gridSize, getPixelColor } = get();
     const pixels: RGBA[] = [];
     if (mask) {
@@ -451,7 +455,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           if (isValidIndex(pixelX, pixelY, gridSize)) {
             const baseIndex = i * rect.width + j;
             if (baseIndex >= mask.length) continue;
-            if (mask[baseIndex]) pixels.push(getPixelColor(pixelX, pixelY));
+            if (mask[baseIndex])
+              pixels.push(getPixelColor(pixelX, pixelY, layerId));
             else pixels.push({ r: 0, g: 0, b: 0, a: 0 });
           }
         }
@@ -462,7 +467,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const pixelX = rect.x + j;
           const pixelY = rect.y + i;
           if (isValidIndex(pixelX, pixelY, gridSize))
-            pixels.push(getPixelColor(pixelX, pixelY));
+            pixels.push(getPixelColor(pixelX, pixelY, layerId));
         }
       }
     }
@@ -512,7 +517,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (!layer.visible || layer.locked) return {};
+      if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -564,7 +569,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (!layer.visible || layer.locked) return {};
+      if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -617,7 +622,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (!layer.visible || layer.locked) return {};
+      if (layer.locked) return {};
       if (!lineStartPos || !lineEndPos) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -677,7 +682,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       const layer = getLayer(activeLayerId) as Layer;
-      if (!layer.visible || layer.locked) return {};
+      if (layer.locked) return {};
       if (!shapeStartPos || !shapeEndPos) return {};
 
       const newData = new Uint8ClampedArray(layer.data);
@@ -739,7 +744,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       get();
     if (!isValidIndex(x, y, gridSize)) return;
     const layer = getLayer(activeLayerId) as Layer;
-    if (!layer.visible || layer.locked) return;
+    if (layer.locked) return;
     const targetColor = getPixelColor(x, y, gridSize.x, layer.data);
     if (isEqualColor(targetColor, color)) return;
 
@@ -812,7 +817,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory,
     } = get();
     const layer = getLayer(activeLayerId) as Layer;
-    if (!layer.visible || layer.locked) return;
+    if (layer.locked) return;
 
     const action: ClearAction = {
       action: "clear",
@@ -1135,6 +1140,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   endSelectionAction: () =>
     set((state) => {
       const {
+        activeLayerId,
         selectionMode,
         selectionAction,
         selectedArea,
@@ -1152,7 +1158,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             selectionMask: mask,
             selectionAction: null,
             selectionStartPos: null,
-            selectedPixels: getPixelsInRect(selectedArea, mask),
+            selectedPixels: getPixelsInRect(selectedArea, mask, activeLayerId),
             showSelectionPreview: true,
           };
         } else {
@@ -1169,136 +1175,145 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       } else return {};
     }),
-  applySelectionAction: () =>
-    set((state) => {
-      const {
-        pixelData,
+  applySelectionAction: () => {
+    const {
+      activeLayerId,
+      gridSize,
+      selectionMask,
+      selectionMoveOffset,
+      selectionResizeOffset,
+      selectedArea,
+      selectedPixels,
+      isPasting,
+      getLayer,
+      setLayerData,
+      getPixelsInRect,
+      getEffectiveSelectionBounds,
+      initSelection,
+      updateHistory,
+    } = get();
+
+    const moveOff = selectionMoveOffset || { x: 0, y: 0 };
+    const resizeOff = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
+    const hasMoved = moveOff.x !== 0 || moveOff.y !== 0;
+    const hasResized =
+      resizeOff.n !== 0 ||
+      resizeOff.e !== 0 ||
+      resizeOff.s !== 0 ||
+      resizeOff.w !== 0;
+    if ((!hasMoved && !hasResized && !isPasting) || !selectedArea) {
+      initSelection();
+      return;
+    }
+
+    const layer = getLayer(activeLayerId) as Layer;
+    if (layer.locked) return;
+    const newData = new Uint8ClampedArray(layer.data);
+    const newSelectedArea = getEffectiveSelectionBounds() as Rect;
+    const newMask = selectionMask
+      ? resizeMaskWithNearestNeighbor(
+          selectionMask,
+          selectedArea.width,
+          selectedArea.height,
+          newSelectedArea.width,
+          newSelectedArea.height,
+        )
+      : null;
+    const pixelsToApply = resizePixelsWithNearestNeighbor(
+      selectedPixels,
+      selectedArea.width,
+      selectedArea.height,
+      newSelectedArea.width,
+      newSelectedArea.height,
+    );
+
+    if (isPasting) {
+      drawRectContent(
+        newSelectedArea,
+        pixelsToApply,
+        newData,
         gridSize,
-        selectionMask,
-        selectionMoveOffset,
-        selectionResizeOffset,
-        selectedArea,
-        selectedPixels,
-        isPasting,
-        getPixelsInRect,
-        getEffectiveSelectionBounds,
-        initSelection,
-        updateHistory,
-      } = state;
-
-      const moveOff = selectionMoveOffset || { x: 0, y: 0 };
-      const resizeOff = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
-      const hasMoved = moveOff.x !== 0 || moveOff.y !== 0;
-      const hasResized =
-        resizeOff.n !== 0 ||
-        resizeOff.e !== 0 ||
-        resizeOff.s !== 0 ||
-        resizeOff.w !== 0;
-      if ((!hasMoved && !hasResized && !isPasting) || !selectedArea) {
-        initSelection();
-        return {};
-      }
-
-      const newData = new Uint8ClampedArray(pixelData);
-      const newSelectedArea = getEffectiveSelectionBounds() as Rect;
-      const newMask = selectionMask
-        ? resizeMaskWithNearestNeighbor(
-            selectionMask,
-            selectedArea.width,
-            selectedArea.height,
-            newSelectedArea.width,
-            newSelectedArea.height,
-          )
-        : null;
-      const pixelsToApply = resizePixelsWithNearestNeighbor(
-        selectedPixels,
-        selectedArea.width,
-        selectedArea.height,
-        newSelectedArea.width,
-        newSelectedArea.height,
+        true,
+        newMask,
       );
 
-      if (isPasting) {
-        drawRectContent(
-          newSelectedArea,
-          pixelsToApply,
-          newData,
-          gridSize,
-          true,
-          newMask,
-        );
-
-        const action: PasteAction = {
-          action: "paste",
-          area: newSelectedArea,
-          pixels: pixelsToApply,
-          prevPixels: getPixelsInRect(newSelectedArea, newMask),
-          mask: newMask,
-        };
-        updateHistory(action);
-      } else {
-        clearRectContent(selectedArea, newData, gridSize, selectionMask);
-        drawRectContent(
-          newSelectedArea,
-          pixelsToApply,
-          newData,
-          gridSize,
-          true,
-          newMask,
-        );
-
-        const action: TransformAction = {
-          action: "transform",
-          srcRect: selectedArea,
-          dstRect: newSelectedArea,
-          srcPixels: selectedPixels,
-          dstPixels: getPixelsInRect(newSelectedArea, newMask),
-          mask: selectionMask,
-        };
-        updateHistory(action);
-      }
-
-      initSelection();
-      return { pixelData: newData };
-    }),
-  deleteSelection: () =>
-    set((state) => {
-      const {
-        pixelData,
-        gridSize,
-        selectionMask,
-        selectedArea,
-        isPasting,
-        getPixelsInRect,
-        initSelection,
-        updateHistory,
-      } = state;
-      if (!selectedArea) return {};
-      if (isPasting) {
-        initSelection();
-        return {};
-      }
-
-      const newData = new Uint8ClampedArray(pixelData);
+      const action: PasteAction = {
+        action: "paste",
+        layerId: activeLayerId,
+        area: newSelectedArea,
+        pixels: pixelsToApply,
+        prevPixels: getPixelsInRect(newSelectedArea, newMask, activeLayerId),
+        mask: newMask,
+      };
+      updateHistory(action);
+    } else {
       clearRectContent(selectedArea, newData, gridSize, selectionMask);
+      drawRectContent(
+        newSelectedArea,
+        pixelsToApply,
+        newData,
+        gridSize,
+        true,
+        newMask,
+      );
 
-      const action: DeleteAction = {
-        action: "delete",
-        area: selectedArea,
-        pixels: getPixelsInRect(selectedArea, selectionMask),
+      const action: TransformAction = {
+        action: "transform",
+        layerId: activeLayerId,
+        srcRect: selectedArea,
+        dstRect: newSelectedArea,
+        srcPixels: selectedPixels,
+        dstPixels: getPixelsInRect(newSelectedArea, newMask, activeLayerId),
         mask: selectionMask,
       };
       updateHistory(action);
+    }
 
+    initSelection();
+    setLayerData(newData, activeLayerId);
+  },
+  deleteSelection: () => {
+    const {
+      activeLayerId,
+      gridSize,
+      selectionMask,
+      selectedArea,
+      isPasting,
+      getLayer,
+      setLayerData,
+      getPixelsInRect,
+      initSelection,
+      updateHistory,
+    } = get();
+    if (!selectedArea) return;
+    if (isPasting) {
       initSelection();
-      return { pixelData: newData };
-    }),
+      return;
+    }
+
+    const layer = getLayer(activeLayerId) as Layer;
+    if (layer.locked) return;
+    const newData = new Uint8ClampedArray(layer.data);
+    clearRectContent(selectedArea, newData, gridSize, selectionMask);
+
+    const action: DeleteAction = {
+      action: "delete",
+      layerId: activeLayerId,
+      area: selectedArea,
+      pixels: getPixelsInRect(selectedArea, selectionMask, activeLayerId),
+      mask: selectionMask,
+    };
+    updateHistory(action);
+
+    initSelection();
+    setLayerData(newData, activeLayerId);
+  },
   performWandSelection: (x, y) =>
     set((state) => {
-      const { gridSize, getPixelColor, getPixelsInRect } = state;
+      const { activeLayerId, gridSize, getPixelColor, getPixelsInRect } = state;
       if (!isValidIndex(x, y, gridSize)) return {};
 
-      const targetColor = getPixelColor(x, y);
+      const targetColor = getPixelColor(x, y, activeLayerId);
       const visited = new Set<string>();
       const selectedCoords: { x: number; y: number }[] = [];
       const queue: { x: number; y: number }[] = [{ x, y }];
@@ -1315,7 +1330,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (visited.has(key)) continue;
         if (!isValidIndex(cx, cy, gridSize)) continue;
 
-        const currentColor = getPixelColor(cx, cy);
+        const currentColor = getPixelColor(cx, cy, activeLayerId);
         if (!isEqualColor(currentColor, targetColor)) continue;
 
         visited.add(key);
@@ -1350,7 +1365,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         selectionAction: null,
         selectionStartPos: null,
         selectedArea,
-        selectedPixels: getPixelsInRect(selectedArea, mask),
+        selectedPixels: getPixelsInRect(selectedArea, mask, activeLayerId),
         showSelectionPreview: true,
       };
     }),
@@ -1387,7 +1402,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   applyMove: (mod) =>
     set((state) => {
-      const { pixelData, gridSize, moveOffset, updateHistory } = state;
+      const {
+        activeLayerId,
+        gridSize,
+        moveOffset,
+        getLayer,
+        setLayerData,
+        updateHistory,
+      } = state;
       if (!moveOffset || (moveOffset.x === 0 && moveOffset.y === 0))
         return { moveStartPos: null, moveOffset: null };
 
@@ -1398,6 +1420,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         else newMoveOffset.x = 0;
       }
 
+      const layer = getLayer(activeLayerId) as Layer;
+      if (layer.locked) return {};
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       for (let y = 0; y < gridSize.y; y++) {
         for (let x = 0; x < gridSize.x; x++) {
@@ -1407,22 +1431,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           if (isValidIndex(srcX, srcY, gridSize)) {
             const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
             const dstIndex = getBaseIndex(x, y, gridSize.x);
-            newData[dstIndex] = pixelData[srcIndex];
-            newData[dstIndex + 1] = pixelData[srcIndex + 1];
-            newData[dstIndex + 2] = pixelData[srcIndex + 2];
-            newData[dstIndex + 3] = pixelData[srcIndex + 3];
+            newData[dstIndex] = layer.data[srcIndex];
+            newData[dstIndex + 1] = layer.data[srcIndex + 1];
+            newData[dstIndex + 2] = layer.data[srcIndex + 2];
+            newData[dstIndex + 3] = layer.data[srcIndex + 3];
           }
         }
       }
 
       const action: MoveAction = {
         action: "move",
-        pixels: pixelData,
+        layerId: activeLayerId,
+        data: layer.data,
         offset: newMoveOffset,
       };
       updateHistory(action);
 
-      return { pixelData: newData, moveStartPos: null, moveOffset: null };
+      setLayerData(newData, activeLayerId);
+      return { moveStartPos: null, moveOffset: null };
     }),
   undo: () => {
     const {
@@ -1640,11 +1666,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   clearDrawBuffer: () =>
     set((state) => {
-      const { drawBuffer, updateHistory } = state;
+      const { activeLayerId, drawBuffer, updateHistory } = state;
       if (drawBuffer.length === 0)
         return { drawnPixels: new Set(), lastDrawPos: null };
       const action: DrawAction = {
         action: "draw",
+        layerId: activeLayerId,
         pixels: drawBuffer,
       };
       updateHistory(action);
@@ -1696,6 +1723,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   paste: () =>
     set((state) => {
       const {
+        activeLayerId,
         gridSize,
         lineStartPos,
         lineEndPos,
@@ -1705,6 +1733,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         moveOffset,
         mousePos,
         clipboard,
+        getLayer,
         getActiveColorRGBA,
         drawLine,
         drawShape,
@@ -1714,7 +1743,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         clearDrawBuffer,
         paste,
       } = state;
-      if (!clipboard) return {};
+      const layer = getLayer(activeLayerId) as Layer;
+      if (layer.locked || !clipboard) return {};
+
       if (showSelectionPreview) {
         applySelectionAction();
         paste();
