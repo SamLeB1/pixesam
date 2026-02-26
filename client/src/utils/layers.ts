@@ -4,12 +4,15 @@ export function compositeLayers(
   layers: Layer[],
   width: number,
   height: number,
+  includeInvisible = false,
 ): Uint8ClampedArray {
   const result = new Uint8ClampedArray(width * height * 4);
-  const visibleLayers = layers.filter((l) => l.visible);
-  if (visibleLayers.length === 0) return result;
-  if (visibleLayers.length === 1 && visibleLayers[0].opacity === 1.0) {
-    result.set(visibleLayers[0].data);
+  const filteredLayers = includeInvisible
+    ? layers
+    : layers.filter((l) => l.visible);
+  if (filteredLayers.length === 0) return result;
+  if (filteredLayers.length === 1 && filteredLayers[0].opacity === 1.0) {
+    result.set(filteredLayers[0].data);
     return result;
   }
 
@@ -19,7 +22,7 @@ export function compositeLayers(
   const outB = new Float32Array(pixelCount);
   const outA = new Float32Array(pixelCount);
 
-  for (const layer of visibleLayers) {
+  for (const layer of filteredLayers) {
     for (let p = 0; p < pixelCount; p++) {
       const i = p * 4;
       const srcA = (layer.data[i + 3] / 255) * layer.opacity;

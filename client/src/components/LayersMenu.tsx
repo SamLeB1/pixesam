@@ -27,6 +27,8 @@ export default function LayersMenu() {
     deleteLayer,
     moveLayerUp,
     moveLayerDown,
+    mergeLayerDown,
+    flattenLayers,
   } = useEditorStore();
 
   function isTopLayer(id: string) {
@@ -54,6 +56,7 @@ export default function LayersMenu() {
             <button
               className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
               type="button"
+              onClick={flattenLayers}
             >
               <MdKeyboardDoubleArrowDown size={20} color="oklch(87% 0 0)" />
             </button>
@@ -182,6 +185,7 @@ export default function LayersMenu() {
             <button
               className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
               type="button"
+              onClick={mergeLayerDown}
             >
               <MdKeyboardArrowDown size={20} color="oklch(87% 0 0)" />
             </button>

@@ -229,6 +229,8 @@ type EditorState = {
   deleteLayer: () => void;
   moveLayerUp: () => void;
   moveLayerDown: () => void;
+  mergeLayerDown: () => void;
+  flattenLayers: () => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
@@ -493,6 +495,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newLayers[index],
       ];
       return { layers: newLayers };
+    }),
+  mergeLayerDown: () =>
+    set((state) => {
+      const { layers, activeLayerId, gridSize, initActions } = state;
+      const index = layers.findIndex((l) => l.id === activeLayerId);
+      if (index <= 0) return {};
+      initActions();
+
+      const topLayer = layers[index];
+      const bottomLayer = layers[index - 1];
+      const composited = compositeLayers(
+        [bottomLayer, topLayer],
+        gridSize.x,
+        gridSize.y,
+        true,
+      );
+      const newLayers = layers.filter((_, i) => i !== index);
+      newLayers[index - 1] = { ...bottomLayer, data: composited };
+      return {
+        layers: newLayers,
+        activeLayerId: bottomLayer.id,
+      };
+    }),
+  flattenLayers: () =>
+    set((state) => {
+      const { layers, gridSize, initActions } = state;
+      if (layers.length <= 1) return {};
+      initActions();
+
+      const flattened = createNewLayer(
+        gridSize.x,
+        gridSize.y,
+        "Flattened",
+        compositeLayers(layers, gridSize.x, gridSize.y),
+      );
+      return {
+        layers: [flattened],
+        activeLayerId: flattened.id,
+      };
     }),
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
