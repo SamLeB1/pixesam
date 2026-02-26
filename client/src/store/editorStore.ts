@@ -22,7 +22,12 @@ import {
   getModdedShapeBounds,
   isInPolygon,
 } from "../utils/geometry";
-import { compositeLayers, createNewLayer } from "../utils/layers";
+import {
+  compositeLayers,
+  createNewLayer,
+  duplicateLayer,
+  getAutoLayerName,
+} from "../utils/layers";
 import { isValidPxsmData } from "../utils/pxsmValidator";
 import {
   DEFAULT_GRID_SIZE,
@@ -219,6 +224,11 @@ type EditorState = {
   setLayerData: (data: Uint8ClampedArray, id: string) => void;
   toggleLayerVisibility: (id: string) => void;
   toggleLayerLock: (id: string) => void;
+  newLayer: () => void;
+  duplicateLayer: () => void;
+  deleteLayer: () => void;
+  moveLayerUp: () => void;
+  moveLayerDown: () => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
@@ -416,6 +426,74 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         l.id === id ? { ...l, locked: !l.locked } : l,
       ),
     })),
+  newLayer: () =>
+    set((state) => {
+      const { layers, activeLayerId, gridSize, initActions } = state;
+      initActions();
+      const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
+      const newLayer = createNewLayer(
+        gridSize.x,
+        gridSize.y,
+        getAutoLayerName(layers),
+      );
+      const newLayers = [...layers];
+      newLayers.splice(activeIndex + 1, 0, newLayer);
+      return {
+        layers: newLayers,
+        activeLayerId: newLayer.id,
+      };
+    }),
+  duplicateLayer: () =>
+    set((state) => {
+      const { layers, activeLayerId, initActions, getLayer } = state;
+      initActions();
+      const active = getLayer(activeLayerId) as Layer;
+      const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
+      const newLayer = duplicateLayer(active);
+      const newLayers = [...layers];
+      newLayers.splice(activeIndex + 1, 0, newLayer);
+      return {
+        layers: newLayers,
+        activeLayerId: newLayer.id,
+      };
+    }),
+  deleteLayer: () =>
+    set((state) => {
+      const { layers, activeLayerId, initActions } = state;
+      if (layers.length <= 1) return {};
+      initActions();
+      const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
+      const newActiveIndex = activeIndex === 0 ? 0 : activeIndex - 1;
+      const newLayers = layers.filter((l) => l.id !== activeLayerId);
+      return {
+        layers: newLayers,
+        activeLayerId: newLayers[newActiveIndex].id,
+      };
+    }),
+  moveLayerUp: () =>
+    set((state) => {
+      const { layers, activeLayerId } = state;
+      const index = layers.findIndex((l) => l.id === activeLayerId);
+      if (index >= layers.length - 1) return {};
+      const newLayers = [...layers];
+      [newLayers[index], newLayers[index + 1]] = [
+        newLayers[index + 1],
+        newLayers[index],
+      ];
+      return { layers: newLayers };
+    }),
+  moveLayerDown: () =>
+    set((state) => {
+      const { layers, activeLayerId } = state;
+      const index = layers.findIndex((l) => l.id === activeLayerId);
+      if (index <= 0) return {};
+      const newLayers = [...layers];
+      [newLayers[index], newLayers[index - 1]] = [
+        newLayers[index - 1],
+        newLayers[index],
+      ];
+      return { layers: newLayers };
+    }),
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;

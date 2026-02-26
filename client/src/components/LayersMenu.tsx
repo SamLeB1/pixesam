@@ -22,6 +22,11 @@ export default function LayersMenu() {
     setActiveLayerId,
     toggleLayerVisibility,
     toggleLayerLock,
+    newLayer,
+    duplicateLayer,
+    deleteLayer,
+    moveLayerUp,
+    moveLayerDown,
   } = useEditorStore();
 
   function isTopLayer(id: string) {
@@ -118,6 +123,7 @@ export default function LayersMenu() {
           <button
             className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
             type="button"
+            onClick={newLayer}
           >
             <MdAdd size={20} color="oklch(87% 0 0)" />
           </button>
@@ -126,6 +132,7 @@ export default function LayersMenu() {
           <button
             className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
             type="button"
+            onClick={duplicateLayer}
           >
             <MdContentCopy size={20} color="oklch(87% 0 0)" />
           </button>
@@ -141,6 +148,7 @@ export default function LayersMenu() {
             <button
               className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
               type="button"
+              onClick={moveLayerUp}
             >
               <MdArrowUpward size={20} color="oklch(87% 0 0)" />
             </button>
@@ -157,6 +165,7 @@ export default function LayersMenu() {
             <button
               className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
               type="button"
+              onClick={moveLayerDown}
             >
               <MdArrowDownward size={20} color="oklch(87% 0 0)" />
             </button>
@@ -189,6 +198,7 @@ export default function LayersMenu() {
             <button
               className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
               type="button"
+              onClick={deleteLayer}
             >
               <MdDelete size={20} color="oklch(87% 0 0)" />
             </button>

@@ -63,3 +63,22 @@ export function createNewLayer(
     opacity: 1.0,
   };
 }
+
+export function duplicateLayer(layer: Layer): Layer {
+  return {
+    id: crypto.randomUUID(),
+    data: new Uint8ClampedArray(layer.data),
+    name: `${layer.name} copy`,
+    visible: layer.visible,
+    locked: layer.locked,
+    opacity: layer.opacity,
+  };
+}
+
+export function getAutoLayerName(layers: Layer[]) {
+  const max = layers.reduce((acc, layer) => {
+    const match = layer.name.match(/^Layer (\d+)$/);
+    return match ? Math.max(acc, Number(match[1])) : acc;
+  }, 0);
+  return `Layer ${max + 1}`;
+}
