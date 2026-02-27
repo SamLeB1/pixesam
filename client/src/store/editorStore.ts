@@ -57,7 +57,8 @@ type Action =
   | DeleteAction
   | PasteAction
   | NewAction
-  | ClearAction;
+  | ClearAction
+  | LayerStructureAction;
 
 type DrawAction = {
   action: "draw";
@@ -122,6 +123,14 @@ type ClearAction = {
   action: "clear";
   layerId: string;
   prevData: Uint8ClampedArray;
+};
+
+type LayerStructureAction = {
+  action: "layer-structure";
+  prevLayers: Layer[];
+  prevActiveLayerId: string;
+  layers: Layer[];
+  activeLayerId: string;
 };
 
 type DrawActionPixel = {
@@ -430,7 +439,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })),
   newLayer: () =>
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions } = state;
+      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+        state;
       initActions();
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newLayer = createNewLayer(
@@ -440,6 +450,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       const newLayers = [...layers];
       newLayers.splice(activeIndex + 1, 0, newLayer);
+
+      const action: LayerStructureAction = {
+        action: "layer-structure",
+        prevLayers: layers,
+        prevActiveLayerId: activeLayerId,
+        layers: newLayers,
+        activeLayerId: newLayer.id,
+      };
+      updateHistory(action);
+
       return {
         layers: newLayers,
         activeLayerId: newLayer.id,
@@ -447,13 +467,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   duplicateLayer: () =>
     set((state) => {
-      const { layers, activeLayerId, initActions, getLayer } = state;
+      const { layers, activeLayerId, initActions, getLayer, updateHistory } =
+        state;
       initActions();
       const active = getLayer(activeLayerId) as Layer;
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newLayer = duplicateLayer(active);
       const newLayers = [...layers];
       newLayers.splice(activeIndex + 1, 0, newLayer);
+
+      const action: LayerStructureAction = {
+        action: "layer-structure",
+        prevLayers: layers,
+        prevActiveLayerId: activeLayerId,
+        layers: newLayers,
+        activeLayerId: newLayer.id,
+      };
+      updateHistory(action);
+
       return {
         layers: newLayers,
         activeLayerId: newLayer.id,
@@ -461,12 +492,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   deleteLayer: () =>
     set((state) => {
-      const { layers, activeLayerId, initActions } = state;
+      const { layers, activeLayerId, initActions, updateHistory } = state;
       if (layers.length <= 1) return {};
       initActions();
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newActiveIndex = activeIndex === 0 ? 0 : activeIndex - 1;
       const newLayers = layers.filter((l) => l.id !== activeLayerId);
+
+      const action: LayerStructureAction = {
+        action: "layer-structure",
+        prevLayers: layers,
+        prevActiveLayerId: activeLayerId,
+        layers: newLayers,
+        activeLayerId: newLayers[newActiveIndex].id,
+      };
+      updateHistory(action);
+
       return {
         layers: newLayers,
         activeLayerId: newLayers[newActiveIndex].id,
@@ -474,7 +515,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   moveLayerUp: () =>
     set((state) => {
-      const { layers, activeLayerId } = state;
+      const { layers, activeLayerId, updateHistory } = state;
       const index = layers.findIndex((l) => l.id === activeLayerId);
       if (index >= layers.length - 1) return {};
       const newLayers = [...layers];
@@ -482,11 +523,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newLayers[index + 1],
         newLayers[index],
       ];
+
+      const action: LayerStructureAction = {
+        action: "layer-structure",
+        prevLayers: layers,
+        prevActiveLayerId: activeLayerId,
+        layers: newLayers,
+        activeLayerId,
+      };
+      updateHistory(action);
+
       return { layers: newLayers };
     }),
   moveLayerDown: () =>
     set((state) => {
-      const { layers, activeLayerId } = state;
+      const { layers, activeLayerId, updateHistory } = state;
       const index = layers.findIndex((l) => l.id === activeLayerId);
       if (index <= 0) return {};
       const newLayers = [...layers];
@@ -494,11 +545,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newLayers[index - 1],
         newLayers[index],
       ];
+
+      const action: LayerStructureAction = {
+        action: "layer-structure",
+        prevLayers: layers,
+        prevActiveLayerId: activeLayerId,
+        layers: newLayers,
+        activeLayerId,
+      };
+      updateHistory(action);
+
       return { layers: newLayers };
     }),
   mergeLayerDown: () =>
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions } = state;
+      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+        state;
       const index = layers.findIndex((l) => l.id === activeLayerId);
       if (index <= 0) return {};
       initActions();
@@ -513,6 +575,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       const newLayers = layers.filter((_, i) => i !== index);
       newLayers[index - 1] = { ...bottomLayer, data: composited };
+
+      const action: LayerStructureAction = {
+        action: "layer-structure",
+        prevLayers: layers,
+        prevActiveLayerId: activeLayerId,
+        layers: newLayers,
+        activeLayerId: bottomLayer.id,
+      };
+      updateHistory(action);
+
       return {
         layers: newLayers,
         activeLayerId: bottomLayer.id,
@@ -520,7 +592,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   flattenLayers: () =>
     set((state) => {
-      const { layers, gridSize, initActions } = state;
+      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+        state;
       if (layers.length <= 1) return {};
       initActions();
 
@@ -530,6 +603,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         "Flattened",
         compositeLayers(layers, gridSize.x, gridSize.y),
       );
+
+      const action: LayerStructureAction = {
+        action: "layer-structure",
+        prevLayers: layers,
+        prevActiveLayerId: activeLayerId,
+        layers: [flattened],
+        activeLayerId: flattened.id,
+      };
+      updateHistory(action);
+
       return {
         layers: [flattened],
         activeLayerId: flattened.id,
@@ -1585,6 +1668,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   undo: () => {
     const {
+      layers,
       gridSize,
       undoHistory,
       redoHistory,
@@ -1664,6 +1748,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "clear") {
       setLayerData(action.prevData, action.layerId);
       set({ activeLayerId: action.layerId });
+    } else if (action.action === "layer-structure") {
+      const restoredLayers = action.prevLayers.map((layer) => {
+        const curr = layers.find((l) => l.id === layer.id);
+        if (curr) {
+          return {
+            ...layer,
+            name: curr.name,
+            visible: curr.visible,
+            locked: curr.locked,
+            opacity: curr.opacity,
+          };
+        }
+        return layer;
+      });
+      set({ layers: restoredLayers, activeLayerId: action.prevActiveLayerId });
     }
 
     initActions();
@@ -1674,6 +1773,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   redo: () => {
     const {
+      layers,
       gridSize,
       undoHistory,
       redoHistory,
@@ -1781,6 +1881,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       setLayerData(newData, action.layerId);
       set({ activeLayerId: action.layerId });
+    } else if (action.action === "layer-structure") {
+      const restoredLayers = action.layers.map((layer) => {
+        const curr = layers.find((l) => l.id === layer.id);
+        if (curr) {
+          return {
+            ...layer,
+            name: curr.name,
+            visible: curr.visible,
+            locked: curr.locked,
+            opacity: curr.opacity,
+          };
+        }
+        return layer;
+      });
+      set({ layers: restoredLayers, activeLayerId: action.activeLayerId });
     }
 
     initActions();
