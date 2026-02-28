@@ -1,10 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import tinycolor from "tinycolor2";
 import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "../hooks/useCanvasZoom";
 import useModifierKeys from "../hooks/useModifierKeys";
 import useKeyboardShortcuts from "../hooks/useKeyboardShortcuts";
-import { isValidIndex } from "../utils/canvas";
+import {
+  isValidIndex,
+  getBaseIndex,
+  setPixelColor,
+  clearRectContent,
+  drawRectContent,
+  resizePixelsWithNearestNeighbor,
+  resizeMaskWithNearestNeighbor,
+} from "../utils/canvas";
 import {
   interpolateBetweenPoints,
   getConstrainedLinePoints,
@@ -14,7 +22,7 @@ import {
   getEllipseFillPoints,
   getModdedShapeBounds,
 } from "../utils/geometry";
-import { compositeLayers } from "../utils/layers";
+import { compositeLayers, compositeLayersWithOverride } from "../utils/layers";
 import { BASE_PX_SIZE, CHECKER_LIGHT, CHECKER_DARK } from "../constants";
 import type { Direction, Rect } from "../types";
 
@@ -34,7 +42,9 @@ const RESIZE_HANDLE_RADIUS = 8;
 export default function Canvas() {
   const {
     layers,
+    activeLayerId,
     gridSize,
+    visibleGridSize,
     panOffset,
     zoomLevel,
     selectedTool,
@@ -78,7 +88,7 @@ export default function Canvas() {
     setMoveStartPos,
     setMoveOffset,
     setMousePos,
-    getActiveColorHex,
+    getActiveLayer,
     getActiveColorRGBA,
     getPixelColor,
     getEffectiveSelectionBounds,
@@ -116,10 +126,6 @@ export default function Canvas() {
     x: Math.min(getPxSize() * gridSize.x, parentSize.x),
     y: Math.min(getPxSize() * gridSize.y, parentSize.y),
   };
-  const visibleGridSize = {
-    x: canvasSize.x / getPxSize(),
-    y: canvasSize.y / getPxSize(),
-  };
   const showMoveCursor =
     selectedTool === "move" ||
     (!selectionAction &&
@@ -155,16 +161,206 @@ export default function Canvas() {
     }
     ctx.putImageData(imageData, 0, 0);
     return canvas;
-  }, [gridSize.x, gridSize.y]);
+  }, [gridSize]);
 
-  const composited = useMemo(
-    () => compositeLayers(layers, gridSize.x, gridSize.y),
-    [layers, gridSize.x, gridSize.y],
+  const buildLinePreviewData = useCallback(
+    (layerData: Uint8ClampedArray) => {
+      if (!lineStartPos || !lineEndPos) return null;
+      const newData = new Uint8ClampedArray(layerData);
+      const color = getActiveColorRGBA();
+      const drawnPixels = new Set<string>();
+      const offset = -Math.floor(brushSize / 2);
+
+      const points = modifierKeys.shift
+        ? [lineStartPos, ...getConstrainedLinePoints(lineStartPos, lineEndPos)]
+        : [
+            lineStartPos,
+            ...interpolateBetweenPoints(
+              lineStartPos.x,
+              lineStartPos.y,
+              lineEndPos.x,
+              lineEndPos.y,
+            ),
+          ];
+      for (const point of points) {
+        for (let i = 0; i < brushSize; i++) {
+          for (let j = 0; j < brushSize; j++) {
+            const x = point.x + j + offset;
+            const y = point.y + i + offset;
+            if (!isValidIndex(x, y, gridSize)) continue;
+            const key = `${x},${y}`;
+            if (drawnPixels.has(key)) continue;
+            drawnPixels.add(key);
+            setPixelColor(x, y, gridSize.x, color, newData);
+          }
+        }
+      }
+      return newData;
+    },
+    [
+      gridSize,
+      brushSize,
+      lineStartPos,
+      lineEndPos,
+      modifierKeys,
+      getActiveColorRGBA,
+    ],
   );
 
-  useEffect(() => {
-    setVisibleGridSize(visibleGridSize);
-  }, [visibleGridSize.x, visibleGridSize.y]);
+  const buildShapePreviewData = useCallback(
+    (layerData: Uint8ClampedArray) => {
+      if (!shapeStartPos || !shapeEndPos) return null;
+      const newData = new Uint8ClampedArray(layerData);
+      const color = getActiveColorRGBA();
+      const drawnPixels = new Set<string>();
+      const offset = -Math.floor(brushSize / 2);
+
+      function drawPixel(px: number, py: number) {
+        if (!isValidIndex(px, py, gridSize)) return;
+        const key = `${px},${py}`;
+        if (drawnPixels.has(key)) return;
+        drawnPixels.add(key);
+        setPixelColor(px, py, gridSize.x, color, newData);
+      }
+
+      const { x1, y1, x2, y2 } = getModdedShapeBounds(
+        shapeStartPos,
+        shapeEndPos,
+        modifierKeys.shift,
+        modifierKeys.ctrl || modifierKeys.meta,
+      );
+      const outlinePoints =
+        shapeMode === "rectangle"
+          ? getRectOutlinePoints(x1, y1, x2, y2)
+          : getEllipseOutlinePoints(x1, y1, x2, y2);
+      for (const point of outlinePoints)
+        for (let i = 0; i < brushSize; i++)
+          for (let j = 0; j < brushSize; j++)
+            drawPixel(point.x + j + offset, point.y + i + offset);
+      if (shapeFill) {
+        const fillPoints =
+          shapeMode === "rectangle"
+            ? getRectFillPoints(x1, y1, x2, y2)
+            : getEllipseFillPoints(x1, y1, x2, y2);
+        for (const point of fillPoints) drawPixel(point.x, point.y);
+      }
+      return newData;
+    },
+    [
+      gridSize,
+      brushSize,
+      shapeStartPos,
+      shapeEndPos,
+      shapeMode,
+      shapeFill,
+      modifierKeys,
+      getActiveColorRGBA,
+    ],
+  );
+
+  const buildMovePreviewData = useCallback(
+    (layerData: Uint8ClampedArray) => {
+      if (!moveOffset) return null;
+      const offset = { ...moveOffset };
+      if (modifierKeys.shift) {
+        if (Math.abs(offset.x) >= Math.abs(offset.y)) offset.y = 0;
+        else offset.x = 0;
+      }
+      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+
+      for (let y = 0; y < gridSize.y; y++) {
+        for (let x = 0; x < gridSize.x; x++) {
+          const srcX = x - offset.x;
+          const srcY = y - offset.y;
+          if (isValidIndex(srcX, srcY, gridSize)) {
+            const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
+            const dstIndex = getBaseIndex(x, y, gridSize.x);
+            newData[dstIndex] = layerData[srcIndex];
+            newData[dstIndex + 1] = layerData[srcIndex + 1];
+            newData[dstIndex + 2] = layerData[srcIndex + 2];
+            newData[dstIndex + 3] = layerData[srcIndex + 3];
+          }
+        }
+      }
+      return newData;
+    },
+    [gridSize, moveOffset, modifierKeys],
+  );
+
+  const buildSelectionPreviewData = useCallback(
+    (layerData: Uint8ClampedArray) => {
+      if (!selectedArea) return null;
+      const newData = new Uint8ClampedArray(layerData);
+      const bounds = getEffectiveSelectionBounds() as Rect;
+      const newPixels = resizePixelsWithNearestNeighbor(
+        selectedPixels,
+        selectedArea.width,
+        selectedArea.height,
+        bounds.width,
+        bounds.height,
+      );
+      const newMask = selectionMask
+        ? resizeMaskWithNearestNeighbor(
+            selectionMask,
+            selectedArea.width,
+            selectedArea.height,
+            bounds.width,
+            bounds.height,
+          )
+        : null;
+
+      if (!isPasting)
+        clearRectContent(selectedArea, newData, gridSize, selectionMask);
+      drawRectContent(bounds, newPixels, newData, gridSize, true, newMask);
+      return newData;
+    },
+    [
+      gridSize,
+      selectionMask,
+      selectionMoveOffset,
+      selectionResizeOffset,
+      selectedArea,
+      selectedPixels,
+      isPasting,
+      getEffectiveSelectionBounds,
+    ],
+  );
+
+  const overrideData = useMemo(() => {
+    const layer = getActiveLayer();
+    if (lineStartPos && lineEndPos) return buildLinePreviewData(layer.data);
+    else if (shapeStartPos && shapeEndPos)
+      return buildShapePreviewData(layer.data);
+    else if (moveOffset) return buildMovePreviewData(layer.data);
+    else if (showSelectionPreview) return buildSelectionPreviewData(layer.data);
+    else return null;
+  }, [
+    getActiveLayer,
+    lineStartPos,
+    lineEndPos,
+    buildLinePreviewData,
+    shapeStartPos,
+    shapeEndPos,
+    buildShapePreviewData,
+    moveOffset,
+    buildMovePreviewData,
+    showSelectionPreview,
+    buildSelectionPreviewData,
+  ]);
+
+  const composited = useMemo(
+    () =>
+      overrideData
+        ? compositeLayersWithOverride(
+            layers,
+            gridSize.x,
+            gridSize.y,
+            activeLayerId,
+            overrideData,
+          )
+        : compositeLayers(layers, gridSize.x, gridSize.y),
+    [layers, activeLayerId, gridSize, overrideData],
+  );
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     ctx.imageSmoothingEnabled = false;
@@ -193,20 +389,11 @@ export default function Canvas() {
     );
     tempCtx.putImageData(imageData, 0, 0);
 
-    let currMoveOffset = { x: 0, y: 0 };
-    if (moveOffset) {
-      currMoveOffset = { ...moveOffset };
-      if (modifierKeys.shift) {
-        if (Math.abs(moveOffset.x) >= Math.abs(moveOffset.y))
-          currMoveOffset.y = 0;
-        else currMoveOffset.x = 0;
-      }
-    }
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
       tempCanvas,
-      panOffset.x - currMoveOffset.x,
-      panOffset.y - currMoveOffset.y,
+      panOffset.x,
+      panOffset.y,
       visibleGridSize.x,
       visibleGridSize.y,
       0,
@@ -255,90 +442,6 @@ export default function Canvas() {
     }
   }
 
-  function drawLinePreview(ctx: CanvasRenderingContext2D) {
-    if (!lineStartPos || !lineEndPos) return;
-
-    ctx.fillStyle = getActiveColorHex();
-    const pxSize = getPxSize();
-    const drawnPixels = new Set<string>();
-    const offset = -Math.floor(brushSize / 2);
-
-    const pointsToDraw = modifierKeys.shift
-      ? [lineStartPos, ...getConstrainedLinePoints(lineStartPos, lineEndPos)]
-      : [
-          lineStartPos,
-          ...interpolateBetweenPoints(
-            lineStartPos.x,
-            lineStartPos.y,
-            lineEndPos.x,
-            lineEndPos.y,
-          ),
-        ];
-    for (const point of pointsToDraw) {
-      for (let i = 0; i < brushSize; i++) {
-        for (let j = 0; j < brushSize; j++) {
-          const x = point.x + j + offset;
-          const y = point.y + i + offset;
-          if (!isValidIndex(x, y, gridSize)) continue;
-          const key = `${x},${y}`;
-          if (drawnPixels.has(key)) continue;
-          drawnPixels.add(key);
-          ctx.fillRect(
-            (x - panOffset.x) * pxSize,
-            (y - panOffset.y) * pxSize,
-            pxSize,
-            pxSize,
-          );
-        }
-      }
-    }
-  }
-
-  function drawShapePreview(ctx: CanvasRenderingContext2D) {
-    if (!shapeStartPos || !shapeEndPos) return;
-
-    ctx.fillStyle = getActiveColorHex();
-    const pxSize = getPxSize();
-    const drawnPixels = new Set<string>();
-    const offset = -Math.floor(brushSize / 2);
-    const { x1, y1, x2, y2 } = getModdedShapeBounds(
-      shapeStartPos,
-      shapeEndPos,
-      modifierKeys.shift,
-      modifierKeys.ctrl || modifierKeys.meta,
-    );
-
-    function drawPixel(px: number, py: number) {
-      if (!isValidIndex(px, py, gridSize)) return;
-      const key = `${px},${py}`;
-      if (drawnPixels.has(key)) return;
-      drawnPixels.add(key);
-      ctx.fillRect(
-        (px - panOffset.x) * pxSize,
-        (py - panOffset.y) * pxSize,
-        pxSize,
-        pxSize,
-      );
-    }
-
-    const outlinePoints =
-      shapeMode === "rectangle"
-        ? getRectOutlinePoints(x1, y1, x2, y2)
-        : getEllipseOutlinePoints(x1, y1, x2, y2);
-    for (const point of outlinePoints)
-      for (let i = 0; i < brushSize; i++)
-        for (let j = 0; j < brushSize; j++)
-          drawPixel(point.x + j + offset, point.y + i + offset);
-
-    if (shapeFill) {
-      const fillPoints =
-        shapeMode === "rectangle"
-          ? getRectFillPoints(x1, y1, x2, y2)
-          : getEllipseFillPoints(x1, y1, x2, y2);
-      for (const point of fillPoints) drawPixel(point.x, point.y);
-    }
-  }
-
   function drawLassoPath(ctx: CanvasRenderingContext2D) {
     const pxSize = getPxSize();
     for (let i = 0; i < lassoPath.length; i++) {
@@ -374,91 +477,6 @@ export default function Canvas() {
     if (selectionMode === "rectangular")
       drawFilterRect(ctx, x, y, width, height);
     else if (selectionMode === "lasso") drawLassoPath(ctx);
-  }
-
-  function drawSelectionPreview(
-    ctx: CanvasRenderingContext2D,
-    clearSource: boolean,
-  ) {
-    if (!selectedArea) return;
-    const pxSize = getPxSize();
-    const bounds = getEffectiveSelectionBounds() as Rect;
-
-    // Clear the source area
-    if (clearSource) {
-      for (let i = 0; i < selectedArea.height; i++) {
-        for (let j = 0; j < selectedArea.width; j++) {
-          const baseIndex = i * selectedArea.width + j;
-          if (
-            selectionMask &&
-            baseIndex < selectionMask.length &&
-            !selectionMask[baseIndex]
-          )
-            continue;
-
-          const sourceX = selectedArea.x + j;
-          const sourceY = selectedArea.y + i;
-          if (isValidIndex(sourceX, sourceY, gridSize)) {
-            ctx.fillStyle =
-              sourceY % 2 === sourceX % 2 ? CHECKER_DARK : CHECKER_LIGHT;
-            ctx.fillRect(
-              (sourceX - panOffset.x) * pxSize,
-              (sourceY - panOffset.y) * pxSize,
-              pxSize,
-              pxSize,
-            );
-          }
-        }
-      }
-    }
-
-    // Draw preview at destination with nearest-neighbor scaling
-    const srcWidth = selectedArea.width;
-    const srcHeight = selectedArea.height;
-    const dstWidth = bounds.width;
-    const dstHeight = bounds.height;
-
-    for (let dy = 0; dy < dstHeight; dy++) {
-      for (let dx = 0; dx < dstWidth; dx++) {
-        const destX = bounds.x + dx;
-        const destY = bounds.y + dy;
-
-        if (isValidIndex(destX, destY, gridSize)) {
-          // Nearest-neighbor scaling
-          const srcX = Math.floor((dx * srcWidth) / dstWidth);
-          const srcY = Math.floor((dy * srcHeight) / dstHeight);
-          const srcIndex = srcY * srcWidth + srcX;
-          if (
-            selectionMask &&
-            srcIndex < selectionMask.length &&
-            !selectionMask[srcIndex]
-          )
-            continue;
-          if (srcIndex >= selectedPixels.length) continue;
-
-          const { r, g, b, a } = selectedPixels[srcIndex];
-          let hoverColor;
-          if (a === 0) {
-            if (destY % 2 === destX % 2)
-              hoverColor = tinycolor(CHECKER_DARK)
-                .darken(FILTER_STRENGTH)
-                .toHexString();
-            else
-              hoverColor = tinycolor(CHECKER_LIGHT)
-                .darken(FILTER_STRENGTH)
-                .toHexString();
-          } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
-
-          ctx.fillStyle = hoverColor;
-          ctx.fillRect(
-            (destX - panOffset.x) * pxSize,
-            (destY - panOffset.y) * pxSize,
-            pxSize,
-            pxSize,
-          );
-        }
-      }
-    }
   }
 
   function drawResizeHandles(ctx: CanvasRenderingContext2D) {
@@ -910,14 +928,9 @@ export default function Canvas() {
 
     if (selectedTool !== "move") {
       if (showSelectionPreview) {
-        drawSelectionPreview(ctx, !isPasting);
         drawResizeHandles(ctx);
       } else if (selectionAction === "select") {
         drawSelectionDrag(ctx);
-      } else if (lineStartPos && lineEndPos) {
-        drawLinePreview(ctx);
-      } else if (shapeStartPos && shapeEndPos) {
-        drawShapePreview(ctx);
       } else if (hoveredPixel) {
         if (
           selectedTool === "pencil" ||
@@ -933,27 +946,15 @@ export default function Canvas() {
       }
     }
 
-    if (!showSelectionPreview) setHoveredResizeHandle(null);
-  }, [
-    layers,
-    gridSize,
-    zoomLevel,
-    hoveredPixel,
-    hoveredResizeHandle,
-    panOffset,
-    brushSize,
-    lineStartPos,
-    lineEndPos,
-    shapeStartPos,
-    shapeEndPos,
-    selectionMoveOffset,
-    selectionResizeOffset,
-    selectedArea,
-    showSelectionPreview,
-    lassoPath,
-    moveOffset,
-    modifierKeys,
-  ]);
+    const visible = {
+      x: canvasSize.x / getPxSize(),
+      y: canvasSize.y / getPxSize(),
+    };
+    if (visible.x !== visibleGridSize.x || visible.y !== visibleGridSize.y)
+      setVisibleGridSize(visible);
+    if (!showSelectionPreview && hoveredResizeHandle)
+      setHoveredResizeHandle(null);
+  });
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
     activeMouseButton.current = e.button;
@@ -1010,23 +1011,7 @@ export default function Canvas() {
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [
-    lineStartPos,
-    lineEndPos,
-    shapeStartPos,
-    shapeEndPos,
-    selectionAction,
-    moveOffset,
-    drawLine,
-    drawShape,
-    endSelectionAction,
-    applyMove,
-    clearDrawBuffer,
-    handleAction,
-    getActiveColorRGBA,
-    updateHoveredPixel,
-    updateHoveredResizeHandle,
-  ]);
+  });
 
   return (
     <div

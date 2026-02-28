@@ -230,6 +230,7 @@ type EditorState = {
   initActions: () => void;
   selectTool: (tool: Tool) => void;
   getLayer: (id: string) => Layer | null;
+  getActiveLayer: () => Layer;
   setLayerData: (data: Uint8ClampedArray, id: string) => void;
   toggleLayerVisibility: (id: string) => void;
   toggleLayerLock: (id: string) => void;
@@ -418,6 +419,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   getLayer: (id) => {
     const layer = get().layers.find((l) => l.id === id);
     return layer ? layer : null;
+  },
+  getActiveLayer: () => {
+    const { layers, activeLayerId } = get();
+    return layers.find((l) => l.id === activeLayerId) as Layer;
   },
   setLayerData: (data, id) =>
     set((state) => {
@@ -1161,12 +1166,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   importFromPxsm: (data) =>
     set((state) => {
-      /* if (!isValidPxsmData(data)) {
+      if (!isValidPxsmData(data)) {
         toast.error(
           "The imported file is invalid and may have been corrupted.",
         );
         return {};
-      } */
+      }
       const { layers, activeLayerId, gridSize, initActions, updateHistory } =
         state;
       const newLayers: Layer[] = data.layers.map((layer) => ({

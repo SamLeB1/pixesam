@@ -51,6 +51,19 @@ export function compositeLayers(
   return result;
 }
 
+export function compositeLayersWithOverride(
+  layers: Layer[],
+  width: number,
+  height: number,
+  overrideLayerId: string,
+  overrideData: Uint8ClampedArray,
+): Uint8ClampedArray {
+  const overriddenLayers = layers.map((l) =>
+    l.id === overrideLayerId ? { ...l, data: overrideData } : l,
+  );
+  return compositeLayers(overriddenLayers, width, height);
+}
+
 export function createNewLayer(
   width: number,
   height: number,
