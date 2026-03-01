@@ -29,8 +29,8 @@ export default function ModalNewPalette() {
   }
 
   function handleAddColorsFromDrawing() {
-    const { pixelData } = useEditorStore.getState();
-    const extractedColors = extractColorsFromPixelData(pixelData);
+    const { getActiveLayer } = useEditorStore.getState();
+    const extractedColors = extractColorsFromPixelData(getActiveLayer().data);
     const existingColorsLower = colors.map((c) => c.toLowerCase());
     const newColors = extractedColors.filter(
       (color) => !existingColorsLower.includes(color.toLowerCase()),
@@ -115,7 +115,7 @@ export default function ModalNewPalette() {
             onClick={handleAddColorsFromDrawing}
           >
             <MdColorLens size={16} />
-            Add from drawing
+            Add from layer
           </button>
         </div>
         {colors.length === 0 ? (
