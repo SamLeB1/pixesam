@@ -472,10 +472,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   duplicateLayer: () =>
     set((state) => {
-      const { layers, activeLayerId, initActions, getLayer, updateHistory } =
-        state;
+      const {
+        layers,
+        activeLayerId,
+        initActions,
+        getActiveLayer,
+        updateHistory,
+      } = state;
       initActions();
-      const active = getLayer(activeLayerId) as Layer;
+      const active = getActiveLayer();
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newLayer = duplicateLayer(active);
       const newLayers = [...layers];
@@ -733,11 +738,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         drawBuffer,
         drawnPixels,
         lastDrawPos,
-        getLayer,
+        getActiveLayer,
         setLayerData,
         getPixelColor,
       } = state;
-      const layer = getLayer(activeLayerId) as Layer;
+      const layer = getActiveLayer();
       if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
 
@@ -786,11 +791,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         drawBuffer,
         drawnPixels,
         lastDrawPos,
-        getLayer,
+        getActiveLayer,
         setLayerData,
         getPixelColor,
       } = state;
-      const layer = getLayer(activeLayerId) as Layer;
+      const layer = getActiveLayer();
       if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
 
@@ -847,11 +852,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         brushSize,
         lineStartPos,
         lineEndPos,
-        getLayer,
+        getActiveLayer,
         setLayerData,
         getPixelColor,
       } = state;
-      const layer = getLayer(activeLayerId) as Layer;
+      const layer = getActiveLayer();
       if (layer.locked) return {};
       if (!lineStartPos || !lineEndPos) return {};
 
@@ -907,11 +912,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shapeEndPos,
         shapeMode,
         shapeFill,
-        getLayer,
+        getActiveLayer,
         setLayerData,
         getPixelColor,
       } = state;
-      const layer = getLayer(activeLayerId) as Layer;
+      const layer = getActiveLayer();
       if (layer.locked) return {};
       if (!shapeStartPos || !shapeEndPos) return {};
 
@@ -970,10 +975,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   erase: (x, y) => get().draw(x, y, { r: 0, g: 0, b: 0, a: 0 }),
   floodFill: (x, y, color, isUpdateHistory = true) => {
-    const { activeLayerId, gridSize, getLayer, setLayerData, updateHistory } =
-      get();
+    const {
+      activeLayerId,
+      gridSize,
+      getActiveLayer,
+      setLayerData,
+      updateHistory,
+    } = get();
     if (!isValidIndex(x, y, gridSize)) return;
-    const layer = getLayer(activeLayerId) as Layer;
+    const layer = getActiveLayer();
     if (layer.locked) return;
     const targetColor = getPixelColor(x, y, gridSize.x, layer.data);
     if (isEqualColor(targetColor, color)) return;
@@ -1042,11 +1052,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeLayerId,
       gridSize,
       initActions,
-      getLayer,
+      getActiveLayer,
       setLayerData,
       updateHistory,
     } = get();
-    const layer = getLayer(activeLayerId) as Layer;
+    const layer = getActiveLayer();
     if (layer.locked) return;
 
     const action: ClearAction = {
@@ -1415,7 +1425,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedArea,
       selectedPixels,
       isPasting,
-      getLayer,
+      getActiveLayer,
       setLayerData,
       getPixelsInRect,
       getEffectiveSelectionBounds,
@@ -1436,7 +1446,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return;
     }
 
-    const layer = getLayer(activeLayerId) as Layer;
+    const layer = getActiveLayer();
     if (layer.locked) return;
     const newData = new Uint8ClampedArray(layer.data);
     const newSelectedArea = getEffectiveSelectionBounds() as Rect;
@@ -1509,7 +1519,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionMask,
       selectedArea,
       isPasting,
-      getLayer,
+      getActiveLayer,
       setLayerData,
       getPixelsInRect,
       initSelection,
@@ -1521,7 +1531,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return;
     }
 
-    const layer = getLayer(activeLayerId) as Layer;
+    const layer = getActiveLayer();
     if (layer.locked) return;
     const newData = new Uint8ClampedArray(layer.data);
     clearRectContent(selectedArea, newData, gridSize, selectionMask);
@@ -1636,7 +1646,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeLayerId,
         gridSize,
         moveOffset,
-        getLayer,
+        getActiveLayer,
         setLayerData,
         updateHistory,
       } = state;
@@ -1650,7 +1660,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         else newMoveOffset.x = 0;
       }
 
-      const layer = getLayer(activeLayerId) as Layer;
+      const layer = getActiveLayer();
       if (layer.locked) return {};
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       for (let y = 0; y < gridSize.y; y++) {
@@ -1985,7 +1995,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   paste: () =>
     set((state) => {
       const {
-        activeLayerId,
         gridSize,
         lineStartPos,
         lineEndPos,
@@ -1995,7 +2004,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         moveOffset,
         mousePos,
         clipboard,
-        getLayer,
+        getActiveLayer,
         getActiveColorRGBA,
         drawLine,
         drawShape,
@@ -2005,7 +2014,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         clearDrawBuffer,
         paste,
       } = state;
-      const layer = getLayer(activeLayerId) as Layer;
+      const layer = getActiveLayer();
       if (layer.locked || !clipboard) return {};
 
       if (showSelectionPreview) {
