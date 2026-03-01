@@ -780,6 +780,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const {
         activeLayerId,
         gridSize,
+        brushSize,
         switchDarkenAndLighten,
         shadeStrength,
         drawBuffer,
@@ -796,32 +797,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newData = new Uint8ClampedArray(layer.data);
       const newDrawBuffer = [...drawBuffer];
       const newDrawnPixels = new Set(drawnPixels);
+      const offset = -Math.floor(brushSize / 2);
       darken = switchDarkenAndLighten ? !darken : darken;
 
       const pointsToDraw = lastDrawPos
         ? interpolateBetweenPoints(lastDrawPos.x, lastDrawPos.y, x, y)
         : [{ x, y }];
       for (const point of pointsToDraw) {
-        if (!isValidIndex(point.x, point.y, gridSize)) continue;
-        const currColor = getPixelColor(point.x, point.y, activeLayerId);
-        if (currColor.a === 0) continue;
-        currColor.a /= 255;
-        const newColor = darken
-          ? tinycolor(currColor).darken(shadeStrength).toRgb()
-          : tinycolor(currColor).lighten(shadeStrength).toRgb();
-        currColor.a *= 255;
-        newColor.a *= 255;
+        for (let i = 0; i < brushSize; i++) {
+          for (let j = 0; j < brushSize; j++) {
+            const pixelX = point.x + j + offset;
+            const pixelY = point.y + i + offset;
+            if (!isValidIndex(pixelX, pixelY, gridSize)) continue;
 
-        const key = `${point.x},${point.y}`;
-        if (newDrawnPixels.has(key)) continue;
-        newDrawnPixels.add(key);
-        newDrawBuffer.push({
-          x: point.x,
-          y: point.y,
-          color: newColor,
-          prevColor: currColor,
-        });
-        setPixelColor(point.x, point.y, gridSize.x, newColor, newData);
+            const currColor = getPixelColor(pixelX, pixelY, activeLayerId);
+            if (currColor.a === 0) continue;
+            currColor.a /= 255;
+            const newColor = darken
+              ? tinycolor(currColor).darken(shadeStrength).toRgb()
+              : tinycolor(currColor).lighten(shadeStrength).toRgb();
+            currColor.a *= 255;
+            newColor.a *= 255;
+
+            const key = `${pixelX},${pixelY}`;
+            if (newDrawnPixels.has(key)) continue;
+            newDrawnPixels.add(key);
+            newDrawBuffer.push({
+              x: pixelX,
+              y: pixelY,
+              color: newColor,
+              prevColor: currColor,
+            });
+            setPixelColor(pixelX, pixelY, gridSize.x, newColor, newData);
+          }
+        }
       }
       setLayerData(newData, activeLayerId);
       return {

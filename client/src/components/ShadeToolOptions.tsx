@@ -1,4 +1,5 @@
 import { useEditorStore } from "../store/editorStore";
+import BrushSizeInput from "./BrushSizeInput";
 import Tooltip from "./Tooltip";
 
 export default function ShadeToolOptions() {
@@ -35,7 +36,7 @@ export default function ShadeToolOptions() {
         side="bottom"
       >
         <input
-          className="range range-primary range-xs w-32 bg-neutral-600"
+          className="range range-primary range-xs mr-4 w-32 bg-neutral-600"
           type="range"
           id="shade-strength"
           min="1"
@@ -44,6 +45,7 @@ export default function ShadeToolOptions() {
           onChange={(e) => setShadeStrength(+e.target.value)}
         />
       </Tooltip>
+      <BrushSizeInput />
     </div>
   );
 }

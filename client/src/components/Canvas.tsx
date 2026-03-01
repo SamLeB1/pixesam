@@ -936,7 +936,8 @@ export default function Canvas() {
           selectedTool === "pencil" ||
           selectedTool === "eraser" ||
           selectedTool === "line" ||
-          selectedTool === "shape"
+          selectedTool === "shape" ||
+          selectedTool === "shade"
         ) {
           const offset = -Math.floor(brushSize / 2);
           const x = hoveredPixel.x + offset;
