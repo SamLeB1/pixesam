@@ -193,7 +193,6 @@ type EditorState = {
   mousePos: { x: number; y: number };
   clipboard: Clipboard | null;
   setLayers: (layers: Layer[]) => void;
-  setActiveLayerId: (id: string) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setVisibleGridSize: (size: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
@@ -231,6 +230,7 @@ type EditorState = {
   selectTool: (tool: Tool) => void;
   getLayer: (id: string) => Layer | null;
   getActiveLayer: () => Layer;
+  selectLayer: (id: string) => void;
   setLayerData: (data: Uint8ClampedArray, id: string) => void;
   toggleLayerVisibility: (id: string) => void;
   toggleLayerLock: (id: string) => void;
@@ -337,7 +337,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mousePos: { x: 0, y: 0 },
   clipboard: null,
   setLayers: (layers) => set({ layers }),
-  setActiveLayerId: (id) => set({ activeLayerId: id }),
   setGridSize: (gridSize) => set({ gridSize }),
   setVisibleGridSize: (size) => set({ visibleGridSize: size }),
   setPanOffset: (panOffset) => set({ panOffset }),
@@ -424,6 +423,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { layers, activeLayerId } = get();
     return layers.find((l) => l.id === activeLayerId) as Layer;
   },
+  selectLayer: (id) =>
+    set((state) => {
+      state.initActions();
+      return { activeLayerId: id };
+    }),
   setLayerData: (data, id) =>
     set((state) => {
       return {
@@ -1433,6 +1437,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory,
     } = get();
 
+    const layer = getActiveLayer();
     const moveOff = selectionMoveOffset || { x: 0, y: 0 };
     const resizeOff = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
     const hasMoved = moveOff.x !== 0 || moveOff.y !== 0;
@@ -1441,13 +1446,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       resizeOff.e !== 0 ||
       resizeOff.s !== 0 ||
       resizeOff.w !== 0;
-    if ((!hasMoved && !hasResized && !isPasting) || !selectedArea) {
+    if (
+      layer.locked ||
+      (!hasMoved && !hasResized && !isPasting) ||
+      !selectedArea
+    ) {
       initSelection();
       return;
     }
 
-    const layer = getActiveLayer();
-    if (layer.locked) return;
     const newData = new Uint8ClampedArray(layer.data);
     const newSelectedArea = getEffectiveSelectionBounds() as Rect;
     const newMask = selectionMask

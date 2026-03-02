@@ -19,7 +19,7 @@ export default function LayersMenu() {
   const {
     layers,
     activeLayerId,
-    setActiveLayerId,
+    selectLayer,
     toggleLayerVisibility,
     toggleLayerLock,
     newLayer,
@@ -79,7 +79,7 @@ export default function LayersMenu() {
             <div
               key={layer.id}
               className={`flex cursor-pointer items-center ${activeLayerId === layer.id ? "bg-neutral-700" : "hover:bg-main-semi-dark"}`}
-              onClick={() => setActiveLayerId(layer.id)}
+              onClick={() => selectLayer(layer.id)}
             >
               <button
                 className={`mr-2 cursor-pointer p-2 ${activeLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}

@@ -133,6 +133,10 @@ export default function Canvas() {
       isInSelectedArea(hoveredPixel.x, hoveredPixel.y)) ||
     selectionAction === "move" ||
     selectionAction === "resize";
+  const showNotAllowedCursor =
+    getActiveLayer().locked &&
+    selectedTool !== "color-picker" &&
+    selectedTool !== "select";
   const { zoomStepTowardsCursor } = useCanvasZoom();
   const modifierKeys = useModifierKeys();
   useKeyboardShortcuts();
@@ -614,6 +618,7 @@ export default function Canvas() {
   }
 
   function handlePencilAction(e: MouseEvent) {
+    if (getActiveLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -624,6 +629,7 @@ export default function Canvas() {
   }
 
   function handleEraserAction(e: MouseEvent) {
+    if (getActiveLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -650,6 +656,7 @@ export default function Canvas() {
   }
 
   function handleBucketAction(e: MouseEvent) {
+    if (getActiveLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -660,6 +667,7 @@ export default function Canvas() {
   }
 
   function handleLineAction(e: MouseEvent, isInitialClick: boolean) {
+    if (getActiveLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -673,6 +681,7 @@ export default function Canvas() {
   }
 
   function handleShapeAction(e: MouseEvent, isInitialClick: boolean) {
+    if (getActiveLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -686,6 +695,7 @@ export default function Canvas() {
   }
 
   function handleShadeAction(e: MouseEvent) {
+    if (getActiveLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -703,9 +713,10 @@ export default function Canvas() {
     const x = Math.floor((e.clientX - rect.left) / getPxSize() + panOffset.x);
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
 
-    if (isInitialClick || !selectionStartPos) {
+    if (isInitialClick) {
       if (selectionAction) return;
       if (hoveredResizeHandle) {
+        if (getActiveLayer().locked) return;
         const resizeStartPos = getResizeStartPos();
         if (!resizeStartPos) return;
         setSelectionAction("resize");
@@ -719,6 +730,7 @@ export default function Canvas() {
         };
         return;
       } else if (isInSelectedArea(x, y)) {
+        if (getActiveLayer().locked) return;
         setSelectionAction("move");
         const offset = selectionMoveOffset
           ? selectionMoveOffset
@@ -737,6 +749,7 @@ export default function Canvas() {
       }
     }
 
+    if (!selectionStartPos) return;
     if (selectionAction === "select") {
       if (selectionMode === "rectangular") {
         const dx = x - selectionStartPos.x;
@@ -833,6 +846,7 @@ export default function Canvas() {
   }
 
   function handleMoveAction(e: MouseEvent, isInitialClick: boolean) {
+    if (getActiveLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -926,7 +940,7 @@ export default function Canvas() {
     drawCheckerboard(ctx);
     drawCompositedLayers(ctx);
 
-    if (selectedTool !== "move") {
+    if (selectedTool !== "move" && !showNotAllowedCursor) {
       if (showSelectionPreview) {
         drawResizeHandles(ctx);
       } else if (selectionAction === "select") {
@@ -1023,6 +1037,7 @@ export default function Canvas() {
           hoveredResizeHandle && {
             cursor: `${hoveredResizeHandle}-resize`,
           }),
+        ...(showNotAllowedCursor && { cursor: "not-allowed" }),
       }}
       ref={parentContainerRef}
       id="parent-container"
