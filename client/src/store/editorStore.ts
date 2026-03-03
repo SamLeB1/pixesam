@@ -1189,7 +1189,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   importFromPxsm: (data) =>
     set((state) => {
-      if (!isValidPxsmData()) {
+      if (!isValidPxsmData(data)) {
         toast.error(
           "The imported file is invalid and may have been corrupted.",
         );
