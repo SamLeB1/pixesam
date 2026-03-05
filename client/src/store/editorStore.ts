@@ -234,6 +234,7 @@ type EditorState = {
   setLayerData: (data: Uint8ClampedArray, id: string) => void;
   toggleLayerVisibility: (id: string) => void;
   toggleLayerLock: (id: string) => void;
+  renameLayer: (id: string, name: string) => void;
   newLayer: () => void;
   duplicateLayer: () => void;
   deleteLayer: () => void;
@@ -445,6 +446,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       layers: state.layers.map((l) =>
         l.id === id ? { ...l, locked: !l.locked } : l,
       ),
+    })),
+  renameLayer: (id, name) =>
+    set((state) => ({
+      layers: state.layers.map((l) => (l.id === id ? { ...l, name } : l)),
     })),
   newLayer: () =>
     set((state) => {

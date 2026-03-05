@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import {
   MdSettings,
   MdVisibility,
@@ -22,6 +23,7 @@ export default function LayersMenu() {
     selectLayer,
     toggleLayerVisibility,
     toggleLayerLock,
+    renameLayer,
     newLayer,
     duplicateLayer,
     deleteLayer,
@@ -30,6 +32,9 @@ export default function LayersMenu() {
     mergeLayerDown,
     flattenLayers,
   } = useEditorStore();
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const cancelRef = useRef(false);
 
   function isTopLayer(id: string) {
     return layers.length > 0 && layers[layers.length - 1].id === id;
@@ -96,12 +101,44 @@ export default function LayersMenu() {
                   <MdVisibilityOff size={16} color="oklch(55.6% 0 0)" />
                 )}
               </button>
-              <p
-                className="mr-auto text-sm text-neutral-300 select-none"
-                title={layer.name}
-              >
-                {layer.name}
-              </p>
+              {editingLayerId === layer.id ? (
+                <input
+                  className="mr-2 w-full bg-neutral-800 px-1 text-sm text-neutral-300 outline-none"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={() => {
+                    if (!cancelRef.current) {
+                      const trimmed = editingName.trim();
+                      if (trimmed) renameLayer(layer.id, trimmed);
+                    }
+                    cancelRef.current = false;
+                    setEditingLayerId(null);
+                    setEditingName("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      (e.target as HTMLInputElement).blur();
+                    } else if (e.key === "Escape") {
+                      cancelRef.current = true;
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  autoFocus
+                />
+              ) : (
+                <p
+                  className="mr-auto text-sm text-neutral-300 select-none"
+                  title={layer.name}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingLayerId(layer.id);
+                    setEditingName(layer.name);
+                  }}
+                >
+                  {layer.name}
+                </p>
+              )}
               <button
                 className={`cursor-pointer p-2 ${activeLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}
                 type="button"
