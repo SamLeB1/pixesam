@@ -103,7 +103,7 @@ export default function LayersMenu() {
               </button>
               {editingLayerId === layer.id ? (
                 <input
-                  className="mr-2 w-full bg-neutral-800 px-1 text-sm text-neutral-300 outline-none"
+                  className="mr-2 w-full bg-neutral-800 px-2 text-sm text-neutral-300 outline-none"
                   value={editingName}
                   onChange={(e) => setEditingName(e.target.value)}
                   onBlur={() => {

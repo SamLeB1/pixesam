@@ -58,7 +58,9 @@ type Action =
   | PasteAction
   | NewAction
   | ClearAction
-  | LayerStructureAction;
+  | LayerStructureAction
+  | LayerToggleAction
+  | LayerRenameAction;
 
 type DrawAction = {
   action: "draw";
@@ -131,6 +133,19 @@ type LayerStructureAction = {
   prevActiveLayerId: string;
   layers: Layer[];
   activeLayerId: string;
+};
+
+type LayerToggleAction = {
+  action: "layer-toggle";
+  layerId: string;
+  toggle: "visible" | "locked";
+};
+
+type LayerRenameAction = {
+  action: "layer-rename";
+  layerId: string;
+  name: string;
+  prevName: string;
 };
 
 type DrawActionPixel = {
@@ -436,21 +451,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }),
   toggleLayerVisibility: (id) =>
-    set((state) => ({
-      layers: state.layers.map((l) =>
-        l.id === id ? { ...l, visible: !l.visible } : l,
-      ),
-    })),
+    set((state) => {
+      const { layers, updateHistory } = state;
+      updateHistory({ action: "layer-toggle", layerId: id, toggle: "visible" });
+      return {
+        layers: layers.map((l) =>
+          l.id === id ? { ...l, visible: !l.visible } : l,
+        ),
+      };
+    }),
   toggleLayerLock: (id) =>
-    set((state) => ({
-      layers: state.layers.map((l) =>
-        l.id === id ? { ...l, locked: !l.locked } : l,
-      ),
-    })),
+    set((state) => {
+      const { layers, updateHistory } = state;
+      updateHistory({ action: "layer-toggle", layerId: id, toggle: "locked" });
+      return {
+        layers: layers.map((l) =>
+          l.id === id ? { ...l, locked: !l.locked } : l,
+        ),
+      };
+    }),
   renameLayer: (id, name) =>
-    set((state) => ({
-      layers: state.layers.map((l) => (l.id === id ? { ...l, name } : l)),
-    })),
+    set((state) => {
+      const { layers, getLayer, updateHistory } = state;
+      const layer = getLayer(id);
+      if (!layer) return {};
+
+      const action: LayerRenameAction = {
+        action: "layer-rename",
+        layerId: id,
+        name,
+        prevName: layer.name,
+      };
+      updateHistory(action);
+
+      return { layers: layers.map((l) => (l.id === id ? { ...l, name } : l)) };
+    }),
   newLayer: () =>
     set((state) => {
       const { layers, activeLayerId, gridSize, initActions, updateHistory } =
@@ -1799,6 +1834,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return layer;
       });
       set({ layers: restoredLayers, activeLayerId: action.prevActiveLayerId });
+    } else if (action.action === "layer-toggle") {
+      if (action.toggle === "visible") {
+        set({
+          layers: layers.map((l) =>
+            l.id === action.layerId ? { ...l, visible: !l.visible } : l,
+          ),
+        });
+      } else if (action.toggle === "locked") {
+        set({
+          layers: layers.map((l) =>
+            l.id === action.layerId ? { ...l, locked: !l.locked } : l,
+          ),
+        });
+      }
+    } else if (action.action === "layer-rename") {
+      set({
+        layers: layers.map((l) =>
+          l.id === action.layerId ? { ...l, name: action.prevName } : l,
+        ),
+      });
     }
 
     initActions();
@@ -1932,6 +1987,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return layer;
       });
       set({ layers: restoredLayers, activeLayerId: action.activeLayerId });
+    } else if (action.action === "layer-toggle") {
+      if (action.toggle === "visible") {
+        set({
+          layers: layers.map((l) =>
+            l.id === action.layerId ? { ...l, visible: !l.visible } : l,
+          ),
+        });
+      } else if (action.toggle === "locked") {
+        set({
+          layers: layers.map((l) =>
+            l.id === action.layerId ? { ...l, locked: !l.locked } : l,
+          ),
+        });
+      }
+    } else if (action.action === "layer-rename") {
+      set({
+        layers: layers.map((l) =>
+          l.id === action.layerId ? { ...l, name: action.name } : l,
+        ),
+      });
     }
 
     initActions();
