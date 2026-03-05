@@ -128,7 +128,7 @@ export default function LayersMenu() {
                 />
               ) : (
                 <p
-                  className="mr-auto text-sm text-neutral-300 select-none"
+                  className="mr-2 truncate text-sm text-neutral-300 select-none"
                   title={layer.name}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
@@ -140,7 +140,7 @@ export default function LayersMenu() {
                 </p>
               )}
               <button
-                className={`cursor-pointer p-2 ${activeLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}
+                className={`ml-auto cursor-pointer p-2 ${activeLayerId === layer.id ? "hover:bg-neutral-600" : "hover:bg-main-semi-light"}`}
                 type="button"
                 title="Lock/unlock"
                 onClick={(e) => {
