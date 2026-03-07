@@ -3,13 +3,11 @@ import { toast } from "sonner";
 import { useEditorStore } from "../store/editorStore";
 import useClickOutside from "../hooks/useClickOutside";
 import ModalNew from "./ModalNew";
-import ModalResize from "./ModalResize";
 import ModalExportToImage from "./ModalExportToImage";
 import type { PxsmData } from "../types";
 
 export default function BtnFile() {
-  const { clearCanvas, importFromPxsm, importImage, exportToPxsm } =
-    useEditorStore();
+  const { importFromPxsm, importImage, exportToPxsm } = useEditorStore();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const pxsmFileInputRef = useRef<HTMLInputElement>(null);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
@@ -20,7 +18,7 @@ export default function BtnFile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm("Your current work will be overwritten. Continue?")) {
+    if (!window.confirm("Your current sprite will be overwritten. Continue?")) {
       if (pxsmFileInputRef.current) pxsmFileInputRef.current.value = "";
       return;
     }
@@ -55,7 +53,7 @@ export default function BtnFile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm("Your current work will be overwritten. Continue?")) {
+    if (!window.confirm("Your current sprite will be overwritten. Continue?")) {
       if (imageFileInputRef.current) imageFileInputRef.current.value = "";
       return;
     }
@@ -107,32 +105,6 @@ export default function BtnFile() {
               }}
             >
               New
-            </button>
-            <button
-              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                if (
-                  window.confirm("Are you sure you want to clear the canvas?")
-                )
-                  clearCanvas();
-              }}
-            >
-              Clear
-            </button>
-            <button
-              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                const modal = document.getElementById(
-                  "modal-resize",
-                ) as HTMLDialogElement;
-                if (modal) modal.showModal();
-              }}
-            >
-              Resize
             </button>
             <hr className="my-1 text-zinc-400" />
             <button
@@ -196,7 +168,6 @@ export default function BtnFile() {
         onChange={handleImageFileChange}
       />
       <ModalNew />
-      <ModalResize />
       <ModalExportToImage />
     </>
   );

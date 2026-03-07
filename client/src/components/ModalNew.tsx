@@ -19,7 +19,7 @@ export default function ModalNew() {
     else setHeightInput(value);
   }
 
-  function handleNewDrawing() {
+  function handleNewSprite() {
     let clampedWidth = widthInput;
     if (clampedWidth < MIN_GRID_SIZE) clampedWidth = MIN_GRID_SIZE;
     else if (clampedWidth > MAX_GRID_SIZE) clampedWidth = MAX_GRID_SIZE;
@@ -40,7 +40,7 @@ export default function ModalNew() {
         <div className="mb-4">
           <h3 className="text-2xl font-medium text-white">New Canvas</h3>
           <p className="text-neutral-400">
-            Start a new drawing! Max size: {MAX_GRID_SIZE}x{MAX_GRID_SIZE}
+            Create a new sprite! Max size: {MAX_GRID_SIZE}x{MAX_GRID_SIZE}
           </p>
         </div>
         <div className="mb-4">
@@ -73,8 +73,8 @@ export default function ModalNew() {
         </div>
         <div className="modal-action">
           <form method="dialog">
-            <button className="btn btn-primary" onClick={handleNewDrawing}>
-              New drawing
+            <button className="btn btn-primary" onClick={handleNewSprite}>
+              New Sprite
             </button>
           </form>
         </div>
