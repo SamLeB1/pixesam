@@ -85,7 +85,7 @@ export default function BtnFile() {
     <>
       <div ref={dropdownRef}>
         <button
-          className={`${isOpen && "bg-zinc-600"} cursor-pointer p-2 hover:bg-zinc-600`}
+          className={`${isOpen && "bg-zinc-600"} cursor-pointer px-3 py-2 hover:bg-zinc-600`}
           type="button"
           onClick={() => setIsOpen(!isOpen)}
         >
