@@ -1,18 +1,26 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { toast } from "sonner";
 import { useEditorStore } from "../store/editorStore";
-import useClickOutside from "../hooks/useClickOutside";
 import ModalNew from "./ModalNew";
 import ModalExportToImage from "./ModalExportToImage";
 import type { PxsmData } from "../types";
 
-export default function BtnFile() {
+type BtnFileProps = {
+  isOpen: boolean;
+  onToggle: () => void;
+  onHoverOpen: () => void;
+  onClose: () => void;
+};
+
+export default function BtnFile({
+  isOpen,
+  onToggle,
+  onHoverOpen,
+  onClose,
+}: BtnFileProps) {
   const { importFromPxsm, importImage, exportToPxsm } = useEditorStore();
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const pxsmFileInputRef = useRef<HTMLInputElement>(null);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  useClickOutside(dropdownRef, () => setIsOpen(false));
 
   function handlePxsmFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -83,11 +91,12 @@ export default function BtnFile() {
 
   return (
     <>
-      <div ref={dropdownRef}>
+      <div>
         <button
           className={`${isOpen && "bg-zinc-600"} cursor-pointer px-3 py-2 hover:bg-zinc-600`}
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={onToggle}
+          onMouseEnter={onHoverOpen}
         >
           File
         </button>
@@ -97,7 +106,7 @@ export default function BtnFile() {
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
               type="button"
               onClick={() => {
-                setIsOpen(false);
+                onClose();
                 const modal = document.getElementById(
                   "modal-new",
                 ) as HTMLDialogElement;
@@ -111,7 +120,7 @@ export default function BtnFile() {
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
               type="button"
               onClick={() => {
-                setIsOpen(false);
+                onClose();
                 exportToPxsm();
               }}
             >
@@ -121,7 +130,7 @@ export default function BtnFile() {
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
               type="button"
               onClick={() => {
-                setIsOpen(false);
+                onClose();
                 pxsmFileInputRef.current?.click();
               }}
             >
@@ -131,7 +140,7 @@ export default function BtnFile() {
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
               type="button"
               onClick={() => {
-                setIsOpen(false);
+                onClose();
                 imageFileInputRef.current?.click();
               }}
             >
@@ -141,7 +150,7 @@ export default function BtnFile() {
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
               type="button"
               onClick={() => {
-                setIsOpen(false);
+                onClose();
                 const modal = document.getElementById(
                   "modal-export-to-image",
                 ) as HTMLDialogElement;

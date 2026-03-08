@@ -1,17 +1,22 @@
-import { useState, useRef } from "react";
-import useClickOutside from "../hooks/useClickOutside";
+type BtnSpriteProps = {
+  isOpen: boolean;
+  onToggle: () => void;
+  onHoverOpen: () => void;
+  onClose: () => void;
+};
 
-export default function BtnSprite() {
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  useClickOutside(dropdownRef, () => setIsOpen(false));
-
+export default function BtnSprite({
+  isOpen,
+  onToggle,
+  onHoverOpen,
+}: BtnSpriteProps) {
   return (
-    <div ref={dropdownRef}>
+    <div>
       <button
         className={`${isOpen && "bg-zinc-600"} cursor-pointer px-3 py-2 hover:bg-zinc-600`}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={onToggle}
+        onMouseEnter={onHoverOpen}
       >
         Sprite
       </button>

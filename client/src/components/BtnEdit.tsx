@@ -1,22 +1,27 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { MdArrowRight } from "react-icons/md";
-import useClickOutside from "../hooks/useClickOutside";
 
-export default function BtnEdit() {
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
+type BtnEditProps = {
+  isOpen: boolean;
+  onToggle: () => void;
+  onHoverOpen: () => void;
+  onClose: () => void;
+};
+
+export default function BtnEdit({
+  isOpen,
+  onToggle,
+  onHoverOpen,
+}: BtnEditProps) {
   const [isRotateOpen, setIsRotateOpen] = useState(false);
-  useClickOutside(dropdownRef, () => {
-    setIsOpen(false);
-    setIsRotateOpen(false);
-  });
 
   return (
-    <div ref={dropdownRef}>
+    <div>
       <button
         className={`${isOpen && "bg-zinc-600"} cursor-pointer px-3 py-2 hover:bg-zinc-600`}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={onToggle}
+        onMouseEnter={onHoverOpen}
       >
         Edit
       </button>
