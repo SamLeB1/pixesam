@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MdArrowRight } from "react-icons/md";
+import { useEditorStore } from "../store/editorStore";
 
 type BtnEditProps = {
   isOpen: boolean;
@@ -12,8 +13,26 @@ export default function BtnEdit({
   isOpen,
   onToggle,
   onHoverOpen,
+  onClose,
 }: BtnEditProps) {
+  const {
+    selectedArea,
+    undoHistory,
+    redoHistory,
+    clipboard,
+    getActiveLayer,
+    undo,
+    redo,
+    copy,
+    paste,
+  } = useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
+
+  const layer = getActiveLayer();
+  const undoEnabled = undoHistory.length > 0;
+  const redoEnabled = redoHistory.length > 0;
+  const copyEnabled = selectedArea !== null;
+  const pasteEnabled = clipboard && !layer.locked;
 
   return (
     <div>
@@ -27,18 +46,46 @@ export default function BtnEdit({
       </button>
       {isOpen && (
         <div className="absolute z-1 w-40 bg-zinc-600">
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-            type="button"
-          >
-            Undo
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-            type="button"
-          >
-            Redo
-          </button>
+          {undoEnabled ? (
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                undo();
+              }}
+            >
+              Undo
+            </button>
+          ) : (
+            <button
+              className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+              type="button"
+              disabled
+            >
+              Undo
+            </button>
+          )}
+          {redoEnabled ? (
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                redo();
+              }}
+            >
+              Redo
+            </button>
+          ) : (
+            <button
+              className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+              type="button"
+              disabled
+            >
+              Redo
+            </button>
+          )}
           <hr className="my-1 text-zinc-400" />
           <button
             className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
@@ -46,18 +93,46 @@ export default function BtnEdit({
           >
             Cut
           </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-            type="button"
-          >
-            Copy
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-            type="button"
-          >
-            Paste
-          </button>
+          {copyEnabled ? (
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                copy();
+              }}
+            >
+              Copy
+            </button>
+          ) : (
+            <button
+              className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+              type="button"
+              disabled
+            >
+              Copy
+            </button>
+          )}
+          {pasteEnabled ? (
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                paste();
+              }}
+            >
+              Paste
+            </button>
+          ) : (
+            <button
+              className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+              type="button"
+              disabled
+            >
+              Paste
+            </button>
+          )}
           <hr className="my-1 text-zinc-400" />
           <button
             className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
