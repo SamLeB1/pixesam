@@ -303,6 +303,7 @@ type EditorState = {
   clearDrawBuffer: () => void;
   copy: () => void;
   paste: () => void;
+  clear: () => void;
 };
 
 const initialLayer = createNewLayer(
@@ -2141,4 +2142,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isPasting: true,
       };
     }),
+  clear: () => {
+    const { showSelectionPreview, clearCanvas, deleteSelection } = get();
+    if (showSelectionPreview) deleteSelection();
+    else clearCanvas();
+  },
 }));
