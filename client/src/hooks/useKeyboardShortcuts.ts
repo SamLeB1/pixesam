@@ -3,7 +3,7 @@ import { useEditorStore } from "../store/editorStore";
 import useCanvasZoom from "./useCanvasZoom";
 
 export default function useKeyboardShortcuts() {
-  const { selectTool, undo, redo, copy, paste, deleteSelection } =
+  const { selectTool, undo, redo, cut, copy, paste, deleteSelection } =
     useEditorStore();
   const { zoomStepTowardsCenter, resetZoom } = useCanvasZoom();
 
@@ -28,6 +28,9 @@ export default function useKeyboardShortcuts() {
       } else if (isCmdOrCtrl && key === "y") {
         e.preventDefault();
         redo();
+      } else if (isCmdOrCtrl && key === "x") {
+        e.preventDefault();
+        cut();
       } else if (isCmdOrCtrl && key === "c") {
         e.preventDefault();
         copy();
@@ -82,6 +85,7 @@ export default function useKeyboardShortcuts() {
     selectTool,
     undo,
     redo,
+    cut,
     copy,
     paste,
     zoomStepTowardsCenter,

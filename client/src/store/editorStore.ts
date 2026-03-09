@@ -301,6 +301,7 @@ type EditorState = {
   redo: () => void;
   updateHistory: (action: Action) => void;
   clearDrawBuffer: () => void;
+  cut: () => void;
   copy: () => void;
   paste: () => void;
   clear: () => void;
@@ -2037,6 +2038,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory(action);
       return { drawBuffer: [], drawnPixels: new Set(), lastDrawPos: null };
     }),
+  cut: () => {
+    const {
+      showSelectionPreview,
+      isPasting,
+      getActiveLayer,
+      deleteSelection,
+      copy,
+    } = get();
+    if (!showSelectionPreview) return;
+    const layer = getActiveLayer();
+    if (layer.locked && !isPasting) return;
+    copy();
+    deleteSelection();
+  },
   copy: () =>
     set((state) => {
       const {

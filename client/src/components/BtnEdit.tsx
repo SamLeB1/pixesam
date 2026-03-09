@@ -23,6 +23,7 @@ export default function BtnEdit({
     getActiveLayer,
     undo,
     redo,
+    cut,
     copy,
     paste,
     clear,
@@ -32,6 +33,7 @@ export default function BtnEdit({
   const layer = getActiveLayer();
   const undoEnabled = undoHistory.length > 0;
   const redoEnabled = redoHistory.length > 0;
+  const cutEnabled = showSelectionPreview && !layer.locked;
   const copyEnabled = showSelectionPreview;
   const pasteEnabled = clipboard && !layer.locked;
   const clearEnabled = !layer.locked;
@@ -89,12 +91,26 @@ export default function BtnEdit({
             </button>
           )}
           <hr className="my-1 text-zinc-400" />
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-            type="button"
-          >
-            Cut
-          </button>
+          {cutEnabled ? (
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                cut();
+              }}
+            >
+              Cut
+            </button>
+          ) : (
+            <button
+              className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+              type="button"
+              disabled
+            >
+              Cut
+            </button>
+          )}
           {copyEnabled ? (
             <button
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
