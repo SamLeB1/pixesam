@@ -1,3 +1,4 @@
+import { useEditorStore } from "../store/editorStore";
 import ModalResize from "./ModalResize";
 
 type BtnSpriteProps = {
@@ -13,6 +14,9 @@ export default function BtnSprite({
   onHoverOpen,
   onClose,
 }: BtnSpriteProps) {
+  const { showSelectionPreview, cropToSelection } = useEditorStore();
+  const cropEnabled = showSelectionPreview;
+
   return (
     <>
       <div>
@@ -39,12 +43,26 @@ export default function BtnSprite({
             >
               Resize
             </button>
-            <button
-              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-              type="button"
-            >
-              Crop
-            </button>
+            {cropEnabled ? (
+              <button
+                className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+                type="button"
+                onClick={() => {
+                  onClose();
+                  cropToSelection();
+                }}
+              >
+                Crop
+              </button>
+            ) : (
+              <button
+                className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+                type="button"
+                disabled
+              >
+                Crop
+              </button>
+            )}
             <button
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
               type="button"
