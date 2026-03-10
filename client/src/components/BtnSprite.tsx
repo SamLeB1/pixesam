@@ -14,7 +14,8 @@ export default function BtnSprite({
   onHoverOpen,
   onClose,
 }: BtnSpriteProps) {
-  const { showSelectionPreview, cropToSelection } = useEditorStore();
+  const { showSelectionPreview, cropToSelection, trimCanvas } =
+    useEditorStore();
   const cropEnabled = showSelectionPreview;
 
   return (
@@ -66,6 +67,10 @@ export default function BtnSprite({
             <button
               className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
               type="button"
+              onClick={() => {
+                onClose();
+                trimCanvas();
+              }}
             >
               Trim
             </button>
