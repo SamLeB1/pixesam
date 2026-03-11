@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { MdArrowRight } from "react-icons/md";
 import { useEditorStore } from "../store/editorStore";
 import ModalResize from "./ModalResize";
 
@@ -16,6 +18,7 @@ export default function BtnSprite({
 }: BtnSpriteProps) {
   const { showSelectionPreview, cropToSelection, trimCanvas } =
     useEditorStore();
+  const [isRotateOpen, setIsRotateOpen] = useState(false);
   const cropEnabled = showSelectionPreview;
 
   return (
@@ -74,6 +77,42 @@ export default function BtnSprite({
             >
               Trim
             </button>
+            <hr className="my-1 text-zinc-400" />
+            <div
+              className="relative"
+              onMouseEnter={() => setIsRotateOpen(true)}
+              onMouseLeave={() => setIsRotateOpen(false)}
+            >
+              <button
+                className="flex w-full cursor-pointer items-center justify-between py-1 pl-2 text-start text-sm hover:bg-zinc-500"
+                type="button"
+              >
+                Rotate
+                <MdArrowRight size={20} />
+              </button>
+              {isRotateOpen && (
+                <div className="absolute top-0 left-full w-32 bg-zinc-600">
+                  <button
+                    className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+                    type="button"
+                  >
+                    180°
+                  </button>
+                  <button
+                    className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+                    type="button"
+                  >
+                    90° CW
+                  </button>
+                  <button
+                    className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+                    type="button"
+                  >
+                    90° CCW
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
