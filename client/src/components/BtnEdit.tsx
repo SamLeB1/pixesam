@@ -27,6 +27,7 @@ export default function BtnEdit({
     copy,
     paste,
     clearEdit,
+    rotateEdit,
   } = useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
 
@@ -37,6 +38,7 @@ export default function BtnEdit({
   const copyEnabled = showSelectionPreview;
   const pasteEnabled = clipboard && !layer.locked;
   const clearEnabled = !layer.locked;
+  const rotateEnabled = !layer.locked;
 
   return (
     <div>
@@ -172,41 +174,67 @@ export default function BtnEdit({
               Clear
             </button>
           )}
-          <div
-            className="relative"
-            onMouseEnter={() => setIsRotateOpen(true)}
-            onMouseLeave={() => setIsRotateOpen(false)}
-          >
+          {rotateEnabled ? (
+            <div
+              className="relative"
+              onMouseEnter={() => setIsRotateOpen(true)}
+              onMouseLeave={() => setIsRotateOpen(false)}
+            >
+              <button
+                className="flex w-full cursor-pointer items-center justify-between py-1 pl-2 text-start text-sm hover:bg-zinc-500"
+                type="button"
+              >
+                Rotate
+                <MdArrowRight size={20} />
+              </button>
+              {isRotateOpen && (
+                <div className="absolute top-0 left-full w-32 bg-zinc-600">
+                  <button
+                    className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      setIsRotateOpen(false);
+                      rotateEdit(180);
+                    }}
+                  >
+                    180°
+                  </button>
+                  <button
+                    className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      setIsRotateOpen(false);
+                      rotateEdit(90);
+                    }}
+                  >
+                    90° CW
+                  </button>
+                  <button
+                    className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      setIsRotateOpen(false);
+                      rotateEdit(270);
+                    }}
+                  >
+                    90° CCW
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
             <button
-              className="flex w-full cursor-pointer items-center justify-between py-1 pl-2 text-start text-sm hover:bg-zinc-500"
+              className="flex w-full items-center justify-between py-1 pl-2 text-start text-sm text-zinc-400"
               type="button"
+              disabled
             >
               Rotate
-              <MdArrowRight size={20} />
+              <MdArrowRight size={20} color="oklch(70.5% 0.015 286.067)" />
             </button>
-            {isRotateOpen && (
-              <div className="absolute top-0 left-full w-32 bg-zinc-600">
-                <button
-                  className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-                  type="button"
-                >
-                  180°
-                </button>
-                <button
-                  className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-                  type="button"
-                >
-                  90° CW
-                </button>
-                <button
-                  className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-                  type="button"
-                >
-                  90° CCW
-                </button>
-              </div>
-            )}
-          </div>
+          )}
           <button
             className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
             type="button"

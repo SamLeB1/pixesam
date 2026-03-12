@@ -258,6 +258,7 @@ type EditorState = {
   mergeLayerDown: () => void;
   flattenLayers: () => void;
   clearLayer: () => void;
+  rotateLayer: (degrees: 90 | 180 | 270) => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
@@ -296,6 +297,7 @@ type EditorState = {
   endSelectionAction: () => void;
   applySelectionAction: () => void;
   deleteSelection: () => void;
+  rotateSelection: (degrees: 90 | 180 | 270) => void;
   performWandSelection: (x: number, y: number) => void;
   generateSelectionMask: () => Uint8Array | null;
   closeLassoPath: () => void;
@@ -308,6 +310,7 @@ type EditorState = {
   copy: () => void;
   paste: () => void;
   clearEdit: () => void;
+  rotateEdit: (degrees: 90 | 180 | 270) => void;
 };
 
 const initialLayer = createNewLayer(
@@ -700,6 +703,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
     setLayerData(newData, activeLayerId);
   },
+  rotateLayer: () => {},
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;
@@ -1802,6 +1806,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     initSelection();
     setLayerData(newData, activeLayerId);
   },
+  rotateSelection: () => {},
   performWandSelection: (x, y) =>
     set((state) => {
       const { activeLayerId, gridSize, getPixelColor, getPixelsInRect } = state;
@@ -2366,5 +2371,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { showSelectionPreview, clearLayer, deleteSelection } = get();
     if (showSelectionPreview) deleteSelection();
     else clearLayer();
+  },
+  rotateEdit: (degrees) => {
+    const { showSelectionPreview, rotateLayer, rotateSelection } = get();
+    if (showSelectionPreview) rotateSelection(degrees);
+    else rotateLayer(degrees);
   },
 }));
