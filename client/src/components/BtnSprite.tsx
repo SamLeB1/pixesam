@@ -16,7 +16,7 @@ export default function BtnSprite({
   onHoverOpen,
   onClose,
 }: BtnSpriteProps) {
-  const { showSelectionPreview, cropToSelection, trimCanvas } =
+  const { showSelectionPreview, cropToSelection, trimCanvas, rotateCanvas } =
     useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
   const cropEnabled = showSelectionPreview;
@@ -95,18 +95,33 @@ export default function BtnSprite({
                   <button
                     className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
                     type="button"
+                    onClick={() => {
+                      onClose();
+                      setIsRotateOpen(false);
+                      rotateCanvas(180);
+                    }}
                   >
                     180°
                   </button>
                   <button
                     className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
                     type="button"
+                    onClick={() => {
+                      onClose();
+                      setIsRotateOpen(false);
+                      rotateCanvas(90);
+                    }}
                   >
                     90° CW
                   </button>
                   <button
                     className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
                     type="button"
+                    onClick={() => {
+                      onClose();
+                      setIsRotateOpen(false);
+                      rotateCanvas(270);
+                    }}
                   >
                     90° CCW
                   </button>

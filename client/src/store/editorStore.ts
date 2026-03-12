@@ -287,6 +287,7 @@ type EditorState = {
   ) => void;
   cropToSelection: () => void;
   trimCanvas: () => void;
+  rotateCanvas: (degrees: 90 | 180 | 270) => void;
   importFromPxsm: (data: PxsmData) => void;
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
@@ -1337,6 +1338,68 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             const srcY = y + minY;
             const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
             const dstIndex = getBaseIndex(x, y, newSize.x);
+            newData[dstIndex] = l.data[srcIndex];
+            newData[dstIndex + 1] = l.data[srcIndex + 1];
+            newData[dstIndex + 2] = l.data[srcIndex + 2];
+            newData[dstIndex + 3] = l.data[srcIndex + 3];
+          }
+        }
+        return { ...l, data: newData };
+      });
+
+      const action: NewAction = {
+        action: "new",
+        layers: newLayers,
+        prevLayers: layers,
+        activeLayerId,
+        prevActiveLayerId: activeLayerId,
+        size: newSize,
+        prevSize: gridSize,
+      };
+      updateHistory(action);
+
+      let pxSize = BASE_CANVAS_SIZE / Math.max(newSize.x, newSize.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+
+      initActions();
+      return {
+        layers: newLayers,
+        gridSize: newSize,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      };
+    });
+  },
+  rotateCanvas: (degrees) => {
+    set((state) => {
+      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+        state;
+
+      const newSize =
+        degrees === 180
+          ? { x: gridSize.x, y: gridSize.y }
+          : { x: gridSize.y, y: gridSize.x };
+
+      const newLayers: Layer[] = layers.map((l) => {
+        const newData = new Uint8ClampedArray(newSize.x * newSize.y * 4);
+        for (let y = 0; y < gridSize.y; y++) {
+          for (let x = 0; x < gridSize.x; x++) {
+            const srcIndex = getBaseIndex(x, y, gridSize.x);
+            let newX: number;
+            let newY: number;
+            if (degrees === 90) {
+              newX = gridSize.y - 1 - y;
+              newY = x;
+            } else if (degrees === 270) {
+              newX = y;
+              newY = gridSize.x - 1 - x;
+            } else {
+              newX = gridSize.x - 1 - x;
+              newY = gridSize.y - 1 - y;
+            }
+            const dstIndex = getBaseIndex(newX, newY, newSize.x);
             newData[dstIndex] = l.data[srcIndex];
             newData[dstIndex + 1] = l.data[srcIndex + 1];
             newData[dstIndex + 2] = l.data[srcIndex + 2];
