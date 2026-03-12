@@ -1,5 +1,17 @@
 import { useEditorStore } from "../store/editorStore";
 import Tooltip from "./Tooltip";
+import toolsSprite from "../assets/images/tools.png";
+
+function toolIcon(row: number, col: number): React.CSSProperties {
+  return {
+    width: 32,
+    height: 32,
+    backgroundImage: `url(${toolsSprite})`,
+    backgroundSize: "64px 160px",
+    backgroundPosition: `${-col * 32}px ${-row * 32}px`,
+    imageRendering: "pixelated",
+  };
+}
 
 export default function SideBarLeft() {
   const {
@@ -19,7 +31,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("pencil")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(0, 0)} />
           </button>
         </Tooltip>
         <Tooltip content="Eraser tool (E)" side="right">
@@ -28,7 +40,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("eraser")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(0, 1)} />
           </button>
         </Tooltip>
         <Tooltip content="Color picker tool (C)" side="right">
@@ -37,7 +49,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("color-picker")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(1, 0)} />
           </button>
         </Tooltip>
         <Tooltip content="Bucket tool (B)" side="right">
@@ -46,7 +58,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("bucket")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(1, 1)} />
           </button>
         </Tooltip>
         <Tooltip
@@ -65,7 +77,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("line")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(2, 0)} />
           </button>
         </Tooltip>
         <Tooltip
@@ -85,7 +97,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("shape")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(2, 1)} />
           </button>
         </Tooltip>
         <Tooltip
@@ -105,7 +117,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("shade")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(3, 0)} />
           </button>
         </Tooltip>
         <Tooltip content="Select tool (S)" side="right">
@@ -114,7 +126,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("select")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(3, 1)} />
           </button>
         </Tooltip>
         <Tooltip
@@ -133,7 +145,7 @@ export default function SideBarLeft() {
             type="button"
             onClick={() => selectTool("move")}
           >
-            <div className="h-8 w-8 bg-white"></div>
+            <div style={toolIcon(4, 0)} />
           </button>
         </Tooltip>
       </div>
