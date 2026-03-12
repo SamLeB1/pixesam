@@ -257,6 +257,7 @@ type EditorState = {
   moveLayerDown: () => void;
   mergeLayerDown: () => void;
   flattenLayers: () => void;
+  clearLayer: () => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
@@ -279,7 +280,6 @@ type EditorState = {
     isUpdateHistory?: boolean,
   ) => void;
   newCanvas: (size: { x: number; y: number }) => void;
-  clearCanvas: () => void;
   resizeCanvas: (
     size: { x: number; y: number },
     anchor: Side,
@@ -307,7 +307,7 @@ type EditorState = {
   cut: () => void;
   copy: () => void;
   paste: () => void;
-  clear: () => void;
+  clearEdit: () => void;
 };
 
 const initialLayer = createNewLayer(
@@ -677,6 +677,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeLayerId: flattened.id,
       };
     }),
+  clearLayer: () => {
+    const {
+      activeLayerId,
+      gridSize,
+      initActions,
+      getActiveLayer,
+      setLayerData,
+      updateHistory,
+    } = get();
+    const layer = getActiveLayer();
+    if (layer.locked) return;
+
+    const action: ClearAction = {
+      action: "clear",
+      layerId: activeLayerId,
+      prevData: layer.data,
+    };
+    updateHistory(action);
+
+    initActions();
+    const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+    setLayerData(newData, activeLayerId);
+  },
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;
@@ -1096,29 +1119,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         zoomLevel,
       };
     }),
-  clearCanvas: () => {
-    const {
-      activeLayerId,
-      gridSize,
-      initActions,
-      getActiveLayer,
-      setLayerData,
-      updateHistory,
-    } = get();
-    const layer = getActiveLayer();
-    if (layer.locked) return;
-
-    const action: ClearAction = {
-      action: "clear",
-      layerId: activeLayerId,
-      prevData: layer.data,
-    };
-    updateHistory(action);
-
-    initActions();
-    const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
-    setLayerData(newData, activeLayerId);
-  },
   resizeCanvas: (size, anchor, resizeContent = false) =>
     set((state) => {
       const {
@@ -2362,9 +2362,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isPasting: true,
       };
     }),
-  clear: () => {
-    const { showSelectionPreview, clearCanvas, deleteSelection } = get();
+  clearEdit: () => {
+    const { showSelectionPreview, clearLayer, deleteSelection } = get();
     if (showSelectionPreview) deleteSelection();
-    else clearCanvas();
+    else clearLayer();
   },
 }));

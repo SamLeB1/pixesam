@@ -26,7 +26,7 @@ export default function BtnEdit({
     cut,
     copy,
     paste,
-    clear,
+    clearEdit,
   } = useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
 
@@ -158,7 +158,7 @@ export default function BtnEdit({
               type="button"
               onClick={() => {
                 onClose();
-                clear();
+                clearEdit();
               }}
             >
               Clear
