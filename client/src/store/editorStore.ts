@@ -60,6 +60,7 @@ type Action =
   | NewAction
   | ClearAction
   | RotateCanvasAction
+  | RotateLayerAction
   | LayerStructureAction
   | LayerToggleAction
   | LayerRenameAction;
@@ -131,6 +132,13 @@ type ClearAction = {
 
 type RotateCanvasAction = {
   action: "rotate-canvas";
+  degrees: 90 | 180 | 270;
+};
+
+type RotateLayerAction = {
+  action: "rotate-layer";
+  layerId: string;
+  data: Uint8ClampedArray;
   degrees: 90 | 180 | 270;
 };
 
@@ -710,7 +718,48 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
     setLayerData(newData, activeLayerId);
   },
-  rotateLayer: () => {},
+  rotateLayer: (degrees) => {
+    const {
+      activeLayerId,
+      gridSize,
+      initActions,
+      getActiveLayer,
+      setLayerData,
+      updateHistory,
+    } = get();
+    const layer = getActiveLayer();
+    if (layer.locked) return;
+
+    const rotatedSize =
+      degrees === 180
+        ? { x: gridSize.x, y: gridSize.y }
+        : { x: gridSize.y, y: gridSize.x };
+    const rotatedData = rotatePixels(layer.data, gridSize, degrees);
+    const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+    for (let y = 0; y < rotatedSize.y; y++) {
+      for (let x = 0; x < rotatedSize.x; x++) {
+        if (x < gridSize.x && y < gridSize.y) {
+          const srcIndex = getBaseIndex(x, y, rotatedSize.x);
+          const dstIndex = getBaseIndex(x, y, gridSize.x);
+          newData[dstIndex] = rotatedData[srcIndex];
+          newData[dstIndex + 1] = rotatedData[srcIndex + 1];
+          newData[dstIndex + 2] = rotatedData[srcIndex + 2];
+          newData[dstIndex + 3] = rotatedData[srcIndex + 3];
+        }
+      }
+    }
+
+    const action: RotateLayerAction = {
+      action: "rotate-layer",
+      layerId: activeLayerId,
+      data: layer.data,
+      degrees,
+    };
+    updateHistory(action);
+
+    initActions();
+    setLayerData(newData, activeLayerId);
+  },
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;
@@ -2028,6 +2077,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       });
+    } else if (action.action === "rotate-layer") {
+      setLayerData(action.data, action.layerId);
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "layer-structure") {
       const restoredLayers = action.prevLayers.map((layer) => {
         const curr = layers.find((l) => l.id === layer.id);
@@ -2200,6 +2252,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       });
+    } else if (action.action === "rotate-layer") {
+      const rotatedSize =
+        action.degrees === 180
+          ? { x: gridSize.x, y: gridSize.y }
+          : { x: gridSize.y, y: gridSize.x };
+      const rotatedData = rotatePixels(action.data, gridSize, action.degrees);
+      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+      for (let y = 0; y < rotatedSize.y; y++) {
+        for (let x = 0; x < rotatedSize.x; x++) {
+          if (x < gridSize.x && y < gridSize.y) {
+            const srcIndex = getBaseIndex(x, y, rotatedSize.x);
+            const dstIndex = getBaseIndex(x, y, gridSize.x);
+            newData[dstIndex] = rotatedData[srcIndex];
+            newData[dstIndex + 1] = rotatedData[srcIndex + 1];
+            newData[dstIndex + 2] = rotatedData[srcIndex + 2];
+            newData[dstIndex + 3] = rotatedData[srcIndex + 3];
+          }
+        }
+      }
+      setLayerData(newData, action.layerId);
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "layer-structure") {
       const restoredLayers = action.layers.map((layer) => {
         const curr = layers.find((l) => l.id === layer.id);
