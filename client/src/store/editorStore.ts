@@ -59,6 +59,7 @@ type Action =
   | PasteAction
   | NewAction
   | ClearAction
+  | RotateCanvasAction
   | LayerStructureAction
   | LayerToggleAction
   | LayerRenameAction;
@@ -126,6 +127,11 @@ type ClearAction = {
   action: "clear";
   layerId: string;
   prevData: Uint8ClampedArray;
+};
+
+type RotateCanvasAction = {
+  action: "rotate-canvas";
+  degrees: 90 | 180 | 270;
 };
 
 type LayerStructureAction = {
@@ -1379,8 +1385,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   rotateCanvas: (degrees) => {
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        state;
+      const { layers, gridSize, initActions, updateHistory } = state;
       const newSize =
         degrees === 180
           ? { x: gridSize.x, y: gridSize.y }
@@ -1390,14 +1395,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         data: rotatePixels(l.data, gridSize, degrees),
       }));
 
-      const action: NewAction = {
-        action: "new",
-        layers: newLayers,
-        prevLayers: layers,
-        activeLayerId,
-        prevActiveLayerId: activeLayerId,
-        size: newSize,
-        prevSize: gridSize,
+      const action: RotateCanvasAction = {
+        action: "rotate-canvas",
+        degrees,
       };
       updateHistory(action);
 
@@ -2008,6 +2008,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } else if (action.action === "clear") {
       setLayerData(action.prevData, action.layerId);
       set({ activeLayerId: action.layerId });
+    } else if (action.action === "rotate-canvas") {
+      const inverseDegrees = (360 - action.degrees) as 90 | 180 | 270;
+      const newLayers: Layer[] = layers.map((l) => ({
+        ...l,
+        data: rotatePixels(l.data, gridSize, inverseDegrees),
+      }));
+      const newSize =
+        action.degrees === 180
+          ? { x: gridSize.x, y: gridSize.y }
+          : { x: gridSize.y, y: gridSize.x };
+      let pxSize = BASE_CANVAS_SIZE / Math.max(newSize.x, newSize.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+      set({
+        layers: newLayers,
+        gridSize: newSize,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      });
     } else if (action.action === "layer-structure") {
       const restoredLayers = action.prevLayers.map((layer) => {
         const curr = layers.find((l) => l.id === layer.id);
@@ -2161,6 +2181,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       setLayerData(newData, action.layerId);
       set({ activeLayerId: action.layerId });
+    } else if (action.action === "rotate-canvas") {
+      const newLayers: Layer[] = layers.map((l) => ({
+        ...l,
+        data: rotatePixels(l.data, gridSize, action.degrees),
+      }));
+      const newSize =
+        action.degrees === 180
+          ? { x: gridSize.x, y: gridSize.y }
+          : { x: gridSize.y, y: gridSize.x };
+      let pxSize = BASE_CANVAS_SIZE / Math.max(newSize.x, newSize.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+      set({
+        layers: newLayers,
+        gridSize: newSize,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
+      });
     } else if (action.action === "layer-structure") {
       const restoredLayers = action.layers.map((layer) => {
         const curr = layers.find((l) => l.id === layer.id);
