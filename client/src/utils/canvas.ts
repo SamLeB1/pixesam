@@ -120,6 +120,39 @@ export function clearRectContent(
   }
 }
 
+export function rotatePixels(
+  pixels: Uint8ClampedArray,
+  size: { x: number; y: number },
+  degrees: 90 | 180 | 270,
+): Uint8ClampedArray {
+  const newSize =
+    degrees === 180 ? { x: size.x, y: size.y } : { x: size.y, y: size.x };
+  const newPixels = new Uint8ClampedArray(newSize.x * newSize.y * 4);
+  for (let y = 0; y < size.y; y++) {
+    for (let x = 0; x < size.x; x++) {
+      const srcIndex = getBaseIndex(x, y, size.x);
+      let newX: number;
+      let newY: number;
+      if (degrees === 90) {
+        newX = size.y - 1 - y;
+        newY = x;
+      } else if (degrees === 270) {
+        newX = y;
+        newY = size.x - 1 - x;
+      } else {
+        newX = size.x - 1 - x;
+        newY = size.y - 1 - y;
+      }
+      const dstIndex = getBaseIndex(newX, newY, newSize.x);
+      newPixels[dstIndex] = pixels[srcIndex];
+      newPixels[dstIndex + 1] = pixels[srcIndex + 1];
+      newPixels[dstIndex + 2] = pixels[srcIndex + 2];
+      newPixels[dstIndex + 3] = pixels[srcIndex + 3];
+    }
+  }
+  return newPixels;
+}
+
 export function resizePixelsWithNearestNeighbor(
   pixels: RGBA[],
   sw: number,
