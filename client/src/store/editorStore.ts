@@ -304,6 +304,7 @@ type EditorState = {
   cropToSelection: () => void;
   trimCanvas: () => void;
   rotateCanvas: (degrees: 90 | 180 | 270) => void;
+  flipCanvas: (direction: "horizontal" | "vertical") => void;
   importFromPxsm: (data: PxsmData) => void;
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
@@ -1464,6 +1465,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     });
   },
+  flipCanvas: () => {},
   importFromPxsm: (data) =>
     set((state) => {
       if (!isValidPxsmData(data)) {

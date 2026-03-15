@@ -16,8 +16,13 @@ export default function BtnSprite({
   onHoverOpen,
   onClose,
 }: BtnSpriteProps) {
-  const { showSelectionPreview, cropToSelection, trimCanvas, rotateCanvas } =
-    useEditorStore();
+  const {
+    showSelectionPreview,
+    cropToSelection,
+    trimCanvas,
+    rotateCanvas,
+    flipCanvas,
+  } = useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
   const cropEnabled = showSelectionPreview;
 
@@ -128,6 +133,26 @@ export default function BtnSprite({
                 </div>
               )}
             </div>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                flipCanvas("horizontal");
+              }}
+            >
+              Flip horizontal
+            </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                flipCanvas("vertical");
+              }}
+            >
+              Flip vertical
+            </button>
           </div>
         )}
       </div>
