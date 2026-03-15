@@ -63,6 +63,7 @@ type Action =
   | RotateCanvasAction
   | RotateLayerAction
   | FlipCanvasAction
+  | FlipLayerAction
   | LayerStructureAction
   | LayerToggleAction
   | LayerRenameAction;
@@ -146,6 +147,12 @@ type RotateLayerAction = {
 
 type FlipCanvasAction = {
   action: "flip-canvas";
+  direction: "horizontal" | "vertical";
+};
+
+type FlipLayerAction = {
+  action: "flip-layer";
+  layerId: string;
   direction: "horizontal" | "vertical";
 };
 
@@ -771,7 +778,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     initActions();
     setLayerData(newData, activeLayerId);
   },
-  flipLayer: () => {},
+  flipLayer: (direction) => {
+    const {
+      activeLayerId,
+      gridSize,
+      initActions,
+      getActiveLayer,
+      setLayerData,
+      updateHistory,
+    } = get();
+    const layer = getActiveLayer();
+    if (layer.locked) return;
+
+    const newData = flipPixels(layer.data, gridSize, direction);
+
+    const action: FlipLayerAction = {
+      action: "flip-layer",
+      layerId: activeLayerId,
+      direction,
+    };
+    updateHistory(action);
+
+    initActions();
+    setLayerData(newData, activeLayerId);
+  },
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;
@@ -2119,6 +2149,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         data: flipPixels(l.data, gridSize, action.direction),
       }));
       set({ layers: newLayers });
+    } else if (action.action === "flip-layer") {
+      const layer = getLayer(action.layerId) as Layer;
+      setLayerData(
+        flipPixels(layer.data, gridSize, action.direction),
+        action.layerId,
+      );
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "layer-structure") {
       const restoredLayers = action.prevLayers.map((layer) => {
         const curr = layers.find((l) => l.id === layer.id);
@@ -2318,6 +2355,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         data: flipPixels(l.data, gridSize, action.direction),
       }));
       set({ layers: newLayers });
+    } else if (action.action === "flip-layer") {
+      const layer = getLayer(action.layerId) as Layer;
+      setLayerData(
+        flipPixels(layer.data, gridSize, action.direction),
+        action.layerId,
+      );
+      set({ activeLayerId: action.layerId });
     } else if (action.action === "layer-structure") {
       const restoredLayers = action.layers.map((layer) => {
         const curr = layers.find((l) => l.id === layer.id);
