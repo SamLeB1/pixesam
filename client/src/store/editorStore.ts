@@ -281,6 +281,7 @@ type EditorState = {
   flattenLayers: () => void;
   clearLayer: () => void;
   rotateLayer: (degrees: 90 | 180 | 270) => void;
+  flipLayer: (direction: "horizontal" | "vertical") => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
@@ -321,6 +322,7 @@ type EditorState = {
   applySelectionAction: () => void;
   deleteSelection: () => void;
   rotateSelection: (degrees: 90 | 180 | 270) => void;
+  flipSelection: (direction: "horizontal" | "vertical") => void;
   performWandSelection: (x: number, y: number) => void;
   generateSelectionMask: () => Uint8Array | null;
   closeLassoPath: () => void;
@@ -334,6 +336,7 @@ type EditorState = {
   paste: () => void;
   clearEdit: () => void;
   rotateEdit: (degrees: 90 | 180 | 270) => void;
+  flipEdit: (direction: "horizontal" | "vertical") => void;
 };
 
 const initialLayer = createNewLayer(
@@ -768,6 +771,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     initActions();
     setLayerData(newData, activeLayerId);
   },
+  flipLayer: () => {},
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
     return isPrimaryColorActive ? primaryColor : secondaryColor;
@@ -1861,6 +1865,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     setLayerData(newData, activeLayerId);
   },
   rotateSelection: () => {},
+  flipSelection: () => {},
   performWandSelection: (x, y) =>
     set((state) => {
       const { activeLayerId, gridSize, getPixelColor, getPixelsInRect } = state;
@@ -2505,5 +2510,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { showSelectionPreview, rotateLayer, rotateSelection } = get();
     if (showSelectionPreview) rotateSelection(degrees);
     else rotateLayer(degrees);
+  },
+  flipEdit: (direction) => {
+    const { showSelectionPreview, flipLayer, flipSelection } = get();
+    if (showSelectionPreview) flipSelection(direction);
+    else flipLayer(direction);
   },
 }));

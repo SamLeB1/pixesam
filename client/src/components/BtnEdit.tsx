@@ -28,6 +28,7 @@ export default function BtnEdit({
     paste,
     clearEdit,
     rotateEdit,
+    flipEdit,
   } = useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
 
@@ -39,6 +40,7 @@ export default function BtnEdit({
   const pasteEnabled = clipboard && !layer.locked;
   const clearEnabled = !layer.locked;
   const rotateEnabled = !layer.locked;
+  const flipEnabled = !layer.locked;
 
   return (
     <div>
@@ -235,18 +237,46 @@ export default function BtnEdit({
               <MdArrowRight size={20} color="oklch(70.5% 0.015 286.067)" />
             </button>
           )}
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-            type="button"
-          >
-            Flip horizontal
-          </button>
-          <button
-            className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
-            type="button"
-          >
-            Flip vertical
-          </button>
+          {flipEnabled ? (
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                flipEdit("horizontal");
+              }}
+            >
+              Flip horizontal
+            </button>
+          ) : (
+            <button
+              className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+              type="button"
+              disabled
+            >
+              Flip horizontal
+            </button>
+          )}
+          {flipEnabled ? (
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                flipEdit("vertical");
+              }}
+            >
+              Flip vertical
+            </button>
+          ) : (
+            <button
+              className="w-full px-2 py-1 text-start text-sm text-zinc-400"
+              type="button"
+              disabled
+            >
+              Flip vertical
+            </button>
+          )}
           <button
             className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
             type="button"
