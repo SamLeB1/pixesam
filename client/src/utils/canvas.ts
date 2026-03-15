@@ -153,6 +153,27 @@ export function rotatePixels(
   return newPixels;
 }
 
+export function flipPixels(
+  pixels: Uint8ClampedArray,
+  size: { x: number; y: number },
+  direction: "horizontal" | "vertical",
+): Uint8ClampedArray {
+  const newPixels = new Uint8ClampedArray(pixels.length);
+  for (let y = 0; y < size.y; y++) {
+    for (let x = 0; x < size.x; x++) {
+      const srcIndex = getBaseIndex(x, y, size.x);
+      const newX = direction === "horizontal" ? size.x - 1 - x : x;
+      const newY = direction === "vertical" ? size.y - 1 - y : y;
+      const dstIndex = getBaseIndex(newX, newY, size.x);
+      newPixels[dstIndex] = pixels[srcIndex];
+      newPixels[dstIndex + 1] = pixels[srcIndex + 1];
+      newPixels[dstIndex + 2] = pixels[srcIndex + 2];
+      newPixels[dstIndex + 3] = pixels[srcIndex + 3];
+    }
+  }
+  return newPixels;
+}
+
 export function resizePixelsWithNearestNeighbor(
   pixels: RGBA[],
   sw: number,
