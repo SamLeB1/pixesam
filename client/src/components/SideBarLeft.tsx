@@ -7,9 +7,7 @@ function toolIcon(row: number, col: number): React.CSSProperties {
     width: 32,
     height: 32,
     backgroundImage: `url(${toolsSprite})`,
-    backgroundSize: "64px 160px",
     backgroundPosition: `${-col * 32}px ${-row * 32}px`,
-    imageRendering: "pixelated",
   };
 }
 
