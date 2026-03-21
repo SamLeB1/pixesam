@@ -77,10 +77,10 @@ type DrawAction = {
 type BucketAction = {
   action: "bucket";
   layerId: string;
+  data: Uint8ClampedArray;
   x: number;
   y: number;
   color: RGBA;
-  prevData: Uint8ClampedArray;
 };
 
 type TransformAction = {
@@ -88,8 +88,8 @@ type TransformAction = {
   layerId: string;
   srcRect: Rect;
   dstRect: Rect;
-  srcPixels: RGBA[];
-  dstPixels: RGBA[];
+  srcPixels: Uint8ClampedArray;
+  dstPixels: Uint8ClampedArray;
   mask: Uint8Array | null;
 };
 
@@ -104,7 +104,7 @@ type DeleteAction = {
   action: "delete";
   layerId: string;
   area: Rect;
-  pixels: RGBA[];
+  pixels: Uint8ClampedArray;
   mask: Uint8Array | null;
 };
 
@@ -112,8 +112,8 @@ type PasteAction = {
   action: "paste";
   layerId: string;
   area: Rect;
-  pixels: RGBA[];
-  prevPixels: RGBA[];
+  pixels: Uint8ClampedArray;
+  prevPixels: Uint8ClampedArray;
   mask: Uint8Array | null;
 };
 
@@ -130,7 +130,7 @@ type NewAction = {
 type ClearAction = {
   action: "clear";
   layerId: string;
-  prevData: Uint8ClampedArray;
+  data: Uint8ClampedArray;
 };
 
 type RotateCanvasAction = {
@@ -223,7 +223,7 @@ type EditorState = {
   selectionResizeOffset: { n: number; e: number; s: number; w: number } | null;
   activeResizeHandle: Direction | null;
   selectedArea: Rect | null;
-  selectedPixels: RGBA[];
+  selectedPixels: Uint8ClampedArray;
   showSelectionPreview: boolean;
   isPasting: boolean;
   lassoPath: { x: number; y: number }[];
@@ -263,7 +263,7 @@ type EditorState = {
   ) => void;
   setActiveResizeHandle: (handle: Direction | null) => void;
   setSelectedArea: (area: Rect | null) => void;
-  setSelectedPixels: (pixels: RGBA[]) => void;
+  setSelectedPixels: (pixels: Uint8ClampedArray) => void;
   setShowSelectionPreview: (show: boolean) => void;
   setIsPasting: (isPasting: boolean) => void;
   setLassoPath: (path: { x: number; y: number }[]) => void;
@@ -295,8 +295,8 @@ type EditorState = {
   getPixelsInRect: (
     rect: Rect,
     mask: Uint8Array | null,
-    layerId?: string,
-  ) => RGBA[];
+    layerId: string,
+  ) => Uint8ClampedArray;
   getEffectiveSelectionBounds: () => Rect | null;
   getRectInBounds: (rect: Rect) => Rect | null;
   draw: (x: number, y: number, color: RGBA) => void;
@@ -380,7 +380,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectionResizeOffset: null,
   activeResizeHandle: null,
   selectedArea: null,
-  selectedPixels: [],
+  selectedPixels: new Uint8ClampedArray(),
   showSelectionPreview: false,
   isPasting: false,
   lassoPath: [],
@@ -728,7 +728,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const action: ClearAction = {
       action: "clear",
       layerId: activeLayerId,
-      prevData: layer.data,
+      data: layer.data,
     };
     updateHistory(action);
 
@@ -846,29 +846,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   getPixelsInRect: (rect, mask, layerId) => {
     const { gridSize, getPixelColor } = get();
-    const pixels: RGBA[] = [];
-    if (mask) {
-      for (let i = 0; i < rect.height; i++) {
-        for (let j = 0; j < rect.width; j++) {
-          const pixelX = rect.x + j;
-          const pixelY = rect.y + i;
-          if (isValidIndex(pixelX, pixelY, gridSize)) {
-            const baseIndex = i * rect.width + j;
-            if (baseIndex >= mask.length) continue;
-            if (mask[baseIndex])
-              pixels.push(getPixelColor(pixelX, pixelY, layerId));
-            else pixels.push({ r: 0, g: 0, b: 0, a: 0 });
-          }
-        }
-      }
-    } else {
-      for (let i = 0; i < rect.height; i++) {
-        for (let j = 0; j < rect.width; j++) {
-          const pixelX = rect.x + j;
-          const pixelY = rect.y + i;
-          if (isValidIndex(pixelX, pixelY, gridSize))
-            pixels.push(getPixelColor(pixelX, pixelY, layerId));
-        }
+    const pixels = new Uint8ClampedArray(rect.width * rect.height * 4);
+    for (let y = 0; y < rect.height; y++) {
+      for (let x = 0; x < rect.width; x++) {
+        const px = rect.x + x;
+        const py = rect.y + y;
+        if (!isValidIndex(px, py, gridSize)) continue;
+        const mi = y * rect.width + x;
+        if (mask && !mask[mi]) continue;
+        const pi = (y * rect.width + x) * 4;
+        const { r, g, b, a } = getPixelColor(px, py, layerId);
+        pixels[pi] = r;
+        pixels[pi + 1] = g;
+        pixels[pi + 2] = b;
+        pixels[pi + 3] = a;
       }
     }
     return pixels;
@@ -1182,10 +1173,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const action: BucketAction = {
         action: "bucket",
         layerId: activeLayerId,
+        data: layer.data,
         x,
         y,
         color,
-        prevData: layer.data,
       };
       updateHistory(action);
     }
@@ -1715,7 +1706,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionResizeOffset: null,
       activeResizeHandle: null,
       selectedArea: null,
-      selectedPixels: [],
+      selectedPixels: new Uint8ClampedArray(),
       showSelectionPreview: false,
       isPasting: false,
       lassoPath: [],
@@ -1819,7 +1810,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         pixelsToApply,
         newData,
         gridSize,
-        true,
         newMask,
       );
 
@@ -1839,7 +1829,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         pixelsToApply,
         newData,
         gridSize,
-        true,
         newMask,
       );
 
@@ -2068,7 +2057,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       setLayerData(newData, action.layerId);
       set({ activeLayerId: action.layerId });
     } else if (action.action === "bucket") {
-      setLayerData(action.prevData, action.layerId);
+      setLayerData(action.data, action.layerId);
       set({ activeLayerId: action.layerId });
     } else if (action.action === "transform") {
       const { layerId, srcRect, dstRect, srcPixels, dstPixels, mask } = action;
@@ -2083,8 +2072,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             dstRect.height,
           )
         : null;
-      drawRectContent(dstRect, dstPixels, newData, gridSize, false, newMask);
-      drawRectContent(srcRect, srcPixels, newData, gridSize, true, mask);
+      drawRectContent(dstRect, dstPixels, newData, gridSize, newMask);
+      drawRectContent(srcRect, srcPixels, newData, gridSize, mask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "move") {
@@ -2094,14 +2083,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const { layerId, area, pixels, mask } = action;
       const layer = getLayer(layerId) as Layer;
       const newData = new Uint8ClampedArray(layer.data);
-      drawRectContent(area, pixels, newData, gridSize, true, mask);
+      drawRectContent(area, pixels, newData, gridSize, mask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "paste") {
       const { layerId, area, prevPixels, mask } = action;
       const layer = getLayer(layerId) as Layer;
       const newData = new Uint8ClampedArray(layer.data);
-      drawRectContent(area, prevPixels, newData, gridSize, false, mask);
+      drawRectContent(area, prevPixels, newData, gridSize, mask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "new") {
@@ -2118,7 +2107,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         zoomLevel,
       });
     } else if (action.action === "clear") {
-      setLayerData(action.prevData, action.layerId);
+      setLayerData(action.data, action.layerId);
       set({ activeLayerId: action.layerId });
     } else if (action.action === "rotate-canvas") {
       const inverseDegrees = (360 - action.degrees) as 90 | 180 | 270;
@@ -2254,7 +2243,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         dstRect.height,
       );
       clearRectContent(srcRect, newData, gridSize, mask);
-      drawRectContent(dstRect, pixelsToApply, newData, gridSize, true, newMask);
+      drawRectContent(dstRect, pixelsToApply, newData, gridSize, newMask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "move") {
@@ -2289,7 +2278,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const { layerId, area, pixels, mask } = action;
       const layer = getLayer(layerId) as Layer;
       const newData = new Uint8ClampedArray(layer.data);
-      drawRectContent(area, pixels, newData, gridSize, true, mask);
+      drawRectContent(area, pixels, newData, gridSize, mask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "new") {

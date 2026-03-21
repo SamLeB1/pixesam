@@ -315,7 +315,7 @@ export default function Canvas() {
 
       if (!isPasting)
         clearRectContent(selectedArea, newData, gridSize, selectionMask);
-      drawRectContent(bounds, newPixels, newData, gridSize, true, newMask);
+      drawRectContent(bounds, newPixels, newData, gridSize, newMask);
       return newData;
     },
     [

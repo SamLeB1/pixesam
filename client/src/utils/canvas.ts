@@ -52,40 +52,20 @@ export function isEqualColor(color1: RGBA, color2: RGBA) {
 
 export function drawRectContent(
   rect: Rect,
-  pixels: RGBA[],
+  pixels: Uint8ClampedArray,
   data: Uint8ClampedArray,
   dataSize: { x: number; y: number },
-  full: boolean,
   mask: Uint8Array | null = null,
 ) {
-  let currPixelIndex = 0;
-  if (mask) {
-    for (let i = 0; i < rect.height; i++) {
-      for (let j = 0; j < rect.width; j++) {
-        const px = rect.x + j;
-        const py = rect.y + i;
-        if (isValidIndex(px, py, dataSize)) {
-          if (currPixelIndex >= pixels.length) return;
-          const baseIndex = i * rect.width + j;
-          if (baseIndex < mask.length && mask[baseIndex])
-            setPixelColor(px, py, dataSize.x, pixels[currPixelIndex], data);
-          if (!full) currPixelIndex++;
-        }
-        if (full) currPixelIndex++;
-      }
-    }
-  } else {
-    for (let i = 0; i < rect.height; i++) {
-      for (let j = 0; j < rect.width; j++) {
-        const px = rect.x + j;
-        const py = rect.y + i;
-        if (isValidIndex(px, py, dataSize)) {
-          if (currPixelIndex >= pixels.length) return;
-          setPixelColor(px, py, dataSize.x, pixels[currPixelIndex], data);
-          if (!full) currPixelIndex++;
-        }
-        if (full) currPixelIndex++;
-      }
+  for (let y = 0; y < rect.height; y++) {
+    for (let x = 0; x < rect.width; x++) {
+      const px = rect.x + x;
+      const py = rect.y + y;
+      if (!isValidIndex(px, py, dataSize)) continue;
+      const mi = y * rect.width + x;
+      if (mask && !mask[mi]) continue;
+      const color = getPixelColor(x, y, rect.width, pixels);
+      setPixelColor(px, py, dataSize.x, color, data);
     }
   }
 }
@@ -175,19 +155,23 @@ export function flipPixels(
 }
 
 export function resizePixelsWithNearestNeighbor(
-  pixels: RGBA[],
+  pixels: Uint8ClampedArray,
   sw: number,
   sh: number,
   dw: number,
   dh: number,
-) {
-  const newPixels: RGBA[] = [];
+): Uint8ClampedArray {
+  const newPixels = new Uint8ClampedArray(dw * dh * 4);
   for (let dy = 0; dy < dh; dy++) {
     for (let dx = 0; dx < dw; dx++) {
       const sx = Math.floor((dx * sw) / dw);
       const sy = Math.floor((dy * sh) / dh);
-      const index = sy * sw + sx;
-      newPixels.push(pixels[index]);
+      const si = (sy * sw + sx) * 4;
+      const di = (dy * dw + dx) * 4;
+      newPixels[di] = pixels[si];
+      newPixels[di + 1] = pixels[si + 1];
+      newPixels[di + 2] = pixels[si + 2];
+      newPixels[di + 3] = pixels[si + 3];
     }
   }
   return newPixels;
@@ -199,7 +183,7 @@ export function resizeMaskWithNearestNeighbor(
   sh: number,
   dw: number,
   dh: number,
-) {
+): Uint8Array {
   const newMask = new Uint8Array(dw * dh);
   for (let dy = 0; dy < dh; dy++) {
     for (let dx = 0; dx < dw; dx++) {
