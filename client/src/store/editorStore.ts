@@ -88,10 +88,12 @@ type TransformAction = {
   action: "transform";
   layerId: string;
   srcRect: Rect;
-  dstRect: Rect;
   srcPixels: Uint8ClampedArray;
+  srcMask: Uint8Array | null;
+  dstRect: Rect;
   dstPixels: Uint8ClampedArray;
-  mask: Uint8Array | null;
+  dstMask: Uint8Array | null;
+  overwrittenPixels: Uint8ClampedArray;
 };
 
 type MoveAction = {
@@ -1904,10 +1906,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         action: "transform",
         layerId: activeLayerId,
         srcRect: selectedArea,
-        dstRect: bounds,
         srcPixels: selectedPixels,
-        dstPixels: getPixelsInRect(bounds, transformed.mask, activeLayerId),
-        mask: selectionMask,
+        srcMask: selectionMask,
+        dstRect: bounds,
+        dstPixels: transformed.pixels,
+        dstMask: transformed.mask,
+        overwrittenPixels: getPixelsInRect(
+          bounds,
+          transformed.mask,
+          activeLayerId,
+        ),
       };
       updateHistory(action);
     }
@@ -2135,20 +2143,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       setLayerData(action.data, action.layerId);
       set({ activeLayerId: action.layerId });
     } else if (action.action === "transform") {
-      const { layerId, srcRect, dstRect, srcPixels, dstPixels, mask } = action;
+      const {
+        layerId,
+        srcRect,
+        srcPixels,
+        srcMask,
+        dstRect,
+        dstMask,
+        overwrittenPixels,
+      } = action;
       const layer = getLayer(layerId) as Layer;
       const newData = new Uint8ClampedArray(layer.data);
-      const newMask = mask
-        ? resizeMaskWithNearestNeighbor(
-            mask,
-            srcRect.width,
-            srcRect.height,
-            dstRect.width,
-            dstRect.height,
-          )
-        : null;
-      drawRectContent(dstRect, dstPixels, newData, gridSize, newMask);
-      drawRectContent(srcRect, srcPixels, newData, gridSize, mask);
+      drawRectContent(dstRect, overwrittenPixels, newData, gridSize, dstMask);
+      drawRectContent(srcRect, srcPixels, newData, gridSize, srcMask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "move") {
@@ -2298,27 +2305,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ activeLayerId: layerId });
       floodFill(x, y, color, false);
     } else if (action.action === "transform") {
-      const { layerId, srcRect, dstRect, srcPixels, mask } = action;
+      const { layerId, srcRect, srcMask, dstRect, dstPixels, dstMask } = action;
       const layer = getLayer(layerId) as Layer;
       const newData = new Uint8ClampedArray(layer.data);
-      const newMask = mask
-        ? resizeMaskWithNearestNeighbor(
-            mask,
-            srcRect.width,
-            srcRect.height,
-            dstRect.width,
-            dstRect.height,
-          )
-        : null;
-      const pixelsToApply = resizePixelsWithNearestNeighbor(
-        srcPixels,
-        srcRect.width,
-        srcRect.height,
-        dstRect.width,
-        dstRect.height,
-      );
-      clearRectContent(srcRect, newData, gridSize, mask);
-      drawRectContent(dstRect, pixelsToApply, newData, gridSize, newMask);
+      clearRectContent(srcRect, newData, gridSize, srcMask);
+      drawRectContent(dstRect, dstPixels, newData, gridSize, dstMask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "move") {
