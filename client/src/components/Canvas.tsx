@@ -10,8 +10,6 @@ import {
   setPixelColor,
   clearRectContent,
   drawRectContent,
-  resizePixelsWithNearestNeighbor,
-  resizeMaskWithNearestNeighbor,
 } from "../utils/canvas";
 import {
   interpolateBetweenPoints,
@@ -24,7 +22,7 @@ import {
 } from "../utils/geometry";
 import { compositeLayers, compositeLayersWithOverride } from "../utils/layers";
 import { BASE_PX_SIZE, CHECKER_LIGHT, CHECKER_DARK } from "../constants";
-import type { Direction, Rect } from "../types";
+import type { Direction } from "../types";
 
 const FILTER_STRENGTH = 25;
 const RESIZE_HANDLES: { name: Direction; x: number; y: number }[] = [
@@ -63,8 +61,8 @@ export default function Canvas() {
     selectionResizeOffset,
     activeResizeHandle,
     selectedArea,
-    selectedPixels,
     showSelectionPreview,
+    isSelectionFlipped,
     isPasting,
     lassoPath,
     moveStartPos,
@@ -93,6 +91,7 @@ export default function Canvas() {
     getPixelColor,
     getEffectiveSelectionBounds,
     getRectInBounds,
+    getTransformedSelection,
     draw,
     drawShade,
     drawLine,
@@ -293,29 +292,20 @@ export default function Canvas() {
 
   const buildSelectionPreviewData = useCallback(
     (layerData: Uint8ClampedArray) => {
-      if (!selectedArea) return null;
-      const newData = new Uint8ClampedArray(layerData);
-      const bounds = getEffectiveSelectionBounds() as Rect;
-      const newPixels = resizePixelsWithNearestNeighbor(
-        selectedPixels,
-        selectedArea.width,
-        selectedArea.height,
-        bounds.width,
-        bounds.height,
-      );
-      const newMask = selectionMask
-        ? resizeMaskWithNearestNeighbor(
-            selectionMask,
-            selectedArea.width,
-            selectedArea.height,
-            bounds.width,
-            bounds.height,
-          )
-        : null;
+      const bounds = getEffectiveSelectionBounds();
+      const transformed = getTransformedSelection();
+      if (!selectedArea || !bounds || !transformed) return null;
 
+      const newData = new Uint8ClampedArray(layerData);
       if (!isPasting)
         clearRectContent(selectedArea, newData, gridSize, selectionMask);
-      drawRectContent(bounds, newPixels, newData, gridSize, newMask);
+      drawRectContent(
+        bounds,
+        transformed.pixels,
+        newData,
+        gridSize,
+        transformed.mask,
+      );
       return newData;
     },
     [
@@ -324,9 +314,10 @@ export default function Canvas() {
       selectionMoveOffset,
       selectionResizeOffset,
       selectedArea,
-      selectedPixels,
+      isSelectionFlipped,
       isPasting,
       getEffectiveSelectionBounds,
+      getTransformedSelection,
     ],
   );
 

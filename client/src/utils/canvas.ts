@@ -154,6 +154,24 @@ export function flipPixels(
   return newPixels;
 }
 
+export function flipMask(
+  mask: Uint8Array,
+  size: { x: number; y: number },
+  direction: "horizontal" | "vertical",
+): Uint8Array {
+  const newMask = new Uint8Array(mask.length);
+  for (let y = 0; y < size.y; y++) {
+    for (let x = 0; x < size.x; x++) {
+      const srcIndex = y * size.x + x;
+      const newX = direction === "horizontal" ? size.x - 1 - x : x;
+      const newY = direction === "vertical" ? size.y - 1 - y : y;
+      const dstIndex = newY * size.x + newX;
+      newMask[dstIndex] = mask[srcIndex];
+    }
+  }
+  return newMask;
+}
+
 export function resizePixelsWithNearestNeighbor(
   pixels: Uint8ClampedArray,
   sw: number,

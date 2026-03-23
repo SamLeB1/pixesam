@@ -11,6 +11,7 @@ import {
   clearRectContent,
   rotatePixels,
   flipPixels,
+  flipMask,
   resizePixelsWithNearestNeighbor,
   resizeMaskWithNearestNeighbor,
 } from "../utils/canvas";
@@ -225,6 +226,7 @@ type EditorState = {
   selectedArea: Rect | null;
   selectedPixels: Uint8ClampedArray;
   showSelectionPreview: boolean;
+  isSelectionFlipped: { horizontal: boolean; vertical: boolean };
   isPasting: boolean;
   lassoPath: { x: number; y: number }[];
   moveStartPos: { x: number; y: number } | null;
@@ -265,6 +267,10 @@ type EditorState = {
   setSelectedArea: (area: Rect | null) => void;
   setSelectedPixels: (pixels: Uint8ClampedArray) => void;
   setShowSelectionPreview: (show: boolean) => void;
+  setIsSelectionFlipped: (flipped: {
+    horizontal: boolean;
+    vertical: boolean;
+  }) => void;
   setIsPasting: (isPasting: boolean) => void;
   setLassoPath: (path: { x: number; y: number }[]) => void;
   setMoveStartPos: (pos: { x: number; y: number } | null) => void;
@@ -299,6 +305,10 @@ type EditorState = {
   ) => Uint8ClampedArray;
   getEffectiveSelectionBounds: () => Rect | null;
   getRectInBounds: (rect: Rect) => Rect | null;
+  getTransformedSelection: () => {
+    pixels: Uint8ClampedArray;
+    mask: Uint8Array | null;
+  } | null;
   draw: (x: number, y: number, color: RGBA) => void;
   drawShade: (x: number, y: number, darken: boolean) => void;
   drawLine: (color: RGBA, mod: boolean) => void;
@@ -382,6 +392,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedArea: null,
   selectedPixels: new Uint8ClampedArray(),
   showSelectionPreview: false,
+  isSelectionFlipped: { horizontal: false, vertical: false },
   isPasting: false,
   lassoPath: [],
   moveStartPos: null,
@@ -421,6 +432,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedArea: (area) => set({ selectedArea: area }),
   setSelectedPixels: (pixels) => set({ selectedPixels: pixels }),
   setShowSelectionPreview: (show) => set({ showSelectionPreview: show }),
+  setIsSelectionFlipped: (flipped) => set({ isSelectionFlipped: flipped }),
   setIsPasting: (isPasting) => set({ isPasting }),
   setLassoPath: (path) => set({ lassoPath: path }),
   setMoveStartPos: (pos) => set({ moveStartPos: pos }),
@@ -893,6 +905,70 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const y2 = Math.min(gridSize.y, rect.y + rect.height);
     if (x1 >= x2 || y1 >= y2) return null;
     return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+  },
+  getTransformedSelection: () => {
+    const {
+      selectionMask,
+      selectedArea,
+      selectedPixels,
+      isSelectionFlipped,
+      getEffectiveSelectionBounds,
+    } = get();
+    const bounds = getEffectiveSelectionBounds();
+    if (!selectedArea || !bounds) return null;
+
+    let pixels = selectedPixels;
+    let mask = selectionMask;
+    if (isSelectionFlipped.horizontal) {
+      pixels = flipPixels(
+        pixels,
+        { x: selectedArea.width, y: selectedArea.height },
+        "horizontal",
+      );
+      if (mask) {
+        mask = flipMask(
+          mask,
+          { x: selectedArea.width, y: selectedArea.height },
+          "horizontal",
+        );
+      }
+    }
+    if (isSelectionFlipped.vertical) {
+      pixels = flipPixels(
+        pixels,
+        { x: selectedArea.width, y: selectedArea.height },
+        "vertical",
+      );
+      if (mask) {
+        mask = flipMask(
+          mask,
+          { x: selectedArea.width, y: selectedArea.height },
+          "vertical",
+        );
+      }
+    }
+    if (
+      selectedArea.width !== bounds.width ||
+      selectedArea.height !== bounds.height
+    ) {
+      pixels = resizePixelsWithNearestNeighbor(
+        pixels,
+        selectedArea.width,
+        selectedArea.height,
+        bounds.width,
+        bounds.height,
+      );
+      if (mask) {
+        mask = resizeMaskWithNearestNeighbor(
+          mask,
+          selectedArea.width,
+          selectedArea.height,
+          bounds.width,
+          bounds.height,
+        );
+      }
+    }
+    return { pixels, mask };
   },
   draw: (x, y, color) =>
     set((state) => {
@@ -1708,6 +1784,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedArea: null,
       selectedPixels: new Uint8ClampedArray(),
       showSelectionPreview: false,
+      isSelectionFlipped: { horizontal: false, vertical: false },
       isPasting: false,
       lassoPath: [],
     }),
@@ -1758,16 +1835,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionResizeOffset,
       selectedArea,
       selectedPixels,
+      isSelectionFlipped,
       isPasting,
       getActiveLayer,
       setLayerData,
       getPixelsInRect,
       getEffectiveSelectionBounds,
+      getTransformedSelection,
       initSelection,
       updateHistory,
     } = get();
 
     const layer = getActiveLayer();
+    const newData = new Uint8ClampedArray(layer.data);
+    const bounds = getEffectiveSelectionBounds();
+    const transformed = getTransformedSelection();
+
     const moveOff = selectionMoveOffset || { x: 0, y: 0 };
     const resizeOff = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
     const hasMoved = moveOff.x !== 0 || moveOff.y !== 0;
@@ -1776,69 +1859,54 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       resizeOff.e !== 0 ||
       resizeOff.s !== 0 ||
       resizeOff.w !== 0;
+    const hasFlipped =
+      isSelectionFlipped.horizontal || isSelectionFlipped.vertical;
     if (
+      (!hasMoved && !hasResized && !hasFlipped && !isPasting) ||
       layer.locked ||
-      (!hasMoved && !hasResized && !isPasting) ||
-      !selectedArea
+      !selectedArea ||
+      !bounds ||
+      !transformed
     ) {
       initSelection();
       return;
     }
 
-    const newData = new Uint8ClampedArray(layer.data);
-    const newSelectedArea = getEffectiveSelectionBounds() as Rect;
-    const newMask = selectionMask
-      ? resizeMaskWithNearestNeighbor(
-          selectionMask,
-          selectedArea.width,
-          selectedArea.height,
-          newSelectedArea.width,
-          newSelectedArea.height,
-        )
-      : null;
-    const pixelsToApply = resizePixelsWithNearestNeighbor(
-      selectedPixels,
-      selectedArea.width,
-      selectedArea.height,
-      newSelectedArea.width,
-      newSelectedArea.height,
-    );
-
     if (isPasting) {
       drawRectContent(
-        newSelectedArea,
-        pixelsToApply,
+        bounds,
+        transformed.pixels,
         newData,
         gridSize,
-        newMask,
+        transformed.mask,
       );
 
       const action: PasteAction = {
         action: "paste",
         layerId: activeLayerId,
-        area: newSelectedArea,
-        pixels: pixelsToApply,
-        prevPixels: getPixelsInRect(newSelectedArea, newMask, activeLayerId),
-        mask: newMask,
+        area: bounds,
+        pixels: transformed.pixels,
+        prevPixels: getPixelsInRect(bounds, transformed.mask, activeLayerId),
+        mask: transformed.mask,
       };
       updateHistory(action);
     } else {
       clearRectContent(selectedArea, newData, gridSize, selectionMask);
       drawRectContent(
-        newSelectedArea,
-        pixelsToApply,
+        bounds,
+        transformed.pixels,
         newData,
         gridSize,
-        newMask,
+        transformed.mask,
       );
 
       const action: TransformAction = {
         action: "transform",
         layerId: activeLayerId,
         srcRect: selectedArea,
-        dstRect: newSelectedArea,
+        dstRect: bounds,
         srcPixels: selectedPixels,
-        dstPixels: getPixelsInRect(newSelectedArea, newMask, activeLayerId),
+        dstPixels: getPixelsInRect(bounds, transformed.mask, activeLayerId),
         mask: selectionMask,
       };
       updateHistory(action);
@@ -1884,7 +1952,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     setLayerData(newData, activeLayerId);
   },
   rotateSelection: () => {},
-  flipSelection: () => {},
+  flipSelection: (direction) =>
+    set((state) => {
+      const { isSelectionFlipped, getActiveLayer } = state;
+      if (getActiveLayer().locked) return {};
+      const flipped = { ...isSelectionFlipped };
+      flipped[direction] = !flipped[direction];
+      return { isSelectionFlipped: flipped };
+    }),
   performWandSelection: (x, y) =>
     set((state) => {
       const { activeLayerId, gridSize, getPixelColor, getPixelsInRect } = state;
@@ -2432,43 +2507,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   copy: () =>
     set((state) => {
       const {
-        selectionMask,
         selectedArea,
-        selectedPixels,
         showSelectionPreview,
         getEffectiveSelectionBounds,
+        getTransformedSelection,
       } = state;
-      if (!selectedArea || !showSelectionPreview) return {};
-
-      const bounds = getEffectiveSelectionBounds() as Rect;
-      let newMask = selectionMask;
-      let pixelsToCopy = selectedPixels;
-      if (
-        selectedArea.width !== bounds.width ||
-        selectedArea.height !== bounds.height
-      ) {
-        if (newMask)
-          newMask = resizeMaskWithNearestNeighbor(
-            newMask,
-            selectedArea.width,
-            selectedArea.height,
-            bounds.width,
-            bounds.height,
-          );
-        pixelsToCopy = resizePixelsWithNearestNeighbor(
-          pixelsToCopy,
-          selectedArea.width,
-          selectedArea.height,
-          bounds.width,
-          bounds.height,
-        );
-      }
+      const bounds = getEffectiveSelectionBounds();
+      const transformed = getTransformedSelection();
+      if (!selectedArea || !showSelectionPreview || !bounds || !transformed)
+        return {};
       return {
         clipboard: {
-          pixels: pixelsToCopy,
+          pixels: transformed.pixels,
           width: bounds.width,
           height: bounds.height,
-          mask: newMask,
+          mask: transformed.mask,
         },
       };
     }),
