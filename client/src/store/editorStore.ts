@@ -10,6 +10,7 @@ import {
   drawRectContent,
   clearRectContent,
   rotatePixels,
+  rotateMask,
   flipPixels,
   flipMask,
   resizePixelsWithNearestNeighbor,
@@ -224,6 +225,7 @@ type EditorState = {
   selectionStartPos: { x: number; y: number } | null;
   selectionMoveOffset: { x: number; y: number } | null;
   selectionResizeOffset: { n: number; e: number; s: number; w: number } | null;
+  selectionRotation: 0 | 90 | 180 | 270;
   activeResizeHandle: Direction | null;
   selectedArea: Rect | null;
   selectedPixels: Uint8ClampedArray;
@@ -265,6 +267,7 @@ type EditorState = {
   setSelectionResizeOffset: (
     offset: { n: number; e: number; s: number; w: number } | null,
   ) => void;
+  setSelectionRotation: (rotation: 0 | 90 | 180 | 270) => void;
   setActiveResizeHandle: (handle: Direction | null) => void;
   setSelectedArea: (area: Rect | null) => void;
   setSelectedPixels: (pixels: Uint8ClampedArray) => void;
@@ -390,6 +393,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectionStartPos: null,
   selectionMoveOffset: null,
   selectionResizeOffset: null,
+  selectionRotation: 0,
   activeResizeHandle: null,
   selectedArea: null,
   selectedPixels: new Uint8ClampedArray(),
@@ -430,6 +434,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectionStartPos: (pos) => set({ selectionStartPos: pos }),
   setSelectionMoveOffset: (offset) => set({ selectionMoveOffset: offset }),
   setSelectionResizeOffset: (offset) => set({ selectionResizeOffset: offset }),
+  setSelectionRotation: (rotation) => set({ selectionRotation: rotation }),
   setActiveResizeHandle: (handle) => set({ activeResizeHandle: handle }),
   setSelectedArea: (area) => set({ selectedArea: area }),
   setSelectedPixels: (pixels) => set({ selectedPixels: pixels }),
@@ -879,22 +884,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return pixels;
   },
   getEffectiveSelectionBounds: () => {
-    const { selectedArea, selectionMoveOffset, selectionResizeOffset } = get();
+    const {
+      selectedArea,
+      selectionMoveOffset,
+      selectionResizeOffset,
+      selectionRotation,
+    } = get();
     if (!selectedArea) return null;
 
+    let baseWidth = selectedArea.width;
+    let baseHeight = selectedArea.height;
+    let rotateOffsetX = 0;
+    let rotateOffsetY = 0;
+    if (selectionRotation === 90 || selectionRotation === 270) {
+      [baseWidth, baseHeight] = [baseHeight, baseWidth];
+      rotateOffsetX = Math.floor((selectedArea.width - baseWidth) / 2);
+      rotateOffsetY = Math.floor((selectedArea.height - baseHeight) / 2);
+    }
     const moveOffset = selectionMoveOffset || { x: 0, y: 0 };
     const resizeOffset = selectionResizeOffset || { n: 0, e: 0, s: 0, w: 0 };
-    const width = Math.max(
-      1,
-      selectedArea.width - resizeOffset.w + resizeOffset.e,
-    );
-    const height = Math.max(
-      1,
-      selectedArea.height - resizeOffset.n + resizeOffset.s,
-    );
+    const width = Math.max(1, baseWidth - resizeOffset.w + resizeOffset.e);
+    const height = Math.max(1, baseHeight - resizeOffset.n + resizeOffset.s);
     return {
-      x: selectedArea.x + moveOffset.x + resizeOffset.w,
-      y: selectedArea.y + moveOffset.y + resizeOffset.n,
+      x: selectedArea.x + moveOffset.x + resizeOffset.w + rotateOffsetX,
+      y: selectedArea.y + moveOffset.y + resizeOffset.n + rotateOffsetY,
       width,
       height,
     };
@@ -911,6 +924,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   getTransformedSelection: () => {
     const {
       selectionMask,
+      selectionRotation,
       selectedArea,
       selectedPixels,
       isSelectionFlipped,
@@ -921,54 +935,56 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     let pixels = selectedPixels;
     let mask = selectionMask;
+    let baseWidth = selectedArea.width;
+    let baseHeight = selectedArea.height;
+
     if (isSelectionFlipped.horizontal) {
       pixels = flipPixels(
         pixels,
-        { x: selectedArea.width, y: selectedArea.height },
+        { x: baseWidth, y: baseHeight },
         "horizontal",
       );
-      if (mask) {
-        mask = flipMask(
-          mask,
-          { x: selectedArea.width, y: selectedArea.height },
-          "horizontal",
-        );
-      }
+      if (mask)
+        mask = flipMask(mask, { x: baseWidth, y: baseHeight }, "horizontal");
     }
     if (isSelectionFlipped.vertical) {
-      pixels = flipPixels(
-        pixels,
-        { x: selectedArea.width, y: selectedArea.height },
-        "vertical",
-      );
-      if (mask) {
-        mask = flipMask(
-          mask,
-          { x: selectedArea.width, y: selectedArea.height },
-          "vertical",
-        );
-      }
+      pixels = flipPixels(pixels, { x: baseWidth, y: baseHeight }, "vertical");
+      if (mask)
+        mask = flipMask(mask, { x: baseWidth, y: baseHeight }, "vertical");
     }
-    if (
-      selectedArea.width !== bounds.width ||
-      selectedArea.height !== bounds.height
-    ) {
+
+    if (selectionRotation !== 0) {
+      pixels = rotatePixels(
+        pixels,
+        { x: baseWidth, y: baseHeight },
+        selectionRotation,
+      );
+      if (mask)
+        mask = rotateMask(
+          mask,
+          { x: baseWidth, y: baseHeight },
+          selectionRotation,
+        );
+      if (selectionRotation === 90 || selectionRotation === 270)
+        [baseWidth, baseHeight] = [baseHeight, baseWidth];
+    }
+
+    if (baseWidth !== bounds.width || baseHeight !== bounds.height) {
       pixels = resizePixelsWithNearestNeighbor(
         pixels,
-        selectedArea.width,
-        selectedArea.height,
+        baseWidth,
+        baseHeight,
         bounds.width,
         bounds.height,
       );
-      if (mask) {
+      if (mask)
         mask = resizeMaskWithNearestNeighbor(
           mask,
-          selectedArea.width,
-          selectedArea.height,
+          baseWidth,
+          baseHeight,
           bounds.width,
           bounds.height,
         );
-      }
     }
     return { pixels, mask };
   },
@@ -1782,6 +1798,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionStartPos: null,
       selectionMoveOffset: null,
       selectionResizeOffset: null,
+      selectionRotation: 0,
       activeResizeHandle: null,
       selectedArea: null,
       selectedPixels: new Uint8ClampedArray(),
@@ -1835,6 +1852,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectionMask,
       selectionMoveOffset,
       selectionResizeOffset,
+      selectionRotation,
       selectedArea,
       selectedPixels,
       isSelectionFlipped,
@@ -1863,8 +1881,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       resizeOff.w !== 0;
     const hasFlipped =
       isSelectionFlipped.horizontal || isSelectionFlipped.vertical;
+    const hasRotated = selectionRotation !== 0;
     if (
-      (!hasMoved && !hasResized && !hasFlipped && !isPasting) ||
+      (!hasMoved && !hasResized && !hasFlipped && !hasRotated && !isPasting) ||
       layer.locked ||
       !selectedArea ||
       !bounds ||
@@ -1959,7 +1978,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     initSelection();
     setLayerData(newData, activeLayerId);
   },
-  rotateSelection: () => {},
+  rotateSelection: (degrees) =>
+    set((state) => {
+      const { selectionRotation, getActiveLayer } = state;
+      if (getActiveLayer().locked) return {};
+      const newRotation = ((selectionRotation + degrees) % 360) as
+        | 0
+        | 90
+        | 180
+        | 270;
+      return { selectionRotation: newRotation };
+    }),
   flipSelection: (direction) =>
     set((state) => {
       const { isSelectionFlipped, getActiveLayer } = state;

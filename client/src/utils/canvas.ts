@@ -133,6 +133,36 @@ export function rotatePixels(
   return newPixels;
 }
 
+export function rotateMask(
+  mask: Uint8Array,
+  size: { x: number; y: number },
+  degrees: 90 | 180 | 270,
+): Uint8Array {
+  const newSize =
+    degrees === 180 ? { x: size.x, y: size.y } : { x: size.y, y: size.x };
+  const newMask = new Uint8Array(newSize.x * newSize.y);
+  for (let y = 0; y < size.y; y++) {
+    for (let x = 0; x < size.x; x++) {
+      const srcIndex = y * size.x + x;
+      let newX: number;
+      let newY: number;
+      if (degrees === 90) {
+        newX = size.y - 1 - y;
+        newY = x;
+      } else if (degrees === 270) {
+        newX = y;
+        newY = size.x - 1 - x;
+      } else {
+        newX = size.x - 1 - x;
+        newY = size.y - 1 - y;
+      }
+      const dstIndex = newY * newSize.x + newX;
+      newMask[dstIndex] = mask[srcIndex];
+    }
+  }
+  return newMask;
+}
+
 export function flipPixels(
   pixels: Uint8ClampedArray,
   size: { x: number; y: number },
