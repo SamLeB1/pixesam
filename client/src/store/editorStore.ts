@@ -359,6 +359,7 @@ type EditorState = {
   clearEdit: () => void;
   rotateEdit: (degrees: 90 | 180 | 270) => void;
   flipEdit: (direction: "horizontal" | "vertical") => void;
+  transformEdit: () => void;
 };
 
 const initialLayer = createNewLayer(
@@ -2622,4 +2623,70 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (showSelectionPreview) flipSelection(direction);
     else flipLayer(direction);
   },
+  transformEdit: () =>
+    set((state) => {
+      const {
+        gridSize,
+        activeLayerId,
+        lineStartPos,
+        lineEndPos,
+        shapeStartPos,
+        shapeEndPos,
+        showSelectionPreview,
+        moveOffset,
+        getActiveLayer,
+        getActiveColorRGBA,
+        getPixelsInRect,
+        drawLine,
+        drawShape,
+        initSelection,
+        applySelectionAction,
+        applyMove,
+        clearDrawBuffer,
+        transformEdit,
+      } = state;
+
+      if (showSelectionPreview) {
+        applySelectionAction();
+        transformEdit();
+        return {};
+      }
+      if (moveOffset) applyMove(false);
+      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
+      if (shapeStartPos && shapeEndPos)
+        drawShape(getActiveColorRGBA(), false, false);
+      clearDrawBuffer();
+
+      const layer = getActiveLayer();
+      let minX = gridSize.x;
+      let minY = gridSize.y;
+      let maxX = -1;
+      let maxY = -1;
+      for (let y = 0; y < gridSize.y; y++) {
+        for (let x = 0; x < gridSize.x; x++) {
+          const alpha = layer.data[getBaseIndex(x, y, gridSize.x) + 3];
+          if (alpha > 0) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return {};
+      const selectedArea: Rect = {
+        x: minX,
+        y: minY,
+        width: maxX - minX + 1,
+        height: maxY - minY + 1,
+      };
+
+      initSelection();
+      return {
+        selectedTool: "select",
+        selectedArea,
+        selectedPixels: getPixelsInRect(selectedArea, null, activeLayerId),
+        showSelectionPreview: true,
+      };
+    }),
 }));

@@ -29,6 +29,7 @@ export default function BtnEdit({
     clearEdit,
     rotateEdit,
     flipEdit,
+    transformEdit,
   } = useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
 
@@ -280,6 +281,10 @@ export default function BtnEdit({
           <button
             className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
             type="button"
+            onClick={() => {
+              onClose();
+              transformEdit();
+            }}
           >
             Transform
           </button>
