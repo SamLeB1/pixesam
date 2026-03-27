@@ -281,7 +281,8 @@ type EditorState = {
   setMoveStartPos: (pos: { x: number; y: number } | null) => void;
   setMoveOffset: (offset: { x: number; y: number } | null) => void;
   setMousePos: (mousePos: { x: number; y: number }) => void;
-  initActions: () => void;
+  discardPendingActions: () => void;
+  applyPendingActions: () => void;
   selectTool: (tool: Tool) => void;
   getLayer: (id: string) => Layer | null;
   getActiveLayer: () => Layer;
@@ -446,9 +447,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setMoveStartPos: (pos) => set({ moveStartPos: pos }),
   setMoveOffset: (offset) => set({ moveOffset: offset }),
   setMousePos: (mousePos) => set({ mousePos }),
-  initActions: () =>
+  discardPendingActions: () =>
     set((state) => {
-      const { initSelection } = state;
+      const {
+        gridSize,
+        drawBuffer,
+        getActiveLayer,
+        setLayerData,
+        initSelection,
+      } = state;
+      if (drawBuffer.length > 0) {
+        const layer = getActiveLayer();
+        const newData = new Uint8ClampedArray(layer.data);
+        for (let i = 0; i < drawBuffer.length; i++) {
+          const { x, y, prevColor } = drawBuffer[i];
+          setPixelColor(x, y, gridSize.x, prevColor, newData);
+        }
+        setLayerData(newData, layer.id);
+      }
+
       initSelection();
       return {
         lineStartPos: null,
@@ -462,34 +479,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastDrawPos: null,
       };
     }),
+  applyPendingActions: () => {
+    const {
+      lineStartPos,
+      lineEndPos,
+      shapeStartPos,
+      shapeEndPos,
+      showSelectionPreview,
+      moveOffset,
+      getActiveColorRGBA,
+      drawLine,
+      drawShape,
+      initSelection,
+      applySelectionAction,
+      applyMove,
+      clearDrawBuffer,
+    } = get();
+    if (showSelectionPreview) applySelectionAction();
+    else initSelection();
+    if (moveOffset) applyMove(false);
+    if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
+    if (shapeStartPos && shapeEndPos)
+      drawShape(getActiveColorRGBA(), false, false);
+    clearDrawBuffer();
+  },
   selectTool: (tool) =>
     set((state) => {
-      const {
-        selectedTool,
-        lineStartPos,
-        lineEndPos,
-        shapeStartPos,
-        shapeEndPos,
-        showSelectionPreview,
-        moveOffset,
-        getActiveColorRGBA,
-        drawLine,
-        drawShape,
-        initSelection,
-        applySelectionAction,
-        applyMove,
-        clearDrawBuffer,
-      } = state;
+      const { selectedTool, applyPendingActions } = state;
       if (selectedTool === tool) return {};
-
-      if (showSelectionPreview) applySelectionAction();
-      else initSelection();
-      if (moveOffset) applyMove(false);
-      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
-      if (shapeStartPos && shapeEndPos)
-        drawShape(getActiveColorRGBA(), false, false);
-      clearDrawBuffer();
-
+      applyPendingActions();
       return { selectedTool: tool };
     }),
   getLayer: (id) => {
@@ -502,7 +520,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   selectLayer: (id) =>
     set((state) => {
-      state.initActions();
+      state.applyPendingActions();
       return { activeLayerId: id };
     }),
   setLayerData: (data, id) =>
@@ -547,11 +565,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return { layers: layers.map((l) => (l.id === id ? { ...l, name } : l)) };
     }),
-  newLayer: () =>
+  newLayer: () => {
+    get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        state;
-      initActions();
+      const { layers, activeLayerId, gridSize, updateHistory } = state;
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newLayer = createNewLayer(
         gridSize.x,
@@ -574,17 +591,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         activeLayerId: newLayer.id,
       };
-    }),
-  duplicateLayer: () =>
+    });
+  },
+  duplicateLayer: () => {
+    get().applyPendingActions();
     set((state) => {
-      const {
-        layers,
-        activeLayerId,
-        initActions,
-        getActiveLayer,
-        updateHistory,
-      } = state;
-      initActions();
+      const { layers, activeLayerId, getActiveLayer, updateHistory } = state;
       const active = getActiveLayer();
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newLayer = duplicateLayer(active);
@@ -604,12 +616,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         activeLayerId: newLayer.id,
       };
-    }),
-  deleteLayer: () =>
+    });
+  },
+  deleteLayer: () => {
+    get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, initActions, updateHistory } = state;
+      const { layers, activeLayerId, updateHistory } = state;
       if (layers.length <= 1) return {};
-      initActions();
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newActiveIndex = activeIndex === 0 ? 0 : activeIndex - 1;
       const newLayers = layers.filter((l) => l.id !== activeLayerId);
@@ -627,7 +640,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         activeLayerId: newLayers[newActiveIndex].id,
       };
-    }),
+    });
+  },
   moveLayerUp: () =>
     set((state) => {
       const { layers, activeLayerId, updateHistory } = state;
@@ -672,13 +686,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return { layers: newLayers };
     }),
-  mergeLayerDown: () =>
+  mergeLayerDown: () => {
+    get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        state;
+      const { layers, activeLayerId, gridSize, updateHistory } = state;
       const index = layers.findIndex((l) => l.id === activeLayerId);
       if (index <= 0) return {};
-      initActions();
 
       const topLayer = layers[index];
       const bottomLayer = layers[index - 1];
@@ -704,13 +717,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         activeLayerId: bottomLayer.id,
       };
-    }),
-  flattenLayers: () =>
+    });
+  },
+  flattenLayers: () => {
+    get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        state;
+      const { layers, activeLayerId, gridSize, updateHistory } = state;
       if (layers.length <= 1) return {};
-      initActions();
 
       const flattened = createNewLayer(
         gridSize.x,
@@ -732,12 +745,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: [flattened],
         activeLayerId: flattened.id,
       };
-    }),
+    });
+  },
   clearLayer: () => {
+    get().applyPendingActions();
     const {
       activeLayerId,
       gridSize,
-      initActions,
       getActiveLayer,
       setLayerData,
       updateHistory,
@@ -752,15 +766,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     updateHistory(action);
 
-    initActions();
     const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
     setLayerData(newData, activeLayerId);
   },
   rotateLayer: (degrees) => {
+    get().applyPendingActions();
     const {
       activeLayerId,
       gridSize,
-      initActions,
       getActiveLayer,
       setLayerData,
       updateHistory,
@@ -795,14 +808,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     updateHistory(action);
 
-    initActions();
     setLayerData(newData, activeLayerId);
   },
   flipLayer: (direction) => {
+    get().applyPendingActions();
     const {
       activeLayerId,
       gridSize,
-      initActions,
       getActiveLayer,
       setLayerData,
       updateHistory,
@@ -819,7 +831,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     updateHistory(action);
 
-    initActions();
     setLayerData(newData, activeLayerId);
   },
   getActiveColorHex: () => {
@@ -1277,10 +1288,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
     setLayerData(newData, activeLayerId);
   },
-  newCanvas: (size) =>
+  newCanvas: (size) => {
+    get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        state;
+      const { layers, activeLayerId, gridSize, updateHistory } = state;
       const newLayer = createNewLayer(size.x, size.y, "Layer 1");
       let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
@@ -1298,7 +1309,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      initActions();
       return {
         layers: [newLayer],
         activeLayerId: newLayer.id,
@@ -1306,14 +1316,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       };
-    }),
-  resizeCanvas: (size, anchor, resizeContent = false) =>
+    });
+  },
+  resizeCanvas: (size, anchor, resizeContent = false) => {
+    get().applyPendingActions();
     set((state) => {
       const {
         layers,
         activeLayerId,
         gridSize: oldGridSize,
-        initActions,
         updateHistory,
       } = state;
 
@@ -1412,14 +1423,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      initActions();
       return {
         layers: newLayers,
         gridSize: size,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       };
-    }),
+    });
+  },
   cropToSelection: () => {
     const {
       showSelectionPreview,
@@ -1434,7 +1445,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!clampedBounds) return;
 
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
+      const { layers, activeLayerId, gridSize, initSelection, updateHistory } =
         state;
 
       const newSize = { x: clampedBounds.width, y: clampedBounds.height };
@@ -1472,7 +1483,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      initActions();
+      initSelection();
       return {
         layers: newLayers,
         gridSize: newSize,
@@ -1482,6 +1493,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   trimCanvas: () => {
+    get().applyPendingActions();
     const { layers, gridSize } = get();
 
     let minX = gridSize.x;
@@ -1513,8 +1525,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return;
 
     set((state) => {
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        state;
+      const { layers, activeLayerId, gridSize, updateHistory } = state;
 
       const newSize = { x: maxX - minX + 1, y: maxY - minY + 1 };
 
@@ -1551,7 +1562,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      initActions();
       return {
         layers: newLayers,
         gridSize: newSize,
@@ -1561,8 +1571,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   rotateCanvas: (degrees) => {
+    get().applyPendingActions();
     set((state) => {
-      const { layers, gridSize, initActions, updateHistory } = state;
+      const { layers, gridSize, updateHistory } = state;
       const newSize =
         degrees === 180
           ? { x: gridSize.x, y: gridSize.y }
@@ -1583,7 +1594,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      initActions();
       return {
         layers: newLayers,
         gridSize: newSize,
@@ -1593,8 +1603,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   flipCanvas: (direction) => {
+    get().applyPendingActions();
     set((state) => {
-      const { layers, gridSize, initActions, updateHistory } = state;
+      const { layers, gridSize, updateHistory } = state;
       const newLayers: Layer[] = layers.map((l) => ({
         ...l,
         data: flipPixels(l.data, gridSize, direction),
@@ -1606,22 +1617,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      initActions();
-      return {
-        layers: newLayers,
-      };
+      return { layers: newLayers };
     });
   },
-  importFromPxsm: (data) =>
+  importFromPxsm: (data) => {
+    if (!isValidPxsmData(data)) {
+      toast.error("The imported file is invalid and may have been corrupted.");
+      return;
+    }
+    get().applyPendingActions();
     set((state) => {
-      if (!isValidPxsmData(data)) {
-        toast.error(
-          "The imported file is invalid and may have been corrupted.",
-        );
-        return {};
-      }
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        state;
+      const { layers, activeLayerId, gridSize, updateHistory } = state;
       const newLayers: Layer[] = data.layers.map((layer) => ({
         ...layer,
         data: new Uint8ClampedArray(layer.data),
@@ -1643,7 +1649,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory(action);
 
       toast.success("File imported successfully!");
-      initActions();
       return {
         layers: newLayers,
         activeLayerId: data.activeLayerId,
@@ -1651,7 +1656,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       };
-    }),
+    });
+  },
   importImage: (dataURL) => {
     const img = new Image();
     img.src = dataURL;
@@ -1682,8 +1688,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       tempCtx.drawImage(img, 0, 0, width, height);
       const imageData = tempCtx.getImageData(0, 0, width, height);
 
-      const { layers, activeLayerId, gridSize, initActions, updateHistory } =
-        get();
+      get().applyPendingActions();
+      const { layers, activeLayerId, gridSize, updateHistory } = get();
       const data = new Uint8ClampedArray(imageData.data);
       const layer = createNewLayer(width, height, "Layer 1", data);
       let pxSize = BASE_CANVAS_SIZE / Math.max(width, height);
@@ -1702,7 +1708,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      initActions();
       set({
         layers: [layer],
         activeLayerId: layer.id,
@@ -2141,12 +2146,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { moveStartPos: null, moveOffset: null };
     }),
   undo: () => {
+    get().applyPendingActions();
     const {
       layers,
       gridSize,
       undoHistory,
       redoHistory,
-      initActions,
       getLayer,
       setLayerData,
     } = get();
@@ -2294,19 +2299,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
     }
 
-    initActions();
     set({
       undoHistory: newUndoHistory,
       redoHistory: newRedoHistory,
     });
   },
   redo: () => {
+    get().discardPendingActions();
     const {
       layers,
       gridSize,
       undoHistory,
       redoHistory,
-      initActions,
       getLayer,
       setLayerData,
       floodFill,
@@ -2484,7 +2488,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
     }
 
-    initActions();
     set({
       undoHistory: newUndoHistory,
       redoHistory: newRedoHistory,
@@ -2550,37 +2553,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const {
         gridSize,
-        lineStartPos,
-        lineEndPos,
-        shapeStartPos,
-        shapeEndPos,
-        showSelectionPreview,
-        moveOffset,
         mousePos,
         clipboard,
+        applyPendingActions,
         getActiveLayer,
-        getActiveColorRGBA,
-        drawLine,
-        drawShape,
-        initSelection,
-        applySelectionAction,
-        applyMove,
-        clearDrawBuffer,
-        paste,
       } = state;
       const layer = getActiveLayer();
       if (layer.locked || !clipboard) return {};
-
-      if (showSelectionPreview) {
-        applySelectionAction();
-        paste();
-        return {};
-      }
-      if (moveOffset) applyMove(false);
-      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
-      if (shapeStartPos && shapeEndPos)
-        drawShape(getActiveColorRGBA(), false, false);
-      clearDrawBuffer();
+      applyPendingActions();
 
       const { pixels, width, height, mask } = clipboard;
       const clipboardX = Math.max(
@@ -2597,8 +2577,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         width,
         height,
       };
-
-      initSelection();
       return {
         selectedTool: "select",
         selectionMask: mask,
@@ -2623,40 +2601,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (showSelectionPreview) flipSelection(direction);
     else flipLayer(direction);
   },
-  transformEdit: () =>
+  transformEdit: () => {
+    get().applyPendingActions();
     set((state) => {
-      const {
-        gridSize,
-        activeLayerId,
-        lineStartPos,
-        lineEndPos,
-        shapeStartPos,
-        shapeEndPos,
-        showSelectionPreview,
-        moveOffset,
-        getActiveLayer,
-        getActiveColorRGBA,
-        getPixelsInRect,
-        drawLine,
-        drawShape,
-        initSelection,
-        applySelectionAction,
-        applyMove,
-        clearDrawBuffer,
-        transformEdit,
-      } = state;
-
-      if (showSelectionPreview) {
-        applySelectionAction();
-        transformEdit();
-        return {};
-      }
-      if (moveOffset) applyMove(false);
-      if (lineStartPos && lineEndPos) drawLine(getActiveColorRGBA(), false);
-      if (shapeStartPos && shapeEndPos)
-        drawShape(getActiveColorRGBA(), false, false);
-      clearDrawBuffer();
-
+      const { activeLayerId, gridSize, getActiveLayer, getPixelsInRect } =
+        state;
       const layer = getActiveLayer();
       let minX = gridSize.x;
       let minY = gridSize.y;
@@ -2674,19 +2623,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }
       if (maxX < 0) return {};
+
       const selectedArea: Rect = {
         x: minX,
         y: minY,
         width: maxX - minX + 1,
         height: maxY - minY + 1,
       };
-
-      initSelection();
       return {
         selectedTool: "select",
         selectedArea,
         selectedPixels: getPixelsInRect(selectedArea, null, activeLayerId),
         showSelectionPreview: true,
       };
-    }),
+    });
+  },
 }));
