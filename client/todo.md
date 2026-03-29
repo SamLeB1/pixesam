@@ -1,3 +1,5 @@
+- Position floating windows in the center of the canvas container by default
+
 - Implement the select tool shift modifier, the selection should keep a 1:1 ratio. Once the selection
   has been made, moving and resizing should have new behavior. If moving, the selection should stay on the same
   x-axis or y-axis. If resizing, the selection should keep the same aspect ratio

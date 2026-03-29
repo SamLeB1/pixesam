@@ -31,7 +31,7 @@ export default function Tooltip({
           <RadixTooltip.Content
             side={side}
             sideOffset={6}
-            className="z-50 rounded bg-neutral-600 px-3 py-2 text-sm text-white shadow-lg"
+            className="z-10 rounded bg-neutral-600 px-3 py-2 text-sm text-white shadow-lg"
           >
             {content}
             <RadixTooltip.Arrow className="fill-neutral-600" />

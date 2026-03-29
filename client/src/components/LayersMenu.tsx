@@ -15,6 +15,7 @@ import {
 } from "react-icons/md";
 import { useEditorStore } from "../store/editorStore";
 import Tooltip from "./Tooltip";
+import LayerPropertiesWindow from "./LayerPropertiesWindow";
 
 export default function LayersMenu() {
   const {
@@ -34,6 +35,7 @@ export default function LayersMenu() {
   } = useEditorStore();
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [showLayerProperties, setShowLayerProperties] = useState(false);
   const cancelRef = useRef(false);
 
   function isTopLayer(id: string) {
@@ -71,6 +73,7 @@ export default function LayersMenu() {
           <button
             className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
             type="button"
+            onClick={() => setShowLayerProperties(true)}
           >
             <MdSettings size={20} color="oklch(87% 0 0)" />
           </button>
@@ -246,6 +249,9 @@ export default function LayersMenu() {
           </Tooltip>
         )}
       </div>
+      {showLayerProperties && (
+        <LayerPropertiesWindow onClose={() => setShowLayerProperties(false)} />
+      )}
     </div>
   );
 }
