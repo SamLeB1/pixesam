@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import FloatingWindow from "./FloatingWindow";
 
@@ -17,45 +18,63 @@ const BLEND_MODES = [
 export default function LayerPropertiesWindow({
   onClose,
 }: LayerPropertiesProps) {
-  const { getActiveLayer } = useEditorStore();
+  const { layers, activeLayerId, getActiveLayer } = useEditorStore();
   const layer = getActiveLayer();
+  const [name, setName] = useState(layer.name);
+  const [opacity, setOpacity] = useState(layer.opacity);
+  const [blendMode, setBlendMode] = useState("Normal");
+
+  useEffect(() => {
+    setName(layer.name);
+    setOpacity(layer.opacity);
+    setBlendMode("Normal");
+  }, [layers, activeLayerId]);
 
   return (
     <FloatingWindow title="Layer Properties" onClose={onClose}>
-      <div className="flex w-48 flex-col gap-3">
-        <div>
-          <label className="mb-1 block text-xs text-neutral-400">Name</label>
+      <>
+        <div className="mb-3">
+          <label className="label mb-1 text-sm" htmlFor="layer-properties-name">
+            Name
+          </label>
           <input
-            className="w-full rounded bg-neutral-700 px-2 py-1 text-sm text-neutral-200 outline-none focus:ring-1 focus:ring-neutral-500"
+            className="input input-sm"
+            id="layer-properties-name"
             type="text"
-            value={layer.name}
-            readOnly
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
         </div>
-        <div>
+        <div className="mb-3">
           <div className="mb-1 flex items-center justify-between">
-            <label className="text-xs text-neutral-400">Opacity</label>
-            <span className="text-xs text-neutral-400">
-              {Math.round(layer.opacity * 100)}%
-            </span>
+            <label className="label text-sm" htmlFor="layer-properties-opacity">
+              Opacity
+            </label>
+            <span className="text-sm">{Math.round(opacity * 100)}%</span>
           </div>
           <input
-            className="w-full accent-neutral-400"
+            className="range range-xs range-primary"
+            id="layer-properties-opacity"
             type="range"
             min={0}
-            max={100}
-            value={Math.round(layer.opacity * 100)}
-            readOnly
+            max={1}
+            step={0.01}
+            value={opacity}
+            onChange={(e) => setOpacity(Number(e.target.value))}
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-neutral-400">
+          <label
+            className="label mb-1 text-sm"
+            htmlFor="layer-properties-blend-mode"
+          >
             Blend Mode
           </label>
           <select
-            className="w-full rounded bg-neutral-700 px-2 py-1 text-sm text-neutral-200 outline-none focus:ring-1 focus:ring-neutral-500"
-            value="Normal"
-            disabled
+            className="select select-sm"
+            id="layer-properties-blend-mode"
+            value={blendMode}
+            onChange={(e) => setBlendMode(e.target.value)}
           >
             {BLEND_MODES.map((mode) => (
               <option key={mode} value={mode}>
@@ -64,7 +83,7 @@ export default function LayerPropertiesWindow({
             ))}
           </select>
         </div>
-      </div>
+      </>
     </FloatingWindow>
   );
 }
