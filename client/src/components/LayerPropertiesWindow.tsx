@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import FloatingWindow from "./FloatingWindow";
 
@@ -18,11 +18,13 @@ const BLEND_MODES = [
 export default function LayerPropertiesWindow({
   onClose,
 }: LayerPropertiesProps) {
-  const { layers, activeLayerId, getActiveLayer } = useEditorStore();
+  const { layers, activeLayerId, getActiveLayer, renameLayer } =
+    useEditorStore();
   const layer = getActiveLayer();
   const [name, setName] = useState(layer.name);
   const [opacity, setOpacity] = useState(layer.opacity);
   const [blendMode, setBlendMode] = useState("Normal");
+  const cancelRef = useRef(false);
 
   useEffect(() => {
     setName(layer.name);
@@ -43,6 +45,23 @@ export default function LayerPropertiesWindow({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onBlur={() => {
+              if (!cancelRef.current) {
+                const trimmed = name.trim();
+                if (trimmed && trimmed !== layer.name)
+                  renameLayer(layer.id, trimmed);
+                else setName(layer.name);
+              }
+              cancelRef.current = false;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              else if (e.key === "Escape") {
+                cancelRef.current = true;
+                setName(layer.name);
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
           />
         </div>
         <div className="mb-3">
