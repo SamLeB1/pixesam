@@ -68,7 +68,8 @@ type Action =
   | FlipLayerAction
   | LayerStructureAction
   | LayerToggleAction
-  | LayerRenameAction;
+  | LayerRenameAction
+  | LayerOpacityAction;
 
 type DrawAction = {
   action: "draw";
@@ -181,6 +182,13 @@ type LayerRenameAction = {
   prevName: string;
 };
 
+type LayerOpacityAction = {
+  action: "layer-opacity";
+  layerId: string;
+  opacity: number;
+  prevOpacity: number;
+};
+
 type DrawActionPixel = {
   x: number;
   y: number;
@@ -291,6 +299,7 @@ type EditorState = {
   toggleLayerVisibility: (id: string) => void;
   toggleLayerLock: (id: string) => void;
   renameLayer: (id: string, name: string) => void;
+  setLayerOpacity: (id: string, opacity: number) => void;
   newLayer: () => void;
   duplicateLayer: () => void;
   deleteLayer: () => void;
@@ -564,6 +573,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory(action);
 
       return { layers: layers.map((l) => (l.id === id ? { ...l, name } : l)) };
+    }),
+  setLayerOpacity: (id, opacity) =>
+    set((state) => {
+      const { layers, getLayer, updateHistory } = state;
+      const layer = getLayer(id);
+      if (!layer) return {};
+
+      const action: LayerOpacityAction = {
+        action: "layer-opacity",
+        layerId: id,
+        opacity,
+        prevOpacity: layer.opacity,
+      };
+      updateHistory(action);
+
+      return {
+        layers: layers.map((l) => (l.id === id ? { ...l, opacity } : l)),
+      };
     }),
   newLayer: () => {
     get().applyPendingActions();
@@ -2297,6 +2324,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           l.id === action.layerId ? { ...l, name: action.prevName } : l,
         ),
       });
+    } else if (action.action === "layer-opacity") {
+      set({
+        layers: layers.map((l) =>
+          l.id === action.layerId ? { ...l, opacity: action.prevOpacity } : l,
+        ),
+      });
     }
 
     set({
@@ -2484,6 +2517,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         layers: layers.map((l) =>
           l.id === action.layerId ? { ...l, name: action.name } : l,
+        ),
+      });
+    } else if (action.action === "layer-opacity") {
+      set({
+        layers: layers.map((l) =>
+          l.id === action.layerId ? { ...l, opacity: action.opacity } : l,
         ),
       });
     }

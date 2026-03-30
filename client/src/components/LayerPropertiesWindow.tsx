@@ -18,13 +18,19 @@ const BLEND_MODES = [
 export default function LayerPropertiesWindow({
   onClose,
 }: LayerPropertiesProps) {
-  const { layers, activeLayerId, getActiveLayer, renameLayer } =
-    useEditorStore();
+  const {
+    layers,
+    activeLayerId,
+    getActiveLayer,
+    renameLayer,
+    setLayerOpacity,
+  } = useEditorStore();
   const layer = getActiveLayer();
   const [name, setName] = useState(layer.name);
   const [opacity, setOpacity] = useState(layer.opacity);
   const [blendMode, setBlendMode] = useState("Normal");
   const cancelRef = useRef(false);
+  const opacityBeforeDrag = useRef(layer.opacity);
 
   useEffect(() => {
     setName(layer.name);
@@ -79,7 +85,28 @@ export default function LayerPropertiesWindow({
             max={1}
             step={0.01}
             value={opacity}
-            onChange={(e) => setOpacity(Number(e.target.value))}
+            onPointerDown={() => (opacityBeforeDrag.current = layer.opacity)}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setOpacity(value);
+              useEditorStore.setState((state) => ({
+                layers: state.layers.map((l) =>
+                  l.id === layer.id ? { ...l, opacity: value } : l,
+                ),
+              }));
+            }}
+            onPointerUp={() => {
+              if (opacity !== opacityBeforeDrag.current) {
+                useEditorStore.setState((state) => ({
+                  layers: state.layers.map((l) =>
+                    l.id === layer.id
+                      ? { ...l, opacity: opacityBeforeDrag.current }
+                      : l,
+                  ),
+                }));
+                setLayerOpacity(layer.id, opacity);
+              }
+            }}
           />
         </div>
         <div>
