@@ -148,17 +148,21 @@ export default function Canvas() {
     const ctx = canvas.getContext("2d")!;
     const imageData = ctx.createImageData(gridSize.x, gridSize.y);
     const d = imageData.data;
+
+    const light = tinycolor(CHECKER_LIGHT).toRgb();
+    const dark = tinycolor(CHECKER_DARK).toRgb();
+
     for (let y = 0; y < gridSize.y; y++) {
       for (let x = 0; x < gridSize.x; x++) {
         const i = (y * gridSize.x + x) * 4;
-        if ((x + y) % 2 === 0) {
-          d[i] = 229;
-          d[i + 1] = 229;
-          d[i + 2] = 229; // CHECKER_DARK #e5e5e5
+        if (y % 2 === x % 2) {
+          d[i] = dark.r;
+          d[i + 1] = dark.g;
+          d[i + 2] = dark.b;
         } else {
-          d[i] = 255;
-          d[i + 1] = 255;
-          d[i + 2] = 255; // CHECKER_LIGHT #ffffff
+          d[i] = light.r;
+          d[i + 1] = light.g;
+          d[i + 2] = light.b;
         }
         d[i + 3] = 255;
       }
@@ -410,27 +414,13 @@ export default function Canvas() {
     const pxSize = getPxSize();
     for (let i = 0; i < height; i++) {
       for (let j = 0; j < width; j++) {
-        const pixelX = x + j;
-        const pixelY = y + i;
-
-        if (isValidIndex(pixelX, pixelY, gridSize)) {
-          const { r, g, b, a } = getPixelColor(pixelX, pixelY);
-          let hoverColor;
-          if (a === 0) {
-            if (pixelY % 2 === pixelX % 2)
-              hoverColor = tinycolor(CHECKER_DARK)
-                .darken(FILTER_STRENGTH)
-                .toHexString();
-            else
-              hoverColor = tinycolor(CHECKER_LIGHT)
-                .darken(FILTER_STRENGTH)
-                .toHexString();
-          } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
-
-          ctx.fillStyle = hoverColor;
+        const px = x + j;
+        const py = y + i;
+        if (isValidIndex(px, py, gridSize)) {
+          ctx.fillStyle = getHoverColor(px, py, FILTER_STRENGTH);
           ctx.fillRect(
-            (pixelX - panOffset.x) * pxSize,
-            (pixelY - panOffset.y) * pxSize,
+            (px - panOffset.x) * pxSize,
+            (py - panOffset.y) * pxSize,
             pxSize,
             pxSize,
           );
@@ -443,28 +433,15 @@ export default function Canvas() {
     const pxSize = getPxSize();
     for (let i = 0; i < lassoPath.length; i++) {
       const { x, y } = lassoPath[i];
-      if (!isValidIndex(x, y, gridSize)) continue;
-
-      const { r, g, b, a } = getPixelColor(x, y);
-      let hoverColor;
-      if (a === 0) {
-        if (y % 2 === x % 2)
-          hoverColor = tinycolor(CHECKER_DARK)
-            .darken(FILTER_STRENGTH)
-            .toHexString();
-        else
-          hoverColor = tinycolor(CHECKER_LIGHT)
-            .darken(FILTER_STRENGTH)
-            .toHexString();
-      } else hoverColor = getHoverColor(r, g, b, a, FILTER_STRENGTH);
-
-      ctx.fillStyle = hoverColor;
-      ctx.fillRect(
-        (x - panOffset.x) * pxSize,
-        (y - panOffset.y) * pxSize,
-        pxSize,
-        pxSize,
-      );
+      if (isValidIndex(x, y, gridSize)) {
+        ctx.fillStyle = getHoverColor(x, y, FILTER_STRENGTH);
+        ctx.fillRect(
+          (x - panOffset.x) * pxSize,
+          (y - panOffset.y) * pxSize,
+          pxSize,
+          pxSize,
+        );
+      }
     }
   }
 
@@ -584,19 +561,22 @@ export default function Canvas() {
     setMousePos({ x, y });
   }
 
-  function getHoverColor(
-    r: number,
-    g: number,
-    b: number,
-    a: number,
-    strength = 25,
-  ) {
-    const originalColor = tinycolor({ r, g, b, a: a / 255 });
-    const hoverColor =
-      originalColor.getLuminance() < 0.5
-        ? originalColor.lighten(strength)
-        : originalColor.darken(strength);
-    return hoverColor.toHexString();
+  function getHoverColor(x: number, y: number, strength = 25) {
+    const pixel = getPixelColor(x, y);
+    const checker =
+      y % 2 === x % 2
+        ? tinycolor(CHECKER_DARK).toRgb()
+        : tinycolor(CHECKER_LIGHT).toRgb();
+    const alpha = pixel.a / 255;
+    const blended = {
+      r: Math.round(pixel.r * alpha + checker.r * (1 - alpha)),
+      g: Math.round(pixel.g * alpha + checker.g * (1 - alpha)),
+      b: Math.round(pixel.b * alpha + checker.b * (1 - alpha)),
+    };
+    const tc = tinycolor(blended);
+    return tc.isLight()
+      ? tc.darken(strength).toHexString()
+      : tc.lighten(strength).toHexString();
   }
 
   function isInSelectedArea(x: number, y: number) {
