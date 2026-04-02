@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import FloatingWindow from "./FloatingWindow";
+import type { BlendMode } from "../types";
 
 type LayerPropertiesProps = {
   onClose: () => void;
 };
 
-const BLEND_MODES = [
-  "Normal",
-  "Multiply",
-  "Screen",
-  "Overlay",
-  "Darken",
-  "Lighten",
+const BLEND_MODES: { label: string; value: BlendMode }[] = [
+  { label: "Normal", value: "normal" },
+  { label: "Multiply", value: "multiply" },
+  { label: "Screen", value: "screen" },
+  { label: "Overlay", value: "overlay" },
+  { label: "Darken", value: "darken" },
+  { label: "Lighten", value: "lighten" },
 ];
 
 export default function LayerPropertiesWindow({
@@ -24,18 +25,17 @@ export default function LayerPropertiesWindow({
     getActiveLayer,
     renameLayer,
     setLayerOpacity,
+    setLayerBlendMode,
   } = useEditorStore();
   const layer = getActiveLayer();
   const [name, setName] = useState(layer.name);
   const [opacity, setOpacity] = useState(layer.opacity);
-  const [blendMode, setBlendMode] = useState("Normal");
   const cancelRef = useRef(false);
   const opacityBeforeDrag = useRef(layer.opacity);
 
   useEffect(() => {
     setName(layer.name);
     setOpacity(layer.opacity);
-    setBlendMode("Normal");
   }, [layers, activeLayerId]);
 
   return (
@@ -119,12 +119,14 @@ export default function LayerPropertiesWindow({
           <select
             className="select select-sm"
             id="layer-properties-blend-mode"
-            value={blendMode}
-            onChange={(e) => setBlendMode(e.target.value)}
+            value={layer.blendMode}
+            onChange={(e) =>
+              setLayerBlendMode(layer.id, e.target.value as BlendMode)
+            }
           >
             {BLEND_MODES.map((mode) => (
-              <option key={mode} value={mode}>
-                {mode}
+              <option key={mode.value} value={mode.value}>
+                {mode.label}
               </option>
             ))}
           </select>

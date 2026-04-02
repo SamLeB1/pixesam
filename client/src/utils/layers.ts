@@ -1,3 +1,4 @@
+import { blendColors } from "./colors";
 import type { Layer } from "../types";
 
 export function compositeLayers(
@@ -23,18 +24,31 @@ export function compositeLayers(
   const outA = new Float32Array(pixelCount);
 
   for (const layer of filteredLayers) {
+    const mode = layer.blendMode;
     for (let p = 0; p < pixelCount; p++) {
       const i = p * 4;
       const srcA = (layer.data[i + 3] / 255) * layer.opacity;
       if (srcA === 0) continue;
       const dstA = outA[p];
+
+      const [blendR, blendG, blendB] =
+        mode === "normal" || dstA === 0
+          ? [layer.data[i], layer.data[i + 1], layer.data[i + 2]]
+          : blendColors(
+              layer.data[i],
+              layer.data[i + 1],
+              layer.data[i + 2],
+              outR[p],
+              outG[p],
+              outB[p],
+              mode,
+            );
+
       const newA = srcA + dstA * (1 - srcA);
       if (newA > 0) {
-        outR[p] = (layer.data[i] * srcA + outR[p] * dstA * (1 - srcA)) / newA;
-        outG[p] =
-          (layer.data[i + 1] * srcA + outG[p] * dstA * (1 - srcA)) / newA;
-        outB[p] =
-          (layer.data[i + 2] * srcA + outB[p] * dstA * (1 - srcA)) / newA;
+        outR[p] = (blendR * srcA + outR[p] * dstA * (1 - srcA)) / newA;
+        outG[p] = (blendG * srcA + outG[p] * dstA * (1 - srcA)) / newA;
+        outB[p] = (blendB * srcA + outB[p] * dstA * (1 - srcA)) / newA;
       }
       outA[p] = newA;
     }
@@ -47,7 +61,6 @@ export function compositeLayers(
     result[i + 2] = Math.round(outB[p]);
     result[i + 3] = Math.round(outA[p] * 255);
   }
-
   return result;
 }
 
@@ -77,6 +90,7 @@ export function createNewLayer(
     visible: true,
     locked: false,
     opacity: 1.0,
+    blendMode: "normal",
   };
 }
 
@@ -88,6 +102,7 @@ export function duplicateLayer(layer: Layer): Layer {
     visible: layer.visible,
     locked: layer.locked,
     opacity: layer.opacity,
+    blendMode: layer.blendMode,
   };
 }
 

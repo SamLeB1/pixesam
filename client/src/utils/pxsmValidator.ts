@@ -16,6 +16,7 @@ export function isValidPxsmData(data: unknown) {
     if (typeof layer.visible !== "boolean") return false;
     if (typeof layer.locked !== "boolean") return false;
     if (typeof layer.opacity !== "number") return false;
+    if (typeof layer.blendMode !== "string") return false;
     if (!Array.isArray(layer.data)) return false;
   }
 

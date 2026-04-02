@@ -39,6 +39,14 @@ export type ColorPalette = {
   isDefault: boolean;
 };
 
+export type BlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "darken"
+  | "lighten";
+
 export type Layer = {
   id: string;
   data: Uint8ClampedArray;
@@ -46,6 +54,7 @@ export type Layer = {
   visible: boolean;
   locked: boolean;
   opacity: number;
+  blendMode: BlendMode;
 };
 
 export type PxsmLayerData = {
@@ -55,6 +64,7 @@ export type PxsmLayerData = {
   visible: boolean;
   locked: boolean;
   opacity: number;
+  blendMode: BlendMode;
 };
 
 export type PxsmData = {

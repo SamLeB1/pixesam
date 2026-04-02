@@ -51,6 +51,7 @@ import type {
   PxsmData,
   PxsmLayerData,
   Layer,
+  BlendMode,
 } from "../types";
 
 type Action =
@@ -69,7 +70,8 @@ type Action =
   | LayerStructureAction
   | LayerToggleAction
   | LayerRenameAction
-  | LayerOpacityAction;
+  | LayerOpacityAction
+  | LayerBlendModeAction;
 
 type DrawAction = {
   action: "draw";
@@ -189,6 +191,13 @@ type LayerOpacityAction = {
   prevOpacity: number;
 };
 
+type LayerBlendModeAction = {
+  action: "layer-blend-mode";
+  layerId: string;
+  blendMode: BlendMode;
+  prevBlendMode: BlendMode;
+};
+
 type DrawActionPixel = {
   x: number;
   y: number;
@@ -300,6 +309,7 @@ type EditorState = {
   toggleLayerLock: (id: string) => void;
   renameLayer: (id: string, name: string) => void;
   setLayerOpacity: (id: string, opacity: number) => void;
+  setLayerBlendMode: (id: string, blendMode: BlendMode) => void;
   newLayer: () => void;
   duplicateLayer: () => void;
   deleteLayer: () => void;
@@ -590,6 +600,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         layers: layers.map((l) => (l.id === id ? { ...l, opacity } : l)),
+      };
+    }),
+  setLayerBlendMode: (id, blendMode) =>
+    set((state) => {
+      const { layers, getLayer, updateHistory } = state;
+      const layer = getLayer(id);
+      if (!layer) return {};
+
+      const action: LayerBlendModeAction = {
+        action: "layer-blend-mode",
+        layerId: id,
+        blendMode,
+        prevBlendMode: layer.blendMode,
+      };
+      updateHistory(action);
+
+      return {
+        layers: layers.map((l) => (l.id === id ? { ...l, blendMode } : l)),
       };
     }),
   newLayer: () => {
@@ -2330,6 +2358,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           l.id === action.layerId ? { ...l, opacity: action.prevOpacity } : l,
         ),
       });
+    } else if (action.action === "layer-blend-mode") {
+      set({
+        layers: layers.map((l) =>
+          l.id === action.layerId
+            ? { ...l, blendMode: action.prevBlendMode }
+            : l,
+        ),
+      });
     }
 
     set({
@@ -2523,6 +2559,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         layers: layers.map((l) =>
           l.id === action.layerId ? { ...l, opacity: action.opacity } : l,
+        ),
+      });
+    } else if (action.action === "layer-blend-mode") {
+      set({
+        layers: layers.map((l) =>
+          l.id === action.layerId ? { ...l, blendMode: action.blendMode } : l,
         ),
       });
     }
