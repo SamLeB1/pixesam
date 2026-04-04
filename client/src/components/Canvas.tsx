@@ -116,6 +116,7 @@ export default function Canvas() {
   } | null>(null);
   const [hoveredResizeHandle, setHoveredResizeHandle] =
     useState<Direction | null>(null);
+  const [marchingAntsOffset, setMarchingAntsOffset] = useState(0);
   const parentSize = parentContainerRef.current
     ? {
         x: parentContainerRef.current.clientWidth,
@@ -451,6 +452,113 @@ export default function Canvas() {
     if (selectionMode === "rectangular")
       drawFilterRect(ctx, x, y, width, height);
     else if (selectionMode === "lasso") drawLassoPath(ctx);
+  }
+
+  function drawMarchingAnts(ctx: CanvasRenderingContext2D) {
+    const bounds = getEffectiveSelectionBounds();
+    if (!bounds) return;
+
+    const pxSize = getPxSize();
+    const baseX = (bounds.x - panOffset.x) * pxSize;
+    const baseY = (bounds.y - panOffset.y) * pxSize;
+
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 6]);
+
+    ctx.beginPath();
+
+    if (!selectionMask) {
+      const w = bounds.width * pxSize;
+      const h = bounds.height * pxSize;
+      ctx.rect(baseX + 0.5, baseY + 0.5, w - 1, h - 1);
+    } else {
+      const transformed = getTransformedSelection();
+      const mask = transformed?.mask;
+      if (!mask) {
+        ctx.restore();
+        return;
+      }
+      const mw = bounds.width;
+      const mh = bounds.height;
+
+      // Collect boundary edges as vertex pairs keyed by grid coordinates.
+      // Each edge is stored as "x1,y1->x2,y2" using grid-corner coords
+      // where (0,0) is top-left of mask and (mw,mh) is bottom-right.
+      type Edge = { x1: number; y1: number; x2: number; y2: number };
+      const edges: Edge[] = [];
+
+      for (let my = 0; my < mh; my++) {
+        for (let mx = 0; mx < mw; mx++) {
+          if (!mask[my * mw + mx]) continue;
+          // Top edge
+          if (my === 0 || !mask[(my - 1) * mw + mx])
+            edges.push({ x1: mx, y1: my, x2: mx + 1, y2: my });
+          // Bottom edge
+          if (my === mh - 1 || !mask[(my + 1) * mw + mx])
+            edges.push({ x1: mx + 1, y1: my + 1, x2: mx, y2: my + 1 });
+          // Left edge
+          if (mx === 0 || !mask[my * mw + mx - 1])
+            edges.push({ x1: mx, y1: my + 1, x2: mx, y2: my });
+          // Right edge
+          if (mx === mw - 1 || !mask[my * mw + mx + 1])
+            edges.push({ x1: mx + 1, y1: my, x2: mx + 1, y2: my + 1 });
+        }
+      }
+
+      // Build adjacency: for each vertex, which edge indices start there?
+      const adj = new Map<string, number[]>();
+      for (let i = 0; i < edges.length; i++) {
+        const key = `${edges[i].x1},${edges[i].y1}`;
+        let list = adj.get(key);
+        if (!list) {
+          list = [];
+          adj.set(key, list);
+        }
+        list.push(i);
+      }
+
+      // Walk edges into contiguous loops
+      const used = new Set<number>();
+      for (let i = 0; i < edges.length; i++) {
+        if (used.has(i)) continue;
+        used.add(i);
+        const start = edges[i];
+        ctx.moveTo(baseX + start.x1 * pxSize, baseY + start.y1 * pxSize);
+        ctx.lineTo(baseX + start.x2 * pxSize, baseY + start.y2 * pxSize);
+
+        let cx = start.x2;
+        let cy = start.y2;
+        while (cx !== start.x1 || cy !== start.y1) {
+          const key = `${cx},${cy}`;
+          const candidates = adj.get(key);
+          if (!candidates) break;
+          let found = false;
+          for (const idx of candidates) {
+            if (used.has(idx)) continue;
+            used.add(idx);
+            const next = edges[idx];
+            cx = next.x2;
+            cy = next.y2;
+            ctx.lineTo(baseX + cx * pxSize, baseY + cy * pxSize);
+            found = true;
+            break;
+          }
+          if (!found) break;
+        }
+        ctx.closePath();
+      }
+    }
+
+    ctx.lineDashOffset = -marchingAntsOffset;
+    ctx.strokeStyle = "black";
+    ctx.stroke();
+
+    ctx.lineDashOffset = -(marchingAntsOffset + 6);
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   function drawResizeHandles(ctx: CanvasRenderingContext2D) {
@@ -915,6 +1023,7 @@ export default function Canvas() {
 
     if (selectedTool !== "move" && !showNotAllowedCursor) {
       if (showSelectionPreview) {
+        drawMarchingAnts(ctx);
         drawResizeHandles(ctx);
       } else if (selectionAction === "select") {
         drawSelectionDrag(ctx);
@@ -943,6 +1052,21 @@ export default function Canvas() {
     if (!showSelectionPreview && hoveredResizeHandle)
       setHoveredResizeHandle(null);
   });
+
+  useEffect(() => {
+    if (!showSelectionPreview) return;
+    let animationId: number;
+    let lastTime = 0;
+    const animate = (time: number) => {
+      if (time - lastTime >= 60) {
+        lastTime = time;
+        setMarchingAntsOffset((n) => (n + 1) % 12);
+      }
+      animationId = requestAnimationFrame(animate);
+    };
+    animationId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationId);
+  }, [showSelectionPreview]);
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
     activeMouseButton.current = e.button;
