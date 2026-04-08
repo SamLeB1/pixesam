@@ -21,7 +21,7 @@ export default function SideBarLeft() {
   } = useEditorStore();
 
   return (
-    <div className="min-w-28 bg-neutral-800 p-2">
+    <div className="min-w-28 overflow-x-hidden overflow-y-auto bg-neutral-800 p-2">
       <div className="mb-2 grid grid-cols-2">
         <Tooltip content="Pencil tool (P)" side="right">
           <button

@@ -4,7 +4,7 @@ import ColorPaletteMenu from "./ColorPaletteMenu";
 
 export default function SideBarRight() {
   return (
-    <div className="max-w-68 bg-neutral-800 p-2">
+    <div className="min-w-68 overflow-x-hidden overflow-y-auto bg-neutral-800 p-2">
       <CanvasPreview />
       <LayersMenu />
       <ColorPaletteMenu />
