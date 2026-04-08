@@ -6,6 +6,7 @@ import SideBarLeft from "./components/SideBarLeft";
 import SideBarRight from "./components/SideBarRight";
 import BottomBar from "./components/BottomBar";
 import ToolOptionsBar from "./components/ToolOptionsBar";
+import FramesPanel from "./components/FramesPanel";
 
 export default function App() {
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function App() {
           <div className="flex flex-grow flex-col">
             <ToolOptionsBar />
             <Canvas />
+            <FramesPanel />
           </div>
           <SideBarRight />
         </div>
