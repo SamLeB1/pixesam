@@ -23,7 +23,7 @@ export default function App() {
         <TopBar />
         <div className="flex flex-grow overflow-hidden">
           <SideBarLeft />
-          <div className="flex flex-grow flex-col">
+          <div className="relative flex flex-grow flex-col">
             <ToolOptionsBar />
             <Canvas />
             <FramesPanel />
