@@ -1127,7 +1127,7 @@ export default function Canvas() {
 
   return (
     <div
-      className="flex flex-grow items-center justify-center"
+      className="flex flex-grow items-center justify-center overflow-hidden"
       style={{
         ...(showMoveCursor && { cursor: "move" }),
         ...(!selectionAction &&
