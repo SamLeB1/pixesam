@@ -60,6 +60,16 @@ export type Frame = { id: string };
 
 export type Cels = Record<string, Uint8ClampedArray>;
 
+export type LayerWithCel = {
+  id: string;
+  cel: Uint8ClampedArray;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  opacity: number;
+  blendMode: BlendMode;
+};
+
 export type PxsmData = {
   version: string;
   width: number;

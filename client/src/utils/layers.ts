@@ -1,8 +1,8 @@
 import { blendColors } from "./colors";
-import type { Layer } from "../types";
+import type { Layer, LayerWithCel } from "../types";
 
 export function compositeLayers(
-  layers: Layer[],
+  layers: LayerWithCel[],
   width: number,
   height: number,
   includeInvisible = false,
@@ -13,7 +13,7 @@ export function compositeLayers(
     : layers.filter((l) => l.visible);
   if (filteredLayers.length === 0) return result;
   if (filteredLayers.length === 1 && filteredLayers[0].opacity === 1.0) {
-    result.set(filteredLayers[0].data);
+    result.set(filteredLayers[0].cel);
     return result;
   }
 
@@ -27,17 +27,17 @@ export function compositeLayers(
     const mode = layer.blendMode;
     for (let p = 0; p < pixelCount; p++) {
       const i = p * 4;
-      const srcA = (layer.data[i + 3] / 255) * layer.opacity;
+      const srcA = (layer.cel[i + 3] / 255) * layer.opacity;
       if (srcA === 0) continue;
       const dstA = outA[p];
 
       const [blendR, blendG, blendB] =
         mode === "normal" || dstA === 0
-          ? [layer.data[i], layer.data[i + 1], layer.data[i + 2]]
+          ? [layer.cel[i], layer.cel[i + 1], layer.cel[i + 2]]
           : blendColors(
-              layer.data[i],
-              layer.data[i + 1],
-              layer.data[i + 2],
+              layer.cel[i],
+              layer.cel[i + 1],
+              layer.cel[i + 2],
               outR[p],
               outG[p],
               outB[p],
@@ -65,27 +65,21 @@ export function compositeLayers(
 }
 
 export function compositeLayersWithOverride(
-  layers: Layer[],
+  layers: LayerWithCel[],
   width: number,
   height: number,
   overrideLayerId: string,
-  overrideData: Uint8ClampedArray,
+  overrideCel: Uint8ClampedArray,
 ): Uint8ClampedArray {
   const overriddenLayers = layers.map((l) =>
-    l.id === overrideLayerId ? { ...l, data: overrideData } : l,
+    l.id === overrideLayerId ? { ...l, cel: overrideCel } : l,
   );
   return compositeLayers(overriddenLayers, width, height);
 }
 
-export function createNewLayer(
-  width: number,
-  height: number,
-  name: string,
-  data?: Uint8ClampedArray,
-): Layer {
+export function createNewLayer(name: string): Layer {
   return {
     id: crypto.randomUUID(),
-    data: data || new Uint8ClampedArray(width * height * 4),
     name,
     visible: true,
     locked: false,
@@ -97,7 +91,6 @@ export function createNewLayer(
 export function duplicateLayer(layer: Layer): Layer {
   return {
     id: crypto.randomUUID(),
-    data: new Uint8ClampedArray(layer.data),
     name: `${layer.name} copy`,
     visible: layer.visible,
     locked: layer.locked,

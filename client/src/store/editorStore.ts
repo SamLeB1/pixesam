@@ -386,15 +386,19 @@ type EditorState = {
   transformEdit: () => void;
 };
 
-const initialLayer = createNewLayer(
-  DEFAULT_GRID_SIZE.x,
-  DEFAULT_GRID_SIZE.y,
-  "Layer 1",
+const initLayer = createNewLayer("Layer 1");
+const initFrame: Frame = { id: crypto.randomUUID() };
+const initCels: Cels = {};
+initCels[`${initLayer.id}-${initFrame.id}`] = new Uint8ClampedArray(
+  DEFAULT_GRID_SIZE.x * DEFAULT_GRID_SIZE.y * 4,
 );
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  layers: [initialLayer],
-  activeLayerId: initialLayer.id,
+  layers: [initLayer],
+  frames: [initFrame],
+  cels: initCels,
+  activeLayerId: initLayer.id,
+  activeFrameId: initFrame.id,
   gridSize: DEFAULT_GRID_SIZE,
   visibleGridSize: DEFAULT_GRID_SIZE,
   panOffset: { x: 0, y: 0 },
