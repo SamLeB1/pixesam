@@ -49,7 +49,6 @@ export type BlendMode =
 
 export type Layer = {
   id: string;
-  data: Uint8ClampedArray;
   name: string;
   visible: boolean;
   locked: boolean;
@@ -57,20 +56,18 @@ export type Layer = {
   blendMode: BlendMode;
 };
 
-export type PxsmLayerData = {
-  id: string;
-  data: number[];
-  name: string;
-  visible: boolean;
-  locked: boolean;
-  opacity: number;
-  blendMode: BlendMode;
-};
+export type Frame = { id: string };
+
+export type Cels = Record<string, Uint8ClampedArray>;
 
 export type PxsmData = {
   version: string;
   width: number;
   height: number;
-  layers: PxsmLayerData[];
+  fps: number;
+  layers: Layer[];
+  frames: Frame[];
+  cels: Cels;
   activeLayerId: string;
+  activeFrameId: string;
 };

@@ -48,10 +48,11 @@ import type {
   Direction,
   Rect,
   Clipboard,
-  PxsmData,
-  PxsmLayerData,
-  Layer,
   BlendMode,
+  Layer,
+  Frame,
+  Cels,
+  PxsmData,
 } from "../types";
 
 type Action =
@@ -218,7 +219,10 @@ type Tool =
 
 type EditorState = {
   layers: Layer[];
+  frames: Frame[];
+  cels: Cels;
   activeLayerId: string;
+  activeFrameId: string;
   gridSize: { x: number; y: number };
   visibleGridSize: { x: number; y: number };
   panOffset: { x: number; y: number };
