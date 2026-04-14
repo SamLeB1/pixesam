@@ -62,27 +62,32 @@ type Action =
   | MoveAction
   | DeleteAction
   | PasteAction
-  | NewAction
   | ClearAction
   | RotateCanvasAction
-  | RotateLayerAction
+  | RotateCelAction
   | FlipCanvasAction
-  | FlipLayerAction
+  | FlipCelAction
+  | ResizeAction
   | LayerStructureAction
+  | LayerMoveAction
   | LayerToggleAction
   | LayerRenameAction
   | LayerOpacityAction
-  | LayerBlendModeAction;
+  | LayerBlendModeAction
+  | FrameStructureAction
+  | FrameMoveAction;
 
 type DrawAction = {
   action: "draw";
   layerId: string;
+  frameId: string;
   pixels: DrawActionPixel[];
 };
 
 type BucketAction = {
   action: "bucket";
   layerId: string;
+  frameId: string;
   data: Uint8ClampedArray;
   x: number;
   y: number;
@@ -92,6 +97,7 @@ type BucketAction = {
 type TransformAction = {
   action: "transform";
   layerId: string;
+  frameId: string;
   srcRect: Rect;
   srcPixels: Uint8ClampedArray;
   srcMask: Uint8Array | null;
@@ -104,6 +110,7 @@ type TransformAction = {
 type MoveAction = {
   action: "move";
   layerId: string;
+  frameId: string;
   data: Uint8ClampedArray;
   offset: { x: number; y: number };
 };
@@ -111,6 +118,7 @@ type MoveAction = {
 type DeleteAction = {
   action: "delete";
   layerId: string;
+  frameId: string;
   area: Rect;
   pixels: Uint8ClampedArray;
   mask: Uint8Array | null;
@@ -119,25 +127,17 @@ type DeleteAction = {
 type PasteAction = {
   action: "paste";
   layerId: string;
+  frameId: string;
   area: Rect;
   pixels: Uint8ClampedArray;
   prevPixels: Uint8ClampedArray;
   mask: Uint8Array | null;
 };
 
-type NewAction = {
-  action: "new";
-  layers: Layer[];
-  prevLayers: Layer[];
-  activeLayerId: string;
-  prevActiveLayerId: string;
-  size: { x: number; y: number };
-  prevSize: { x: number; y: number };
-};
-
 type ClearAction = {
   action: "clear";
   layerId: string;
+  frameId: string;
   data: Uint8ClampedArray;
 };
 
@@ -146,9 +146,10 @@ type RotateCanvasAction = {
   degrees: 90 | 180 | 270;
 };
 
-type RotateLayerAction = {
-  action: "rotate-layer";
+type RotateCelAction = {
+  action: "rotate-cel";
   layerId: string;
+  frameId: string;
   data: Uint8ClampedArray;
   degrees: 90 | 180 | 270;
 };
@@ -158,18 +159,35 @@ type FlipCanvasAction = {
   direction: "horizontal" | "vertical";
 };
 
-type FlipLayerAction = {
-  action: "flip-layer";
+type FlipCelAction = {
+  action: "flip-cel";
   layerId: string;
+  frameId: string;
   direction: "horizontal" | "vertical";
+};
+
+type ResizeAction = {
+  action: "resize";
+  cels: Cels;
+  prevCels: Cels;
+  size: { x: number; y: number };
+  prevSize: { x: number; y: number };
 };
 
 type LayerStructureAction = {
   action: "layer-structure";
-  prevLayers: Layer[];
-  prevActiveLayerId: string;
   layers: Layer[];
+  prevLayers: Layer[];
+  cels: Cels;
+  prevCels: Cels;
   activeLayerId: string;
+  prevActiveLayerId: string;
+};
+
+type LayerMoveAction = {
+  action: "layer-move";
+  layers: Layer[];
+  prevLayers: Layer[];
 };
 
 type LayerToggleAction = {
@@ -197,6 +215,22 @@ type LayerBlendModeAction = {
   layerId: string;
   blendMode: BlendMode;
   prevBlendMode: BlendMode;
+};
+
+type FrameStructureAction = {
+  action: "frame-structure";
+  frames: Frame[];
+  prevFrames: Frame[];
+  cels: Cels;
+  prevCels: Cels;
+  activeFrameId: string;
+  prevActiveFrameId: string;
+};
+
+type FrameMoveAction = {
+  action: "frame-move";
+  frames: Frame[];
+  prevFrames: Frame[];
 };
 
 type DrawActionPixel = {
