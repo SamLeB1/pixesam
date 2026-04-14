@@ -263,7 +263,6 @@ type EditorState = {
   lastDrawPos: { x: number; y: number } | null;
   mousePos: { x: number; y: number };
   clipboard: Clipboard | null;
-  setLayers: (layers: Layer[]) => void;
   setGridSize: (gridSize: { x: number; y: number }) => void;
   setVisibleGridSize: (size: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
@@ -305,8 +304,9 @@ type EditorState = {
   discardPendingActions: () => void;
   applyPendingActions: () => void;
   selectTool: (tool: Tool) => void;
-  getLayer: (id: string) => Layer | null;
-  getActiveLayer: () => Layer;
+  getLayer: (id?: string) => Layer | null;
+  getFrame: (id?: string) => Frame | null;
+  getCel: (layerId?: string, frameId?: string) => Uint8ClampedArray | null;
   selectLayer: (id: string) => void;
   setLayerData: (data: Uint8ClampedArray, id: string) => void;
   toggleLayerVisibility: (id: string) => void;
@@ -439,7 +439,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   lastDrawPos: null,
   mousePos: { x: 0, y: 0 },
   clipboard: null,
-  setLayers: (layers) => set({ layers }),
   setGridSize: (gridSize) => set({ gridSize }),
   setVisibleGridSize: (size) => set({ visibleGridSize: size }),
   setPanOffset: (panOffset) => set({ panOffset }),
@@ -538,12 +537,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { selectedTool: tool };
     }),
   getLayer: (id) => {
-    const layer = get().layers.find((l) => l.id === id);
-    return layer ? layer : null;
+    if (id) {
+      const { layers } = get();
+      const layer = layers.find((l) => l.id === id);
+      return layer ? layer : null;
+    } else {
+      const { layers, activeLayerId } = get();
+      const layer = layers.find((l) => l.id === activeLayerId);
+      return layer ? layer : null;
+    }
   },
-  getActiveLayer: () => {
-    const { layers, activeLayerId } = get();
-    return layers.find((l) => l.id === activeLayerId) as Layer;
+  getFrame: (id) => {
+    if (id) {
+      const { frames } = get();
+      const frame = frames.find((f) => f.id === id);
+      return frame ? frame : null;
+    } else {
+      const { frames, activeFrameId } = get();
+      const frame = frames.find((f) => f.id === activeFrameId);
+      return frame ? frame : null;
+    }
+  },
+  getCel: (layerId, frameId) => {
+    if (layerId && frameId) {
+      const { cels } = get();
+      const cel = cels[`${layerId}-${frameId}`];
+      return cel ? cel : null;
+    } else {
+      const { cels, activeLayerId, activeFrameId } = get();
+      const cel = cels[`${activeLayerId}-${activeFrameId}`];
+      return cel ? cel : null;
+    }
   },
   selectLayer: (id) =>
     set((state) => {
