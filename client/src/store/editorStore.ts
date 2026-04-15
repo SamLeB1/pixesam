@@ -52,6 +52,7 @@ import type {
   Layer,
   Frame,
   Cels,
+  LayerWithCel,
   PxsmData,
 } from "../types";
 
@@ -341,8 +342,12 @@ type EditorState = {
   getLayer: (id?: string) => Layer | null;
   getFrame: (id?: string) => Frame | null;
   getCel: (layerId?: string, frameId?: string) => Uint8ClampedArray | null;
+  setCelData: (
+    data: Uint8ClampedArray,
+    layerId?: string,
+    frameId?: string,
+  ) => void;
   selectLayer: (id: string) => void;
-  setLayerData: (data: Uint8ClampedArray, id: string) => void;
   toggleLayerVisibility: (id: string) => void;
   toggleLayerLock: (id: string) => void;
   renameLayer: (id: string, name: string) => void;
@@ -360,11 +365,18 @@ type EditorState = {
   flipLayer: (direction: "horizontal" | "vertical") => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
-  getPixelColor: (x: number, y: number, layerId?: string) => RGBA;
+  getPixelColor: (
+    x: number,
+    y: number,
+    layerId?: string,
+    frameId?: string,
+  ) => RGBA;
+  getCompositedPixelColor: (x: number, y: number, frameId?: string) => RGBA;
   getPixelsInRect: (
     rect: Rect,
     mask: Uint8Array | null,
-    layerId: string,
+    layerId?: string,
+    frameId?: string,
   ) => Uint8ClampedArray;
   getEffectiveSelectionBounds: () => Rect | null;
   getRectInBounds: (rect: Rect) => Rect | null;
@@ -603,16 +615,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return cel ? cel : null;
     }
   },
+  setCelData: (data, layerId, frameId) => {
+    const { cels, activeLayerId, activeFrameId } = get();
+    if (!layerId || !frameId) {
+      layerId = activeLayerId;
+      frameId = activeFrameId;
+    }
+    if (cels[`${layerId}-${frameId}`]) {
+      const newCels = { ...cels };
+      newCels[`${layerId}-${frameId}`] = data;
+      set({ cels: newCels });
+    }
+  },
   selectLayer: (id) =>
     set((state) => {
       state.applyPendingActions();
       return { activeLayerId: id };
-    }),
-  setLayerData: (data, id) =>
-    set((state) => {
-      return {
-        layers: state.layers.map((l) => (l.id === id ? { ...l, data } : l)),
-      };
     }),
   toggleLayerVisibility: (id) =>
     set((state) => {
@@ -965,38 +983,49 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     rgba.a *= 255;
     return rgba;
   },
-  getPixelColor: (x, y, layerId) => {
-    const { layers, gridSize, getLayer } = get();
-    if (!isValidIndex(x, y, gridSize)) return { r: 0, g: 0, b: 0, a: 0 };
-    const baseIndex = getBaseIndex(x, y, gridSize.x);
-    if (layerId) {
-      const layer = getLayer(layerId);
-      if (!layer) return { r: 0, g: 0, b: 0, a: 0 };
-      return {
-        r: layer.data[baseIndex],
-        g: layer.data[baseIndex + 1],
-        b: layer.data[baseIndex + 2],
-        a: layer.data[baseIndex + 3],
-      };
-    } else {
-      const pxLayers: Layer[] = layers.map((layer) => {
-        const r = layer.data[baseIndex];
-        const g = layer.data[baseIndex + 1];
-        const b = layer.data[baseIndex + 2];
-        const a = layer.data[baseIndex + 3];
-        const px = new Uint8ClampedArray([r, g, b, a]);
-        return { ...layer, data: px };
-      });
-      const composited = compositeLayers(pxLayers, 1, 1);
-      return {
-        r: composited[0],
-        g: composited[1],
-        b: composited[2],
-        a: composited[3],
-      };
+  getPixelColor: (x, y, layerId, frameId) => {
+    const { activeLayerId, activeFrameId, gridSize, getCel } = get();
+    if (!layerId || !frameId) {
+      layerId = activeLayerId;
+      frameId = activeFrameId;
     }
+    const cel = getCel(layerId, frameId);
+    if (!cel || !isValidIndex(x, y, gridSize))
+      return { r: 0, g: 0, b: 0, a: 0 };
+    const baseIndex = getBaseIndex(x, y, gridSize.x);
+    return {
+      r: cel[baseIndex],
+      g: cel[baseIndex + 1],
+      b: cel[baseIndex + 2],
+      a: cel[baseIndex + 3],
+    };
   },
-  getPixelsInRect: (rect, mask, layerId) => {
+  getCompositedPixelColor: (x, y, frameId) => {
+    const { layers, activeFrameId, gridSize, getCel } = get();
+    if (!isValidIndex(x, y, gridSize)) return { r: 0, g: 0, b: 0, a: 0 };
+    if (!frameId) frameId = activeFrameId;
+    const baseIndex = getBaseIndex(x, y, gridSize.x);
+    const pxLayers: LayerWithCel[] = layers.map((layer) => {
+      const cel = getCel(layer.id, frameId);
+      const px = cel
+        ? new Uint8ClampedArray([
+            cel[baseIndex],
+            cel[baseIndex + 1],
+            cel[baseIndex + 2],
+            cel[baseIndex + 3],
+          ])
+        : new Uint8ClampedArray([0, 0, 0, 0]);
+      return { ...layer, cel: px };
+    });
+    const composited = compositeLayers(pxLayers, 1, 1);
+    return {
+      r: composited[0],
+      g: composited[1],
+      b: composited[2],
+      a: composited[3],
+    };
+  },
+  getPixelsInRect: (rect, mask, layerId, frameId) => {
     const { gridSize, getPixelColor } = get();
     const pixels = new Uint8ClampedArray(rect.width * rect.height * 4);
     for (let y = 0; y < rect.height; y++) {
@@ -1007,7 +1036,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const mi = y * rect.width + x;
         if (mask && !mask[mi]) continue;
         const pi = (y * rect.width + x) * 4;
-        const { r, g, b, a } = getPixelColor(px, py, layerId);
+        const { r, g, b, a } = getPixelColor(px, py, layerId, frameId);
         pixels[pi] = r;
         pixels[pi + 1] = g;
         pixels[pi + 2] = b;
@@ -1124,21 +1153,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   draw: (x, y, color) =>
     set((state) => {
       const {
-        activeLayerId,
         gridSize,
         brushSize,
         drawBuffer,
         drawnPixels,
         lastDrawPos,
-        getActiveLayer,
-        setLayerData,
+        getLayer,
+        getCel,
+        setCelData,
         getPixelColor,
       } = state;
-      const layer = getActiveLayer();
-      if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
+      const layer = getLayer() as Layer;
+      if (layer.locked) return {};
+      const cel = getCel() as Uint8ClampedArray;
 
-      const newData = new Uint8ClampedArray(layer.data);
+      const newData = new Uint8ClampedArray(cel);
       const newDrawBuffer = [...drawBuffer];
       const newDrawnPixels = new Set(drawnPixels);
       const offset = -Math.floor(brushSize / 2);
@@ -1159,13 +1189,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               x: pixelX,
               y: pixelY,
               color,
-              prevColor: getPixelColor(pixelX, pixelY, activeLayerId),
+              prevColor: getPixelColor(pixelX, pixelY),
             });
             setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
         }
       }
-      setLayerData(newData, activeLayerId);
+      setCelData(newData);
       return {
         drawBuffer: newDrawBuffer,
         drawnPixels: newDrawnPixels,
