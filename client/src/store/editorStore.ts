@@ -1205,7 +1205,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawShade: (x, y, darken) =>
     set((state) => {
       const {
-        activeLayerId,
         gridSize,
         brushSize,
         switchDarkenAndLighten,
@@ -1213,15 +1212,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         drawBuffer,
         drawnPixels,
         lastDrawPos,
-        getActiveLayer,
-        setLayerData,
+        getLayer,
+        getCel,
+        setCelData,
         getPixelColor,
       } = state;
-      const layer = getActiveLayer();
-      if (layer.locked) return {};
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
+      const layer = getLayer() as Layer;
+      if (layer.locked) return {};
+      const cel = getCel() as Uint8ClampedArray;
 
-      const newData = new Uint8ClampedArray(layer.data);
+      const newData = new Uint8ClampedArray(cel);
       const newDrawBuffer = [...drawBuffer];
       const newDrawnPixels = new Set(drawnPixels);
       const offset = -Math.floor(brushSize / 2);
@@ -1237,7 +1238,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             const pixelY = point.y + i + offset;
             if (!isValidIndex(pixelX, pixelY, gridSize)) continue;
 
-            const currColor = getPixelColor(pixelX, pixelY, activeLayerId);
+            const currColor = getPixelColor(pixelX, pixelY);
             if (currColor.a === 0) continue;
             currColor.a /= 255;
             const newColor = darken
@@ -1259,7 +1260,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         }
       }
-      setLayerData(newData, activeLayerId);
+      setCelData(newData);
       return {
         drawBuffer: newDrawBuffer,
         drawnPixels: newDrawnPixels,
@@ -1269,20 +1270,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawLine: (color, mod) =>
     set((state) => {
       const {
-        activeLayerId,
         gridSize,
         brushSize,
         lineStartPos,
         lineEndPos,
-        getActiveLayer,
-        setLayerData,
+        getLayer,
+        getCel,
+        setCelData,
         getPixelColor,
       } = state;
-      const layer = getActiveLayer();
-      if (layer.locked) return {};
       if (!lineStartPos || !lineEndPos) return {};
+      const layer = getLayer() as Layer;
+      if (layer.locked) return {};
+      const cel = getCel() as Uint8ClampedArray;
 
-      const newData = new Uint8ClampedArray(layer.data);
+      const newData = new Uint8ClampedArray(cel);
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
@@ -1311,13 +1313,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               x: pixelX,
               y: pixelY,
               color,
-              prevColor: getPixelColor(pixelX, pixelY, activeLayerId),
+              prevColor: getPixelColor(pixelX, pixelY),
             });
             setPixelColor(pixelX, pixelY, gridSize.x, color, newData);
           }
         }
       }
-      setLayerData(newData, activeLayerId);
+      setCelData(newData);
       return {
         lineStartPos: null,
         lineEndPos: null,
@@ -1327,22 +1329,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawShape: (color, mod1, mod2) =>
     set((state) => {
       const {
-        activeLayerId,
         gridSize,
         brushSize,
         shapeStartPos,
         shapeEndPos,
         shapeMode,
         shapeFill,
-        getActiveLayer,
-        setLayerData,
+        getLayer,
+        getCel,
+        setCelData,
         getPixelColor,
       } = state;
-      const layer = getActiveLayer();
-      if (layer.locked) return {};
       if (!shapeStartPos || !shapeEndPos) return {};
+      const layer = getLayer() as Layer;
+      if (layer.locked) return {};
+      const cel = getCel() as Uint8ClampedArray;
 
-      const newData = new Uint8ClampedArray(layer.data);
+      const newData = new Uint8ClampedArray(cel);
       const drawBuffer: DrawActionPixel[] = [];
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
@@ -1362,7 +1365,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           x: px,
           y: py,
           color,
-          prevColor: getPixelColor(px, py, activeLayerId),
+          prevColor: getPixelColor(px, py),
         });
         setPixelColor(px, py, gridSize.x, color, newData);
       }
@@ -1388,7 +1391,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         for (const point of fillPoints) setPixel(point.x, point.y);
       }
 
-      setLayerData(newData, activeLayerId);
+      setCelData(newData);
       return {
         shapeStartPos: null,
         shapeEndPos: null,
@@ -1399,18 +1402,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   floodFill: (x, y, color, isUpdateHistory = true) => {
     const {
       activeLayerId,
+      activeFrameId,
       gridSize,
-      getActiveLayer,
-      setLayerData,
+      getLayer,
+      getCel,
+      setCelData,
       updateHistory,
     } = get();
     if (!isValidIndex(x, y, gridSize)) return;
-    const layer = getActiveLayer();
+    const layer = getLayer() as Layer;
     if (layer.locked) return;
-    const targetColor = getPixelColor(x, y, gridSize.x, layer.data);
+    const cel = getCel() as Uint8ClampedArray;
+    const targetColor = getPixelColor(x, y, gridSize.x, cel);
     if (isEqualColor(targetColor, color)) return;
 
-    const newData = new Uint8ClampedArray(layer.data);
+    const newData = new Uint8ClampedArray(cel);
     const queue: { x: number; y: number }[] = [];
     queue.push({ x, y });
     while (queue.length > 0) {
@@ -1430,14 +1436,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const action: BucketAction = {
         action: "bucket",
         layerId: activeLayerId,
-        data: layer.data,
+        frameId: activeFrameId,
+        data: cel,
         x,
         y,
         color,
       };
       updateHistory(action);
     }
-    setLayerData(newData, activeLayerId);
+    setCelData(newData);
   },
   newCanvas: (size) => {
     get().applyPendingActions();
