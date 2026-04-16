@@ -189,6 +189,7 @@ type LayerMoveAction = {
   action: "layer-move";
   layers: Layer[];
   prevLayers: Layer[];
+  activeLayerId: string;
 };
 
 type LayerToggleAction = {
@@ -232,6 +233,7 @@ type FrameMoveAction = {
   action: "frame-move";
   frames: Frame[];
   prevFrames: Frame[];
+  activeFrameId: string;
 };
 
 type DrawActionPixel = {
@@ -707,27 +709,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   newLayer: () => {
     get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, gridSize, updateHistory } = state;
+      const { layers, frames, cels, activeLayerId, gridSize, updateHistory } =
+        state;
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
-      const newLayer = createNewLayer(
-        gridSize.x,
-        gridSize.y,
-        getAutoLayerName(layers),
-      );
+      const newLayer = createNewLayer(getAutoLayerName(layers));
       const newLayers = [...layers];
       newLayers.splice(activeIndex + 1, 0, newLayer);
+      const newCels: Cels = { ...cels };
+      for (let i = 0; i < frames.length; i++)
+        newCels[`${newLayer.id}-${frames[i].id}`] = new Uint8ClampedArray(
+          gridSize.x * gridSize.y * 4,
+        );
 
       const action: LayerStructureAction = {
         action: "layer-structure",
-        prevLayers: layers,
-        prevActiveLayerId: activeLayerId,
         layers: newLayers,
+        prevLayers: layers,
+        cels: newCels,
+        prevCels: cels,
         activeLayerId: newLayer.id,
+        prevActiveLayerId: activeLayerId,
       };
       updateHistory(action);
 
       return {
         layers: newLayers,
+        cels: newCels,
         activeLayerId: newLayer.id,
       };
     });
@@ -735,24 +742,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   duplicateLayer: () => {
     get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, getActiveLayer, updateHistory } = state;
-      const active = getActiveLayer();
+      const {
+        layers,
+        frames,
+        cels,
+        activeLayerId,
+        getLayer,
+        getCel,
+        updateHistory,
+      } = state;
+      const active = getLayer() as Layer;
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newLayer = duplicateLayer(active);
       const newLayers = [...layers];
       newLayers.splice(activeIndex + 1, 0, newLayer);
+      const newCels: Cels = { ...cels };
+      for (let i = 0; i < frames.length; i++) {
+        const celToDuplicate = getCel(activeLayerId, frames[i].id);
+        if (celToDuplicate)
+          newCels[`${newLayer.id}-${frames[i].id}`] = celToDuplicate;
+      }
 
       const action: LayerStructureAction = {
         action: "layer-structure",
-        prevLayers: layers,
-        prevActiveLayerId: activeLayerId,
         layers: newLayers,
+        prevLayers: layers,
+        cels: newCels,
+        prevCels: cels,
         activeLayerId: newLayer.id,
+        prevActiveLayerId: activeLayerId,
       };
       updateHistory(action);
 
       return {
         layers: newLayers,
+        cels: newCels,
         activeLayerId: newLayer.id,
       };
     });
@@ -760,23 +784,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   deleteLayer: () => {
     get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, updateHistory } = state;
-      if (layers.length <= 1) return {};
+      const { layers, frames, cels, activeLayerId, updateHistory } = state;
+      if (layers.length < 2) return {};
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newActiveIndex = activeIndex === 0 ? 0 : activeIndex - 1;
       const newLayers = layers.filter((l) => l.id !== activeLayerId);
+      const newCels: Cels = { ...cels };
+      for (let i = 0; i < frames.length; i++)
+        delete newCels[`${activeLayerId}-${frames[i].id}`];
 
       const action: LayerStructureAction = {
         action: "layer-structure",
-        prevLayers: layers,
-        prevActiveLayerId: activeLayerId,
         layers: newLayers,
+        prevLayers: layers,
+        cels: newCels,
+        prevCels: cels,
         activeLayerId: newLayers[newActiveIndex].id,
+        prevActiveLayerId: activeLayerId,
       };
       updateHistory(action);
 
       return {
         layers: newLayers,
+        cels: newCels,
         activeLayerId: newLayers[newActiveIndex].id,
       };
     });
@@ -792,11 +822,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newLayers[index],
       ];
 
-      const action: LayerStructureAction = {
-        action: "layer-structure",
-        prevLayers: layers,
-        prevActiveLayerId: activeLayerId,
+      const action: LayerMoveAction = {
+        action: "layer-move",
         layers: newLayers,
+        prevLayers: layers,
         activeLayerId,
       };
       updateHistory(action);
@@ -814,11 +843,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newLayers[index],
       ];
 
-      const action: LayerStructureAction = {
-        action: "layer-structure",
-        prevLayers: layers,
-        prevActiveLayerId: activeLayerId,
+      const action: LayerMoveAction = {
+        action: "layer-move",
         layers: newLayers,
+        prevLayers: layers,
         activeLayerId,
       };
       updateHistory(action);
@@ -828,32 +856,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mergeLayerDown: () => {
     get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, gridSize, updateHistory } = state;
-      const index = layers.findIndex((l) => l.id === activeLayerId);
-      if (index <= 0) return {};
+      const {
+        layers,
+        frames,
+        cels,
+        activeLayerId,
+        gridSize,
+        getCel,
+        updateHistory,
+      } = state;
+      const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
+      if (activeIndex < 1) return {};
 
-      const topLayer = layers[index];
-      const bottomLayer = layers[index - 1];
-      const composited = compositeLayers(
-        [bottomLayer, topLayer],
-        gridSize.x,
-        gridSize.y,
-        true,
-      );
-      const newLayers = layers.filter((_, i) => i !== index);
-      newLayers[index - 1] = { ...bottomLayer, data: composited };
+      const topLayer = layers[activeIndex];
+      const bottomLayer = layers[activeIndex - 1];
+      const newLayers = layers.filter((l) => l.id !== activeLayerId);
+      const newCels: Cels = { ...cels };
+      for (let i = 0; i < frames.length; i++) {
+        const topCel = getCel(topLayer.id, frames[i].id) as Uint8ClampedArray;
+        const bottomCel = getCel(
+          bottomLayer.id,
+          frames[i].id,
+        ) as Uint8ClampedArray;
+        const composited = compositeLayers(
+          [
+            { ...bottomLayer, cel: bottomCel },
+            { ...topLayer, cel: topCel },
+          ],
+          gridSize.x,
+          gridSize.y,
+          true,
+        );
+        delete newCels[`${topLayer.id}-${frames[i].id}`];
+        newCels[`${bottomLayer.id}-${frames[i].id}`] = composited;
+      }
 
       const action: LayerStructureAction = {
         action: "layer-structure",
-        prevLayers: layers,
-        prevActiveLayerId: activeLayerId,
         layers: newLayers,
+        prevLayers: layers,
+        cels: newCels,
+        prevCels: cels,
         activeLayerId: bottomLayer.id,
+        prevActiveLayerId: activeLayerId,
       };
       updateHistory(action);
 
       return {
         layers: newLayers,
+        cels: newCels,
         activeLayerId: bottomLayer.id,
       };
     });
@@ -861,27 +912,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   flattenLayers: () => {
     get().applyPendingActions();
     set((state) => {
-      const { layers, activeLayerId, gridSize, updateHistory } = state;
-      if (layers.length <= 1) return {};
-
-      const flattened = createNewLayer(
-        gridSize.x,
-        gridSize.y,
-        "Flattened",
-        compositeLayers(layers, gridSize.x, gridSize.y),
-      );
+      const {
+        layers,
+        frames,
+        cels,
+        activeLayerId,
+        gridSize,
+        getCel,
+        updateHistory,
+      } = state;
+      if (layers.length < 2) return {};
+      const flattened = createNewLayer("Flattened");
+      const newCels: Cels = {};
+      for (let i = 0; i < frames.length; i++) {
+        const layersToComposite: LayerWithCel[] = layers.map((layer) => {
+          const cel = getCel(layer.id, frames[i].id) as Uint8ClampedArray;
+          return { ...layer, cel };
+        });
+        const composited = compositeLayers(
+          layersToComposite,
+          gridSize.x,
+          gridSize.y,
+        );
+        newCels[`${flattened.id}-${frames[i].id}`] = composited;
+      }
 
       const action: LayerStructureAction = {
         action: "layer-structure",
-        prevLayers: layers,
-        prevActiveLayerId: activeLayerId,
         layers: [flattened],
+        prevLayers: layers,
+        cels: newCels,
+        prevCels: cels,
         activeLayerId: flattened.id,
+        prevActiveLayerId: activeLayerId,
       };
       updateHistory(action);
 
       return {
         layers: [flattened],
+        cels: newCels,
         activeLayerId: flattened.id,
       };
     });
