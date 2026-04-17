@@ -362,6 +362,12 @@ type EditorState = {
   moveLayerDown: () => void;
   mergeLayerDown: () => void;
   flattenLayers: () => void;
+  selectFrame: (id: string) => void;
+  newFrame: (last?: boolean) => void;
+  duplicateFrame: () => void;
+  deleteFrame: () => void;
+  moveFrameLeft: () => void;
+  moveFrameRight: () => void;
   clearLayer: () => void;
   rotateLayer: (degrees: 90 | 180 | 270) => void;
   flipLayer: (direction: "horizontal" | "vertical") => void;
@@ -955,6 +961,154 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     });
   },
+  selectFrame: (id) =>
+    set((state) => {
+      state.applyPendingActions();
+      return { activeFrameId: id };
+    }),
+  newFrame: (last = false) => {
+    get().applyPendingActions();
+    set((state) => {
+      const { layers, frames, cels, activeFrameId, gridSize, updateHistory } =
+        state;
+      const newFrame: Frame = { id: crypto.randomUUID() };
+      const newFrames = [...frames];
+      if (last) newFrames.push(newFrame);
+      else {
+        const activeIndex = frames.findIndex((f) => f.id === activeFrameId);
+        newFrames.splice(activeIndex + 1, 0, newFrame);
+      }
+      const newCels: Cels = { ...cels };
+      for (let i = 0; i < layers.length; i++)
+        newCels[`${layers[i].id}-${newFrame.id}`] = new Uint8ClampedArray(
+          gridSize.x * gridSize.y * 4,
+        );
+
+      const action: FrameStructureAction = {
+        action: "frame-structure",
+        frames: newFrames,
+        prevFrames: frames,
+        cels: newCels,
+        prevCels: cels,
+        activeFrameId: newFrame.id,
+        prevActiveFrameId: activeFrameId,
+      };
+      updateHistory(action);
+
+      return {
+        frames: newFrames,
+        cels: newCels,
+        activeFrameId: newFrame.id,
+      };
+    });
+  },
+  duplicateFrame: () => {
+    get().applyPendingActions();
+    set((state) => {
+      const { layers, frames, cels, activeFrameId, getCel, updateHistory } =
+        state;
+      const activeIndex = frames.findIndex((f) => f.id === activeFrameId);
+      const newFrame: Frame = { id: crypto.randomUUID() };
+      const newFrames = [...frames];
+      newFrames.splice(activeIndex + 1, 0, newFrame);
+      const newCels: Cels = { ...cels };
+      for (let i = 0; i < layers.length; i++) {
+        const celToDuplicate = getCel(layers[i].id, activeFrameId);
+        if (celToDuplicate)
+          newCels[`${layers[i].id}-${newFrame.id}`] = celToDuplicate;
+      }
+
+      const action: FrameStructureAction = {
+        action: "frame-structure",
+        frames: newFrames,
+        prevFrames: frames,
+        cels: newCels,
+        prevCels: cels,
+        activeFrameId: newFrame.id,
+        prevActiveFrameId: activeFrameId,
+      };
+      updateHistory(action);
+
+      return {
+        frames: newFrames,
+        cels: newCels,
+        activeFrameId: newFrame.id,
+      };
+    });
+  },
+  deleteFrame: () => {
+    get().applyPendingActions();
+    set((state) => {
+      const { layers, frames, cels, activeFrameId, updateHistory } = state;
+      if (frames.length < 2) return {};
+      const activeIndex = frames.findIndex((f) => f.id === activeFrameId);
+      const newActiveIndex =
+        activeIndex < frames.length - 1 ? activeIndex : activeIndex - 1;
+      const newFrames = frames.filter((f) => f.id !== activeFrameId);
+      const newCels: Cels = { ...cels };
+      for (let i = 0; i < layers.length; i++)
+        delete newCels[`${layers[i].id}-${activeFrameId}`];
+
+      const action: FrameStructureAction = {
+        action: "frame-structure",
+        frames: newFrames,
+        prevFrames: frames,
+        cels: newCels,
+        prevCels: cels,
+        activeFrameId: newFrames[newActiveIndex].id,
+        prevActiveFrameId: activeFrameId,
+      };
+      updateHistory(action);
+
+      return {
+        frames: newFrames,
+        cels: newCels,
+        activeFrameId: newFrames[newActiveIndex].id,
+      };
+    });
+  },
+  moveFrameLeft: () =>
+    set((state) => {
+      const { frames, activeFrameId, updateHistory } = state;
+      const index = frames.findIndex((f) => f.id === activeFrameId);
+      if (index <= 0) return {};
+      const newFrames = [...frames];
+      [newFrames[index], newFrames[index - 1]] = [
+        newFrames[index - 1],
+        newFrames[index],
+      ];
+
+      const action: FrameMoveAction = {
+        action: "frame-move",
+        frames: newFrames,
+        prevFrames: frames,
+        activeFrameId,
+      };
+      updateHistory(action);
+
+      return { frames: newFrames };
+    }),
+  moveFrameRight: () =>
+    set((state) => {
+      const { frames, activeFrameId, updateHistory } = state;
+      const index = frames.findIndex((f) => f.id === activeFrameId);
+      if (index >= frames.length - 1) return {};
+      const newFrames = [...frames];
+      [newFrames[index], newFrames[index + 1]] = [
+        newFrames[index + 1],
+        newFrames[index],
+      ];
+
+      const action: FrameMoveAction = {
+        action: "frame-move",
+        frames: newFrames,
+        prevFrames: frames,
+        activeFrameId,
+      };
+      updateHistory(action);
+
+      return { frames: newFrames };
+    }),
   clearLayer: () => {
     get().applyPendingActions();
     const {
