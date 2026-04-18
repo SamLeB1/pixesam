@@ -341,14 +341,9 @@ type EditorState = {
   discardPendingActions: () => void;
   applyPendingActions: () => void;
   selectTool: (tool: Tool) => void;
-  getLayer: (id?: string) => Layer | null;
-  getFrame: (id?: string) => Frame | null;
-  getCel: (layerId?: string, frameId?: string) => Uint8ClampedArray | null;
-  setCelData: (
-    data: Uint8ClampedArray,
-    layerId?: string,
-    frameId?: string,
-  ) => void;
+  getLayer: (id?: string) => Layer;
+  getFrame: (id?: string) => Frame;
+  getCel: (layerId?: string, frameId?: string) => Uint8ClampedArray;
   selectLayer: (id: string) => void;
   toggleLayerVisibility: (id: string) => void;
   toggleLayerLock: (id: string) => void;
@@ -591,49 +586,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { selectedTool: tool };
     }),
   getLayer: (id) => {
-    if (id) {
-      const { layers } = get();
-      const layer = layers.find((l) => l.id === id);
-      return layer ? layer : null;
-    } else {
-      const { layers, activeLayerId } = get();
-      const layer = layers.find((l) => l.id === activeLayerId);
-      return layer ? layer : null;
-    }
+    const { layers, activeLayerId } = get();
+    if (!id) id = activeLayerId;
+    const layer = layers.find((l) => l.id === id);
+    if (!layer) throw new Error(`Layer ${id} not found.`);
+    return layer;
   },
   getFrame: (id) => {
-    if (id) {
-      const { frames } = get();
-      const frame = frames.find((f) => f.id === id);
-      return frame ? frame : null;
-    } else {
-      const { frames, activeFrameId } = get();
-      const frame = frames.find((f) => f.id === activeFrameId);
-      return frame ? frame : null;
-    }
+    const { frames, activeFrameId } = get();
+    if (!id) id = activeFrameId;
+    const frame = frames.find((f) => f.id === id);
+    if (!frame) throw new Error(`Frame ${id} not found.`);
+    return frame;
   },
   getCel: (layerId, frameId) => {
-    if (layerId && frameId) {
-      const { cels } = get();
-      const cel = cels[`${layerId}-${frameId}`];
-      return cel ? cel : null;
-    } else {
-      const { cels, activeLayerId, activeFrameId } = get();
-      const cel = cels[`${activeLayerId}-${activeFrameId}`];
-      return cel ? cel : null;
-    }
-  },
-  setCelData: (data, layerId, frameId) => {
     const { cels, activeLayerId, activeFrameId } = get();
     if (!layerId || !frameId) {
       layerId = activeLayerId;
       frameId = activeFrameId;
     }
-    if (cels[`${layerId}-${frameId}`]) {
-      const newCels = { ...cels };
-      newCels[`${layerId}-${frameId}`] = data;
-      set({ cels: newCels });
-    }
+    const cel = cels[`${layerId}-${frameId}`];
+    if (!cel) throw new Error(`Cel ${layerId}-${frameId} not found.`);
+    return cel;
   },
   selectLayer: (id) =>
     set((state) => {
@@ -664,7 +638,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const { layers, getLayer, updateHistory } = state;
       const layer = getLayer(id);
-      if (!layer) return {};
 
       const action: LayerRenameAction = {
         action: "layer-rename",
@@ -680,7 +653,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const { layers, getLayer, updateHistory } = state;
       const layer = getLayer(id);
-      if (!layer) return {};
 
       const action: LayerOpacityAction = {
         action: "layer-opacity",
@@ -698,7 +670,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const { layers, getLayer, updateHistory } = state;
       const layer = getLayer(id);
-      if (!layer) return {};
 
       const action: LayerBlendModeAction = {
         action: "layer-blend-mode",
@@ -757,16 +728,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getCel,
         updateHistory,
       } = state;
-      const active = getLayer() as Layer;
+      const active = getLayer();
       const activeIndex = layers.findIndex((l) => l.id === activeLayerId);
       const newLayer = duplicateLayer(active);
       const newLayers = [...layers];
       newLayers.splice(activeIndex + 1, 0, newLayer);
       const newCels: Cels = { ...cels };
       for (let i = 0; i < frames.length; i++) {
-        const celToDuplicate = getCel(activeLayerId, frames[i].id);
-        if (celToDuplicate)
-          newCels[`${newLayer.id}-${frames[i].id}`] = celToDuplicate;
+        newCels[`${newLayer.id}-${frames[i].id}`] = getCel(
+          activeLayerId,
+          frames[i].id,
+        );
       }
 
       const action: LayerStructureAction = {
@@ -879,11 +851,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newLayers = layers.filter((l) => l.id !== activeLayerId);
       const newCels: Cels = { ...cels };
       for (let i = 0; i < frames.length; i++) {
-        const topCel = getCel(topLayer.id, frames[i].id) as Uint8ClampedArray;
-        const bottomCel = getCel(
-          bottomLayer.id,
-          frames[i].id,
-        ) as Uint8ClampedArray;
+        const topCel = getCel(topLayer.id, frames[i].id);
+        const bottomCel = getCel(bottomLayer.id, frames[i].id);
         const composited = compositeLayers(
           [
             { ...bottomLayer, cel: bottomCel },
@@ -932,7 +901,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newCels: Cels = {};
       for (let i = 0; i < frames.length; i++) {
         const layersToComposite: LayerWithCel[] = layers.map((layer) => {
-          const cel = getCel(layer.id, frames[i].id) as Uint8ClampedArray;
+          const cel = getCel(layer.id, frames[i].id);
           return { ...layer, cel };
         });
         const composited = compositeLayers(
@@ -1013,9 +982,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       newFrames.splice(activeIndex + 1, 0, newFrame);
       const newCels: Cels = { ...cels };
       for (let i = 0; i < layers.length; i++) {
-        const celToDuplicate = getCel(layers[i].id, activeFrameId);
-        if (celToDuplicate)
-          newCels[`${layers[i].id}-${newFrame.id}`] = celToDuplicate;
+        newCels[`${layers[i].id}-${newFrame.id}`] = getCel(
+          layers[i].id,
+          activeFrameId,
+        );
       }
 
       const action: FrameStructureAction = {
@@ -1208,13 +1178,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   getPixelColor: (x, y, layerId, frameId) => {
     const { activeLayerId, activeFrameId, gridSize, getCel } = get();
+    if (!isValidIndex(x, y, gridSize)) return { r: 0, g: 0, b: 0, a: 0 };
     if (!layerId || !frameId) {
       layerId = activeLayerId;
       frameId = activeFrameId;
     }
     const cel = getCel(layerId, frameId);
-    if (!cel || !isValidIndex(x, y, gridSize))
-      return { r: 0, g: 0, b: 0, a: 0 };
     const baseIndex = getBaseIndex(x, y, gridSize.x);
     return {
       r: cel[baseIndex],
@@ -1230,14 +1199,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const baseIndex = getBaseIndex(x, y, gridSize.x);
     const pxLayers: LayerWithCel[] = layers.map((layer) => {
       const cel = getCel(layer.id, frameId);
-      const px = cel
-        ? new Uint8ClampedArray([
-            cel[baseIndex],
-            cel[baseIndex + 1],
-            cel[baseIndex + 2],
-            cel[baseIndex + 3],
-          ])
-        : new Uint8ClampedArray([0, 0, 0, 0]);
+      const px = new Uint8ClampedArray([
+        cel[baseIndex],
+        cel[baseIndex + 1],
+        cel[baseIndex + 2],
+        cel[baseIndex + 3],
+      ]);
       return { ...layer, cel: px };
     });
     const composited = compositeLayers(pxLayers, 1, 1);
@@ -1387,9 +1354,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
-      const layer = getLayer() as Layer;
+      const layer = getLayer();
       if (layer.locked) return {};
-      const cel = getCel() as Uint8ClampedArray;
+      const cel = getCel();
 
       const newData = new Uint8ClampedArray(cel);
       const newDrawBuffer = [...drawBuffer];
@@ -1441,9 +1408,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
-      const layer = getLayer() as Layer;
+      const layer = getLayer();
       if (layer.locked) return {};
-      const cel = getCel() as Uint8ClampedArray;
+      const cel = getCel();
 
       const newData = new Uint8ClampedArray(cel);
       const newDrawBuffer = [...drawBuffer];
@@ -1503,9 +1470,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       if (!lineStartPos || !lineEndPos) return {};
-      const layer = getLayer() as Layer;
+      const layer = getLayer();
       if (layer.locked) return {};
-      const cel = getCel() as Uint8ClampedArray;
+      const cel = getCel();
 
       const newData = new Uint8ClampedArray(cel);
       const drawBuffer: DrawActionPixel[] = [];
@@ -1564,9 +1531,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         getPixelColor,
       } = state;
       if (!shapeStartPos || !shapeEndPos) return {};
-      const layer = getLayer() as Layer;
+      const layer = getLayer();
       if (layer.locked) return {};
-      const cel = getCel() as Uint8ClampedArray;
+      const cel = getCel();
 
       const newData = new Uint8ClampedArray(cel);
       const drawBuffer: DrawActionPixel[] = [];
@@ -1633,9 +1600,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       updateHistory,
     } = get();
     if (!isValidIndex(x, y, gridSize)) return;
-    const layer = getLayer() as Layer;
+    const layer = getLayer();
     if (layer.locked) return;
-    const cel = getCel() as Uint8ClampedArray;
+    const cel = getCel();
     const targetColor = getPixelColor(x, y, gridSize.x, cel);
     if (isEqualColor(targetColor, color)) return;
 
@@ -2543,7 +2510,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newRedoHistory = [action, ...redoHistory];
 
     if (action.action === "draw") {
-      const layer = getLayer(action.layerId) as Layer;
+      const layer = getLayer(action.layerId);
       const newData = new Uint8ClampedArray(layer.data);
       for (let i = 0; i < action.pixels.length; i++) {
         const { x, y, prevColor } = action.pixels[i];
@@ -2568,7 +2535,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         dstMask,
         overwrittenPixels,
       } = action;
-      const layer = getLayer(layerId) as Layer;
+      const layer = getLayer(layerId);
       const newData = new Uint8ClampedArray(layer.data);
       drawRectContent(dstRect, overwrittenPixels, newData, gridSize, dstMask);
       drawRectContent(srcRect, srcPixels, newData, gridSize, srcMask);
@@ -2579,14 +2546,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ activeLayerId: action.layerId });
     } else if (action.action === "delete") {
       const { layerId, area, pixels, mask } = action;
-      const layer = getLayer(layerId) as Layer;
+      const layer = getLayer(layerId);
       const newData = new Uint8ClampedArray(layer.data);
       drawRectContent(area, pixels, newData, gridSize, mask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "paste") {
       const { layerId, area, prevPixels, mask } = action;
-      const layer = getLayer(layerId) as Layer;
+      const layer = getLayer(layerId);
       const newData = new Uint8ClampedArray(layer.data);
       drawRectContent(area, prevPixels, newData, gridSize, mask);
       setLayerData(newData, layerId);
@@ -2637,7 +2604,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }));
       set({ layers: newLayers });
     } else if (action.action === "flip-layer") {
-      const layer = getLayer(action.layerId) as Layer;
+      const layer = getLayer(action.layerId);
       setLayerData(
         flipPixels(layer.data, gridSize, action.direction),
         action.layerId,
@@ -2717,7 +2684,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newUndoHistory = [action, ...undoHistory];
 
     if (action.action === "draw") {
-      const layer = getLayer(action.layerId) as Layer;
+      const layer = getLayer(action.layerId);
       const newData = new Uint8ClampedArray(layer.data);
       for (let i = action.pixels.length - 1; i >= 0; i--) {
         const { x, y, color } = action.pixels[i];
@@ -2735,7 +2702,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       floodFill(x, y, color, false);
     } else if (action.action === "transform") {
       const { layerId, srcRect, srcMask, dstRect, dstPixels, dstMask } = action;
-      const layer = getLayer(layerId) as Layer;
+      const layer = getLayer(layerId);
       const newData = new Uint8ClampedArray(layer.data);
       clearRectContent(srcRect, newData, gridSize, srcMask);
       drawRectContent(dstRect, dstPixels, newData, gridSize, dstMask);
@@ -2743,7 +2710,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ activeLayerId: layerId });
     } else if (action.action === "move") {
       const { layerId, offset } = action;
-      const layer = getLayer(layerId) as Layer;
+      const layer = getLayer(layerId);
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
 
       for (let y = 0; y < gridSize.y; y++) {
@@ -2764,14 +2731,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ activeLayerId: layerId });
     } else if (action.action === "delete") {
       const { layerId, area, mask } = action;
-      const layer = getLayer(layerId) as Layer;
+      const layer = getLayer(layerId);
       const newData = new Uint8ClampedArray(layer.data);
       clearRectContent(area, newData, gridSize, mask);
       setLayerData(newData, layerId);
       set({ activeLayerId: layerId });
     } else if (action.action === "paste") {
       const { layerId, area, pixels, mask } = action;
-      const layer = getLayer(layerId) as Layer;
+      const layer = getLayer(layerId);
       const newData = new Uint8ClampedArray(layer.data);
       drawRectContent(area, pixels, newData, gridSize, mask);
       setLayerData(newData, layerId);
@@ -2840,7 +2807,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }));
       set({ layers: newLayers });
     } else if (action.action === "flip-layer") {
-      const layer = getLayer(action.layerId) as Layer;
+      const layer = getLayer(action.layerId);
       setLayerData(
         flipPixels(layer.data, gridSize, action.direction),
         action.layerId,
