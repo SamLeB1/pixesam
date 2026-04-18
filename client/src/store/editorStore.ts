@@ -363,9 +363,9 @@ type EditorState = {
   deleteFrame: () => void;
   moveFrameLeft: () => void;
   moveFrameRight: () => void;
-  clearLayer: () => void;
-  rotateLayer: (degrees: 90 | 180 | 270) => void;
-  flipLayer: (direction: "horizontal" | "vertical") => void;
+  clearCel: () => void;
+  rotateCel: (degrees: 90 | 180 | 270) => void;
+  flipCel: (direction: "horizontal" | "vertical") => void;
   getActiveColorHex: () => string;
   getActiveColorRGBA: () => RGBA;
   getPixelColor: (
@@ -1079,91 +1079,115 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return { frames: newFrames };
     }),
-  clearLayer: () => {
+  clearCel: () => {
     get().applyPendingActions();
-    const {
-      activeLayerId,
-      gridSize,
-      getActiveLayer,
-      setLayerData,
-      updateHistory,
-    } = get();
-    const layer = getActiveLayer();
-    if (layer.locked) return;
+    set((state) => {
+      const {
+        cels,
+        activeLayerId,
+        activeFrameId,
+        gridSize,
+        getLayer,
+        getCel,
+        updateHistory,
+      } = state;
+      const layer = getLayer();
+      if (layer.locked) return {};
+      const cel = getCel();
 
-    const action: ClearAction = {
-      action: "clear",
-      layerId: activeLayerId,
-      data: layer.data,
-    };
-    updateHistory(action);
+      const action: ClearAction = {
+        action: "clear",
+        layerId: activeLayerId,
+        frameId: activeFrameId,
+        data: cel,
+      };
+      updateHistory(action);
 
-    const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
-    setLayerData(newData, activeLayerId);
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = new Uint8ClampedArray(
+        gridSize.x * gridSize.y * 4,
+      );
+      return { cels: newCels };
+    });
   },
-  rotateLayer: (degrees) => {
+  rotateCel: (degrees) => {
     get().applyPendingActions();
-    const {
-      activeLayerId,
-      gridSize,
-      getActiveLayer,
-      setLayerData,
-      updateHistory,
-    } = get();
-    const layer = getActiveLayer();
-    if (layer.locked) return;
+    set((state) => {
+      const {
+        cels,
+        activeLayerId,
+        activeFrameId,
+        gridSize,
+        getLayer,
+        getCel,
+        updateHistory,
+      } = state;
+      const layer = getLayer();
+      if (layer.locked) return {};
+      const cel = getCel();
 
-    const rotatedSize =
-      degrees === 180
-        ? { x: gridSize.x, y: gridSize.y }
-        : { x: gridSize.y, y: gridSize.x };
-    const rotatedData = rotatePixels(layer.data, gridSize, degrees);
-    const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
-    for (let y = 0; y < rotatedSize.y; y++) {
-      for (let x = 0; x < rotatedSize.x; x++) {
-        if (x < gridSize.x && y < gridSize.y) {
-          const srcIndex = getBaseIndex(x, y, rotatedSize.x);
-          const dstIndex = getBaseIndex(x, y, gridSize.x);
-          newData[dstIndex] = rotatedData[srcIndex];
-          newData[dstIndex + 1] = rotatedData[srcIndex + 1];
-          newData[dstIndex + 2] = rotatedData[srcIndex + 2];
-          newData[dstIndex + 3] = rotatedData[srcIndex + 3];
+      const rotatedSize =
+        degrees === 180
+          ? { x: gridSize.x, y: gridSize.y }
+          : { x: gridSize.y, y: gridSize.x };
+      const rotatedData = rotatePixels(cel, gridSize, degrees);
+      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
+      for (let y = 0; y < rotatedSize.y; y++) {
+        for (let x = 0; x < rotatedSize.x; x++) {
+          if (x < gridSize.x && y < gridSize.y) {
+            const srcIndex = getBaseIndex(x, y, rotatedSize.x);
+            const dstIndex = getBaseIndex(x, y, gridSize.x);
+            newData[dstIndex] = rotatedData[srcIndex];
+            newData[dstIndex + 1] = rotatedData[srcIndex + 1];
+            newData[dstIndex + 2] = rotatedData[srcIndex + 2];
+            newData[dstIndex + 3] = rotatedData[srcIndex + 3];
+          }
         }
       }
-    }
 
-    const action: RotateLayerAction = {
-      action: "rotate-layer",
-      layerId: activeLayerId,
-      data: layer.data,
-      degrees,
-    };
-    updateHistory(action);
+      const action: RotateCelAction = {
+        action: "rotate-cel",
+        layerId: activeLayerId,
+        frameId: activeFrameId,
+        data: cel,
+        degrees,
+      };
+      updateHistory(action);
 
-    setLayerData(newData, activeLayerId);
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
+      return { cels: newCels };
+    });
   },
-  flipLayer: (direction) => {
+  flipCel: (direction) => {
     get().applyPendingActions();
-    const {
-      activeLayerId,
-      gridSize,
-      getActiveLayer,
-      setLayerData,
-      updateHistory,
-    } = get();
-    const layer = getActiveLayer();
-    if (layer.locked) return;
+    set((state) => {
+      const {
+        cels,
+        activeLayerId,
+        activeFrameId,
+        gridSize,
+        getLayer,
+        getCel,
+        updateHistory,
+      } = state;
+      const layer = getLayer();
+      if (layer.locked) return {};
+      const cel = getCel();
+      const newData = flipPixels(cel, gridSize, direction);
 
-    const newData = flipPixels(layer.data, gridSize, direction);
+      const action: FlipCelAction = {
+        action: "flip-cel",
+        layerId: activeLayerId,
+        frameId: activeFrameId,
+        direction,
+      };
+      updateHistory(action);
 
-    const action: FlipLayerAction = {
-      action: "flip-layer",
-      layerId: activeLayerId,
-      direction,
-    };
-    updateHistory(action);
-
-    setLayerData(newData, activeLayerId);
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
+      return { cels: newCels };
+    });
   },
   getActiveColorHex: () => {
     const { primaryColor, secondaryColor, isPrimaryColorActive } = get();
@@ -2984,19 +3008,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }),
   clearEdit: () => {
-    const { showSelectionPreview, clearLayer, deleteSelection } = get();
+    const { showSelectionPreview, clearCel, deleteSelection } = get();
     if (showSelectionPreview) deleteSelection();
-    else clearLayer();
+    else clearCel();
   },
   rotateEdit: (degrees) => {
-    const { showSelectionPreview, rotateLayer, rotateSelection } = get();
+    const { showSelectionPreview, rotateCel, rotateSelection } = get();
     if (showSelectionPreview) rotateSelection(degrees);
-    else rotateLayer(degrees);
+    else rotateCel(degrees);
   },
   flipEdit: (direction) => {
-    const { showSelectionPreview, flipLayer, flipSelection } = get();
+    const { showSelectionPreview, flipCel, flipSelection } = get();
     if (showSelectionPreview) flipSelection(direction);
-    else flipLayer(direction);
+    else flipCel(direction);
   },
   transformEdit: () => {
     get().applyPendingActions();
