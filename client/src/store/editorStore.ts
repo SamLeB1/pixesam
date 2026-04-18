@@ -1343,6 +1343,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   draw: (x, y, color) =>
     set((state) => {
       const {
+        cels,
+        activeLayerId,
+        activeFrameId,
         gridSize,
         brushSize,
         drawBuffer,
@@ -1350,7 +1353,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastDrawPos,
         getLayer,
         getCel,
-        setCelData,
         getPixelColor,
       } = state;
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
@@ -1385,8 +1387,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         }
       }
-      setCelData(newData);
+
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
       return {
+        cels: newCels,
         drawBuffer: newDrawBuffer,
         drawnPixels: newDrawnPixels,
         lastDrawPos: { x, y },
@@ -1395,6 +1400,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawShade: (x, y, darken) =>
     set((state) => {
       const {
+        cels,
+        activeLayerId,
+        activeFrameId,
         gridSize,
         brushSize,
         switchDarkenAndLighten,
@@ -1404,7 +1412,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastDrawPos,
         getLayer,
         getCel,
-        setCelData,
         getPixelColor,
       } = state;
       if (lastDrawPos && lastDrawPos.x === x && lastDrawPos.y === y) return {};
@@ -1450,8 +1457,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         }
       }
-      setCelData(newData);
+
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
       return {
+        cels: newCels,
         drawBuffer: newDrawBuffer,
         drawnPixels: newDrawnPixels,
         lastDrawPos: { x, y },
@@ -1460,13 +1470,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawLine: (color, mod) =>
     set((state) => {
       const {
+        cels,
+        activeLayerId,
+        activeFrameId,
         gridSize,
         brushSize,
         lineStartPos,
         lineEndPos,
         getLayer,
         getCel,
-        setCelData,
         getPixelColor,
       } = state;
       if (!lineStartPos || !lineEndPos) return {};
@@ -1509,8 +1521,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         }
       }
-      setCelData(newData);
+
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
       return {
+        cels: newCels,
         lineStartPos: null,
         lineEndPos: null,
         drawBuffer,
@@ -1519,6 +1534,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   drawShape: (color, mod1, mod2) =>
     set((state) => {
       const {
+        cels,
+        activeLayerId,
+        activeFrameId,
         gridSize,
         brushSize,
         shapeStartPos,
@@ -1527,7 +1545,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shapeFill,
         getLayer,
         getCel,
-        setCelData,
         getPixelColor,
       } = state;
       if (!shapeStartPos || !shapeEndPos) return {};
@@ -1581,61 +1598,67 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         for (const point of fillPoints) setPixel(point.x, point.y);
       }
 
-      setCelData(newData);
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
       return {
+        cels: newCels,
         shapeStartPos: null,
         shapeEndPos: null,
         drawBuffer,
       };
     }),
   erase: (x, y) => get().draw(x, y, { r: 0, g: 0, b: 0, a: 0 }),
-  floodFill: (x, y, color, isUpdateHistory = true) => {
-    const {
-      activeLayerId,
-      activeFrameId,
-      gridSize,
-      getLayer,
-      getCel,
-      setCelData,
-      updateHistory,
-    } = get();
-    if (!isValidIndex(x, y, gridSize)) return;
-    const layer = getLayer();
-    if (layer.locked) return;
-    const cel = getCel();
-    const targetColor = getPixelColor(x, y, gridSize.x, cel);
-    if (isEqualColor(targetColor, color)) return;
+  floodFill: (x, y, color, isUpdateHistory = true) =>
+    set((state) => {
+      const {
+        cels,
+        activeLayerId,
+        activeFrameId,
+        gridSize,
+        getLayer,
+        getCel,
+        updateHistory,
+      } = state;
+      if (!isValidIndex(x, y, gridSize)) return {};
+      const layer = getLayer();
+      if (layer.locked) return {};
+      const cel = getCel();
+      const targetColor = getPixelColor(x, y, gridSize.x, cel);
+      if (isEqualColor(targetColor, color)) return {};
 
-    const newData = new Uint8ClampedArray(cel);
-    const queue: { x: number; y: number }[] = [];
-    queue.push({ x, y });
-    while (queue.length > 0) {
-      const { x, y } = queue.shift()!;
-      const currentColor = getPixelColor(x, y, gridSize.x, newData);
+      const newData = new Uint8ClampedArray(cel);
+      const queue: { x: number; y: number }[] = [];
+      queue.push({ x, y });
+      while (queue.length > 0) {
+        const { x, y } = queue.shift()!;
+        const currentColor = getPixelColor(x, y, gridSize.x, newData);
 
-      if (isEqualColor(currentColor, targetColor)) {
-        setPixelColor(x, y, gridSize.x, color, newData);
-        if (isValidIndex(x + 1, y, gridSize)) queue.push({ x: x + 1, y });
-        if (isValidIndex(x - 1, y, gridSize)) queue.push({ x: x - 1, y });
-        if (isValidIndex(x, y + 1, gridSize)) queue.push({ x, y: y + 1 });
-        if (isValidIndex(x, y - 1, gridSize)) queue.push({ x, y: y - 1 });
+        if (isEqualColor(currentColor, targetColor)) {
+          setPixelColor(x, y, gridSize.x, color, newData);
+          if (isValidIndex(x + 1, y, gridSize)) queue.push({ x: x + 1, y });
+          if (isValidIndex(x - 1, y, gridSize)) queue.push({ x: x - 1, y });
+          if (isValidIndex(x, y + 1, gridSize)) queue.push({ x, y: y + 1 });
+          if (isValidIndex(x, y - 1, gridSize)) queue.push({ x, y: y - 1 });
+        }
       }
-    }
 
-    if (isUpdateHistory) {
-      const action: BucketAction = {
-        action: "bucket",
-        layerId: activeLayerId,
-        frameId: activeFrameId,
-        data: cel,
-        x,
-        y,
-        color,
-      };
-      updateHistory(action);
-    }
-    setCelData(newData);
-  },
+      if (isUpdateHistory) {
+        const action: BucketAction = {
+          action: "bucket",
+          layerId: activeLayerId,
+          frameId: activeFrameId,
+          data: cel,
+          x,
+          y,
+          color,
+        };
+        updateHistory(action);
+      }
+
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
+      return { cels: newCels };
+    }),
   newCanvas: (size) => {
     get().applyPendingActions();
     set((state) => {
