@@ -40,6 +40,7 @@ import {
   BASE_PX_SIZE,
   MIN_PX_SIZE,
   MAX_PX_SIZE,
+  DEFAULT_FPS,
   MAX_HISTORY_SIZE,
 } from "../constants";
 import type {
@@ -264,6 +265,7 @@ type EditorState = {
   visibleGridSize: { x: number; y: number };
   panOffset: { x: number; y: number };
   zoomLevel: number;
+  fps: number;
   selectedTool: Tool;
   primaryColor: string;
   secondaryColor: string;
@@ -304,6 +306,7 @@ type EditorState = {
   setVisibleGridSize: (size: { x: number; y: number }) => void;
   setPanOffset: (panOffset: { x: number; y: number }) => void;
   setZoomLevel: (n: number) => void;
+  setFps: (fps: number) => void;
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setIsPrimaryColorActive: (active: boolean) => void;
@@ -452,6 +455,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   visibleGridSize: DEFAULT_GRID_SIZE,
   panOffset: { x: 0, y: 0 },
   zoomLevel: 1,
+  fps: DEFAULT_FPS,
   selectedTool: "pencil",
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
@@ -492,6 +496,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setVisibleGridSize: (size) => set({ visibleGridSize: size }),
   setPanOffset: (panOffset) => set({ panOffset }),
   setZoomLevel: (n) => set({ zoomLevel: n }),
+  setFps: (fps) => set({ fps }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setIsPrimaryColorActive: (active) => set({ isPrimaryColorActive: active }),
@@ -1684,33 +1689,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return { cels: newCels };
     }),
   newCanvas: (size) => {
-    get().applyPendingActions();
-    set((state) => {
-      const { layers, activeLayerId, gridSize, updateHistory } = state;
-      const newLayer = createNewLayer(size.x, size.y, "Layer 1");
-      let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
-      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
-      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
-      const zoomLevel = pxSize / BASE_PX_SIZE;
-
-      const action: NewAction = {
-        action: "new",
-        layers: [newLayer],
-        prevLayers: layers,
-        activeLayerId: newLayer.id,
-        prevActiveLayerId: activeLayerId,
-        size,
-        prevSize: gridSize,
-      };
-      updateHistory(action);
-
-      return {
-        layers: [newLayer],
-        activeLayerId: newLayer.id,
-        gridSize: size,
-        panOffset: { x: 0, y: 0 },
-        zoomLevel,
-      };
+    get().discardPendingActions();
+    const newLayer = createNewLayer("Layer 1");
+    const newFrame: Frame = { id: crypto.randomUUID() };
+    const newCels: Cels = {};
+    newCels[`${newLayer.id}-${newFrame.id}`] = new Uint8ClampedArray(
+      size.x * size.y * 4,
+    );
+    let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
+    if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+    if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+    const zoomLevel = pxSize / BASE_PX_SIZE;
+    set({
+      layers: [newLayer],
+      frames: [newFrame],
+      cels: newCels,
+      activeLayerId: newLayer.id,
+      activeFrameId: newFrame.id,
+      gridSize: size,
+      panOffset: { x: 0, y: 0 },
+      zoomLevel,
+      fps: DEFAULT_FPS,
+      undoHistory: [],
+      redoHistory: [],
     });
   },
   resizeCanvas: (size, anchor, resizeContent = false) => {
@@ -2020,37 +2021,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       toast.error("The imported file is invalid and may have been corrupted.");
       return;
     }
-    get().applyPendingActions();
-    set((state) => {
-      const { layers, activeLayerId, gridSize, updateHistory } = state;
-      const newLayers: Layer[] = data.layers.map((layer) => ({
-        ...layer,
-        data: new Uint8ClampedArray(layer.data),
-      }));
-      let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
-      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
-      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
-      const zoomLevel = pxSize / BASE_PX_SIZE;
+    get().discardPendingActions();
 
-      const action: NewAction = {
-        action: "new",
-        layers: newLayers,
-        prevLayers: layers,
-        activeLayerId: data.activeLayerId,
-        prevActiveLayerId: activeLayerId,
-        size: { x: data.width, y: data.height },
-        prevSize: gridSize,
-      };
-      updateHistory(action);
+    const newCels: Cels = {};
+    for (let i = 0; i < data.layers.length; i++) {
+      for (let j = 0; j < data.frames.length; j++) {
+        const cel = data.cels[
+          `${data.layers[i].id}-${data.frames[j].id}`
+        ] as number[];
+        newCels[`${data.layers[i].id}-${data.frames[j].id}`] =
+          new Uint8ClampedArray(cel);
+      }
+    }
+    let pxSize = BASE_CANVAS_SIZE / Math.max(data.width, data.height);
+    if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+    if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+    const zoomLevel = pxSize / BASE_PX_SIZE;
 
-      toast.success("File imported successfully!");
-      return {
-        layers: newLayers,
-        activeLayerId: data.activeLayerId,
-        gridSize: { x: data.width, y: data.height },
-        panOffset: { x: 0, y: 0 },
-        zoomLevel,
-      };
+    toast.success("File imported successfully!");
+    set({
+      layers: data.layers,
+      frames: data.frames,
+      cels: newCels,
+      activeLayerId: data.activeLayerId,
+      activeFrameId: data.activeFrameId,
+      gridSize: { x: data.width, y: data.height },
+      panOffset: { x: 0, y: 0 },
+      zoomLevel,
+      fps: data.fps,
+      undoHistory: [],
+      redoHistory: [],
     });
   },
   importImage: (dataURL) => {
@@ -2083,32 +2083,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       tempCtx.drawImage(img, 0, 0, width, height);
       const imageData = tempCtx.getImageData(0, 0, width, height);
 
-      get().applyPendingActions();
-      const { layers, activeLayerId, gridSize, updateHistory } = get();
-      const data = new Uint8ClampedArray(imageData.data);
-      const layer = createNewLayer(width, height, "Layer 1", data);
+      get().discardPendingActions();
+      const layer = createNewLayer("Layer 1");
+      const frame: Frame = { id: crypto.randomUUID() };
+      const cels: Cels = {};
+      cels[`${layer.id}-${frame.id}`] = new Uint8ClampedArray(imageData.data);
       let pxSize = BASE_CANVAS_SIZE / Math.max(width, height);
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
-
-      const action: NewAction = {
-        action: "new",
-        layers: [layer],
-        prevLayers: layers,
-        activeLayerId: layer.id,
-        prevActiveLayerId: activeLayerId,
-        size: { x: width, y: height },
-        prevSize: gridSize,
-      };
-      updateHistory(action);
-
       set({
         layers: [layer],
+        frames: [frame],
+        cels,
         activeLayerId: layer.id,
+        activeFrameId: frame.id,
         gridSize: { x: width, y: height },
         panOffset: { x: 0, y: 0 },
         zoomLevel,
+        fps: DEFAULT_FPS,
+        undoHistory: [],
+        redoHistory: [],
       });
       toast.success("Image imported successfully!");
     };

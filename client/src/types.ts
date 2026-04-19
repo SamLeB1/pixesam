@@ -77,7 +77,7 @@ export type PxsmData = {
   fps: number;
   layers: Layer[];
   frames: Frame[];
-  cels: Cels;
+  cels: Record<string, number[]>;
   activeLayerId: string;
   activeFrameId: string;
 };
