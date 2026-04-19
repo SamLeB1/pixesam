@@ -1719,96 +1719,98 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const {
         layers,
-        activeLayerId,
+        frames,
+        cels,
         gridSize: oldGridSize,
+        getCel,
         updateHistory,
       } = state;
 
-      const newLayers: Layer[] = layers.map((layer) => {
-        const newData = new Uint8ClampedArray(size.x * size.y * 4);
-        if (resizeContent) {
-          const scaleX = size.x / oldGridSize.x;
-          const scaleY = size.y / oldGridSize.y;
+      const newCels: Cels = {};
+      for (let i = 0; i < layers.length; i++) {
+        for (let j = 0; j < frames.length; j++) {
+          const cel = getCel(layers[i].id, frames[j].id);
+          const newData = new Uint8ClampedArray(size.x * size.y * 4);
 
-          for (let newY = 0; newY < size.y; newY++) {
-            for (let newX = 0; newX < size.x; newX++) {
-              const oldX = Math.floor(newX / scaleX);
-              const oldY = Math.floor(newY / scaleY);
+          if (resizeContent) {
+            const scaleX = size.x / oldGridSize.x;
+            const scaleY = size.y / oldGridSize.y;
+            for (let newY = 0; newY < size.y; newY++) {
+              for (let newX = 0; newX < size.x; newX++) {
+                const oldX = Math.floor(newX / scaleX);
+                const oldY = Math.floor(newY / scaleY);
+                if (isValidIndex(oldX, oldY, oldGridSize)) {
+                  const oldBaseIndex = getBaseIndex(oldX, oldY, oldGridSize.x);
+                  const newBaseIndex = getBaseIndex(newX, newY, size.x);
+                  newData[newBaseIndex] = cel[oldBaseIndex];
+                  newData[newBaseIndex + 1] = cel[oldBaseIndex + 1];
+                  newData[newBaseIndex + 2] = cel[oldBaseIndex + 2];
+                  newData[newBaseIndex + 3] = cel[oldBaseIndex + 3];
+                }
+              }
+            }
+          } else {
+            let offsetX = 0;
+            let offsetY = 0;
+            switch (anchor) {
+              case "top-left":
+                break;
+              case "top-center":
+                offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+                offsetY = 0;
+                break;
+              case "top-right":
+                offsetX = size.x - oldGridSize.x;
+                offsetY = 0;
+                break;
+              case "middle-left":
+                offsetX = 0;
+                offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+                break;
+              case "middle-center":
+                offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+                offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+                break;
+              case "middle-right":
+                offsetX = size.x - oldGridSize.x;
+                offsetY = Math.floor((size.y - oldGridSize.y) / 2);
+                break;
+              case "bottom-left":
+                offsetX = 0;
+                offsetY = size.y - oldGridSize.y;
+                break;
+              case "bottom-center":
+                offsetX = Math.floor((size.x - oldGridSize.x) / 2);
+                offsetY = size.y - oldGridSize.y;
+                break;
+              case "bottom-right":
+                offsetX = size.x - oldGridSize.x;
+                offsetY = size.y - oldGridSize.y;
+            }
 
-              if (isValidIndex(oldX, oldY, oldGridSize)) {
-                const oldBaseIndex = getBaseIndex(oldX, oldY, oldGridSize.x);
-                const newBaseIndex = getBaseIndex(newX, newY, size.x);
-                newData[newBaseIndex] = layer.data[oldBaseIndex];
-                newData[newBaseIndex + 1] = layer.data[oldBaseIndex + 1];
-                newData[newBaseIndex + 2] = layer.data[oldBaseIndex + 2];
-                newData[newBaseIndex + 3] = layer.data[oldBaseIndex + 3];
+            for (let y = 0; y < oldGridSize.y; y++) {
+              for (let x = 0; x < oldGridSize.x; x++) {
+                const newX = x + offsetX;
+                const newY = y + offsetY;
+                if (isValidIndex(newX, newY, size)) {
+                  const oldBaseIndex = getBaseIndex(x, y, oldGridSize.x);
+                  const newBaseIndex = getBaseIndex(newX, newY, size.x);
+                  newData[newBaseIndex] = cel[oldBaseIndex];
+                  newData[newBaseIndex + 1] = cel[oldBaseIndex + 1];
+                  newData[newBaseIndex + 2] = cel[oldBaseIndex + 2];
+                  newData[newBaseIndex + 3] = cel[oldBaseIndex + 3];
+                }
               }
             }
           }
-        } else {
-          let offsetX = 0;
-          let offsetY = 0;
-          switch (anchor) {
-            case "top-left":
-              break;
-            case "top-center":
-              offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-              offsetY = 0;
-              break;
-            case "top-right":
-              offsetX = size.x - oldGridSize.x;
-              offsetY = 0;
-              break;
-            case "middle-left":
-              offsetX = 0;
-              offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-              break;
-            case "middle-center":
-              offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-              offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-              break;
-            case "middle-right":
-              offsetX = size.x - oldGridSize.x;
-              offsetY = Math.floor((size.y - oldGridSize.y) / 2);
-              break;
-            case "bottom-left":
-              offsetX = 0;
-              offsetY = size.y - oldGridSize.y;
-              break;
-            case "bottom-center":
-              offsetX = Math.floor((size.x - oldGridSize.x) / 2);
-              offsetY = size.y - oldGridSize.y;
-              break;
-            case "bottom-right":
-              offsetX = size.x - oldGridSize.x;
-              offsetY = size.y - oldGridSize.y;
-          }
-
-          for (let y = 0; y < oldGridSize.y; y++) {
-            for (let x = 0; x < oldGridSize.x; x++) {
-              const oldBaseIndex = getBaseIndex(x, y, oldGridSize.x);
-              const newX = x + offsetX;
-              const newY = y + offsetY;
-
-              if (newX >= 0 && newX < size.x && newY >= 0 && newY < size.y) {
-                const newBaseIndex = getBaseIndex(newX, newY, size.x);
-                newData[newBaseIndex] = layer.data[oldBaseIndex];
-                newData[newBaseIndex + 1] = layer.data[oldBaseIndex + 1];
-                newData[newBaseIndex + 2] = layer.data[oldBaseIndex + 2];
-                newData[newBaseIndex + 3] = layer.data[oldBaseIndex + 3];
-              }
-            }
-          }
+          newCels[`${layers[i].id}-${frames[j].id}`] = newData;
         }
-        return { ...layer, data: newData };
-      });
+      }
 
-      const action: NewAction = {
-        action: "new",
-        layers: newLayers,
-        prevLayers: layers,
-        activeLayerId,
-        prevActiveLayerId: activeLayerId,
+      const action: ResizeAction = {
+        action: "resize",
+        cels: newCels,
+        prevCels: cels,
         size,
         prevSize: oldGridSize,
       };
@@ -1818,9 +1820,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
-
       return {
-        layers: newLayers,
+        cels: newCels,
         gridSize: size,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
