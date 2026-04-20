@@ -530,24 +530,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   discardPendingActions: () =>
     set((state) => {
       const {
+        cels,
+        activeLayerId,
+        activeFrameId,
         gridSize,
         drawBuffer,
-        getActiveLayer,
-        setLayerData,
+        getCel,
         initSelection,
       } = state;
+      const newCels: Cels = { ...cels };
       if (drawBuffer.length > 0) {
-        const layer = getActiveLayer();
-        const newData = new Uint8ClampedArray(layer.data);
+        const cel = getCel();
+        const newData = new Uint8ClampedArray(cel);
         for (let i = 0; i < drawBuffer.length; i++) {
           const { x, y, prevColor } = drawBuffer[i];
           setPixelColor(x, y, gridSize.x, prevColor, newData);
         }
-        setLayerData(newData, layer.id);
+        newCels[`${activeLayerId}-${activeFrameId}`] = newData;
       }
 
       initSelection();
       return {
+        cels: newCels,
         lineStartPos: null,
         lineEndPos: null,
         shapeStartPos: null,
@@ -1980,15 +1984,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   rotateCanvas: (degrees) => {
     get().applyPendingActions();
     set((state) => {
-      const { layers, gridSize, updateHistory } = state;
+      const { layers, frames, gridSize, getCel, updateHistory } = state;
+      const newCels: Cels = {};
       const newSize =
         degrees === 180
           ? { x: gridSize.x, y: gridSize.y }
           : { x: gridSize.y, y: gridSize.x };
-      const newLayers: Layer[] = layers.map((l) => ({
-        ...l,
-        data: rotatePixels(l.data, gridSize, degrees),
-      }));
+      for (let i = 0; i < layers.length; i++) {
+        for (let j = 0; j < frames.length; j++) {
+          const cel = getCel(layers[i].id, frames[j].id);
+          newCels[`${layers[i].id}-${frames[j].id}`] = rotatePixels(
+            cel,
+            gridSize,
+            degrees,
+          );
+        }
+      }
 
       const action: RotateCanvasAction = {
         action: "rotate-canvas",
@@ -2000,9 +2011,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
-
       return {
-        layers: newLayers,
+        cels: newCels,
         gridSize: newSize,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
@@ -2012,11 +2022,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   flipCanvas: (direction) => {
     get().applyPendingActions();
     set((state) => {
-      const { layers, gridSize, updateHistory } = state;
-      const newLayers: Layer[] = layers.map((l) => ({
-        ...l,
-        data: flipPixels(l.data, gridSize, direction),
-      }));
+      const { layers, frames, gridSize, getCel, updateHistory } = state;
+      const newCels: Cels = {};
+      for (let i = 0; i < layers.length; i++) {
+        for (let j = 0; j < frames.length; j++) {
+          const cel = getCel(layers[i].id, frames[j].id);
+          newCels[`${layers[i].id}-${frames[j].id}`] = flipPixels(
+            cel,
+            gridSize,
+            direction,
+          );
+        }
+      }
 
       const action: FlipCanvasAction = {
         action: "flip-canvas",
@@ -2024,7 +2041,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      return { layers: newLayers };
+      return { cels: newCels };
     });
   },
   importFromPxsm: (data) => {
