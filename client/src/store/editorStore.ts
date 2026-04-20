@@ -1834,7 +1834,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       getEffectiveSelectionBounds,
       getRectInBounds,
     } = get();
-
     if (!showSelectionPreview) return;
     const bounds = getEffectiveSelectionBounds();
     if (!bounds) return;
@@ -1842,34 +1841,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!clampedBounds) return;
 
     set((state) => {
-      const { layers, activeLayerId, gridSize, initSelection, updateHistory } =
-        state;
-
+      const {
+        layers,
+        frames,
+        cels,
+        gridSize,
+        getCel,
+        initSelection,
+        updateHistory,
+      } = state;
+      const newCels: Cels = {};
       const newSize = { x: clampedBounds.width, y: clampedBounds.height };
 
-      const newLayers: Layer[] = layers.map((l) => {
-        const newData = new Uint8ClampedArray(newSize.x * newSize.y * 4);
-        for (let y = 0; y < newSize.y; y++) {
-          for (let x = 0; x < newSize.x; x++) {
-            const srcX = x + clampedBounds.x;
-            const srcY = y + clampedBounds.y;
-            const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
-            const dstIndex = getBaseIndex(x, y, newSize.x);
-            newData[dstIndex] = l.data[srcIndex];
-            newData[dstIndex + 1] = l.data[srcIndex + 1];
-            newData[dstIndex + 2] = l.data[srcIndex + 2];
-            newData[dstIndex + 3] = l.data[srcIndex + 3];
-          }
-        }
-        return { ...l, data: newData };
-      });
+      for (let i = 0; i < layers.length; i++) {
+        for (let j = 0; j < frames.length; j++) {
+          const cel = getCel(layers[i].id, frames[j].id);
+          const newData = new Uint8ClampedArray(newSize.x * newSize.y * 4);
 
-      const action: NewAction = {
-        action: "new",
-        layers: newLayers,
-        prevLayers: layers,
-        activeLayerId,
-        prevActiveLayerId: activeLayerId,
+          for (let y = 0; y < newSize.y; y++) {
+            for (let x = 0; x < newSize.x; x++) {
+              const srcX = x + clampedBounds.x;
+              const srcY = y + clampedBounds.y;
+              const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
+              const dstIndex = getBaseIndex(x, y, newSize.x);
+              newData[dstIndex] = cel[srcIndex];
+              newData[dstIndex + 1] = cel[srcIndex + 1];
+              newData[dstIndex + 2] = cel[srcIndex + 2];
+              newData[dstIndex + 3] = cel[srcIndex + 3];
+            }
+          }
+          newCels[`${layers[i].id}-${frames[j].id}`] = newData;
+        }
+      }
+
+      const action: ResizeAction = {
+        action: "resize",
+        cels: newCels,
+        prevCels: cels,
         size: newSize,
         prevSize: gridSize,
       };
@@ -1879,10 +1887,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
-
       initSelection();
       return {
-        layers: newLayers,
+        cels: newCels,
         gridSize: newSize,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
@@ -1891,27 +1898,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   trimCanvas: () => {
     get().applyPendingActions();
-    const { layers, gridSize } = get();
-
+    const { layers, frames, gridSize, getCel } = get();
     let minX = gridSize.x;
     let minY = gridSize.y;
     let maxX = -1;
     let maxY = -1;
 
-    for (const layer of layers) {
-      for (let y = 0; y < gridSize.y; y++) {
-        for (let x = 0; x < gridSize.x; x++) {
-          const alpha = layer.data[getBaseIndex(x, y, gridSize.x) + 3];
-          if (alpha > 0) {
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
+    for (let i = 0; i < layers.length; i++) {
+      for (let j = 0; j < frames.length; j++) {
+        const cel = getCel(layers[i].id, frames[j].id);
+
+        for (let y = 0; y < gridSize.y; y++) {
+          for (let x = 0; x < gridSize.x; x++) {
+            const alpha = cel[getBaseIndex(x, y, gridSize.x) + 3];
+            if (alpha > 0) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
           }
         }
       }
     }
-
     if (maxX < 0) return;
     if (
       minX === 0 &&
@@ -1922,33 +1931,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return;
 
     set((state) => {
-      const { layers, activeLayerId, gridSize, updateHistory } = state;
-
+      const { cels, updateHistory } = state;
+      const newCels: Cels = {};
       const newSize = { x: maxX - minX + 1, y: maxY - minY + 1 };
 
-      const newLayers: Layer[] = layers.map((l) => {
-        const newData = new Uint8ClampedArray(newSize.x * newSize.y * 4);
-        for (let y = 0; y < newSize.y; y++) {
-          for (let x = 0; x < newSize.x; x++) {
-            const srcX = x + minX;
-            const srcY = y + minY;
-            const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
-            const dstIndex = getBaseIndex(x, y, newSize.x);
-            newData[dstIndex] = l.data[srcIndex];
-            newData[dstIndex + 1] = l.data[srcIndex + 1];
-            newData[dstIndex + 2] = l.data[srcIndex + 2];
-            newData[dstIndex + 3] = l.data[srcIndex + 3];
-          }
-        }
-        return { ...l, data: newData };
-      });
+      for (let i = 0; i < layers.length; i++) {
+        for (let j = 0; j < frames.length; j++) {
+          const cel = getCel(layers[i].id, frames[j].id);
+          const newData = new Uint8ClampedArray(newSize.x * newSize.y * 4);
 
-      const action: NewAction = {
-        action: "new",
-        layers: newLayers,
-        prevLayers: layers,
-        activeLayerId,
-        prevActiveLayerId: activeLayerId,
+          for (let y = 0; y < newSize.y; y++) {
+            for (let x = 0; x < newSize.x; x++) {
+              const srcX = x + minX;
+              const srcY = y + minY;
+              const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
+              const dstIndex = getBaseIndex(x, y, newSize.x);
+              newData[dstIndex] = cel[srcIndex];
+              newData[dstIndex + 1] = cel[srcIndex + 1];
+              newData[dstIndex + 2] = cel[srcIndex + 2];
+              newData[dstIndex + 3] = cel[srcIndex + 3];
+            }
+          }
+          newCels[`${layers[i].id}-${frames[j].id}`] = newData;
+        }
+      }
+
+      const action: ResizeAction = {
+        action: "resize",
+        cels: newCels,
+        prevCels: cels,
         size: newSize,
         prevSize: gridSize,
       };
@@ -1958,9 +1969,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
-
       return {
-        layers: newLayers,
+        cels: newCels,
         gridSize: newSize,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
