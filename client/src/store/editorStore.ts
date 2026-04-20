@@ -2141,17 +2141,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
   },
   exportToPxsm: () => {
-    const { layers, activeLayerId, gridSize } = get();
-    const newLayers: PxsmLayerData[] = layers.map((layer) => ({
-      ...layer,
-      data: Array.from(layer.data),
-    }));
+    const {
+      layers,
+      frames,
+      activeLayerId,
+      activeFrameId,
+      gridSize,
+      fps,
+      getCel,
+    } = get();
+    const newCels: Record<string, number[]> = {};
+    for (const layer of layers) {
+      for (const frame of frames) {
+        const cel = getCel(layer.id, frame.id);
+        newCels[`${layer.id}-${frame.id}`] = Array.from(cel);
+      }
+    }
     const pxsmData: PxsmData = {
       version: "1.0.0",
       width: gridSize.x,
       height: gridSize.y,
-      layers: newLayers,
+      fps,
+      layers,
+      frames,
+      cels: newCels,
       activeLayerId,
+      activeFrameId,
     };
 
     const id = Math.random().toString(36).substring(2, 15);
