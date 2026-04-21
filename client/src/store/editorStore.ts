@@ -414,7 +414,6 @@ type EditorState = {
   importFromPxsm: (data: PxsmData) => void;
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
-  exportToImage: (scale: number) => void;
   initSelection: () => void;
   endSelectionAction: () => void;
   applySelectionAction: () => void;
@@ -2181,55 +2180,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   },
-  exportToImage: (scale) => {
-    const { layers, gridSize } = get();
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      toast.error("Failed to export the image.");
-      return;
-    }
-    canvas.width = Math.floor(gridSize.x * scale);
-    canvas.height = Math.floor(gridSize.y * scale);
-
-    const imageData = new ImageData(
-      compositeLayers(layers, gridSize.x, gridSize.y) as ImageDataArray,
-      gridSize.x,
-      gridSize.y,
-    );
-    const tempCanvas = document.createElement("canvas");
-    const tempCtx = tempCanvas.getContext("2d");
-    if (!tempCtx) {
-      toast.error("Failed to export the image.");
-      return;
-    }
-    tempCanvas.width = gridSize.x;
-    tempCanvas.height = gridSize.y;
-    tempCtx.putImageData(imageData, 0, 0);
-
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(
-      tempCanvas,
-      0,
-      0,
-      gridSize.x,
-      gridSize.y,
-      0,
-      0,
-      canvas.width,
-      canvas.height,
-    );
-
-    const id = Math.random().toString(36).substring(2, 15);
-    const dataURL = canvas.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = dataURL;
-    link.download = `new-pixesam-${id}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  },
   initSelection: () =>
     set({
       selectionMask: null,
@@ -2545,38 +2495,39 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   applyMove: (mod) =>
     set((state) => {
       const {
+        cels,
         activeLayerId,
+        activeFrameId,
         gridSize,
         moveOffset,
-        getActiveLayer,
-        setLayerData,
+        getLayer,
+        getCel,
         updateHistory,
       } = state;
       if (!moveOffset || (moveOffset.x === 0 && moveOffset.y === 0))
         return { moveStartPos: null, moveOffset: null };
+      const layer = getLayer();
+      if (layer.locked) return {};
+      const cel = getCel();
 
+      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       const newMoveOffset = { ...moveOffset };
       if (mod) {
         if (Math.abs(moveOffset.x) >= Math.abs(moveOffset.y))
           newMoveOffset.y = 0;
         else newMoveOffset.x = 0;
       }
-
-      const layer = getActiveLayer();
-      if (layer.locked) return {};
-      const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
       for (let y = 0; y < gridSize.y; y++) {
         for (let x = 0; x < gridSize.x; x++) {
           const srcX = x - newMoveOffset.x;
           const srcY = y - newMoveOffset.y;
-
           if (isValidIndex(srcX, srcY, gridSize)) {
             const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
             const dstIndex = getBaseIndex(x, y, gridSize.x);
-            newData[dstIndex] = layer.data[srcIndex];
-            newData[dstIndex + 1] = layer.data[srcIndex + 1];
-            newData[dstIndex + 2] = layer.data[srcIndex + 2];
-            newData[dstIndex + 3] = layer.data[srcIndex + 3];
+            newData[dstIndex] = cel[srcIndex];
+            newData[dstIndex + 1] = cel[srcIndex + 1];
+            newData[dstIndex + 2] = cel[srcIndex + 2];
+            newData[dstIndex + 3] = cel[srcIndex + 3];
           }
         }
       }
@@ -2584,13 +2535,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const action: MoveAction = {
         action: "move",
         layerId: activeLayerId,
-        data: layer.data,
+        frameId: activeFrameId,
+        data: cel,
         offset: newMoveOffset,
       };
       updateHistory(action);
 
-      setLayerData(newData, activeLayerId);
-      return { moveStartPos: null, moveOffset: null };
+      const newCels: Cels = { ...cels };
+      newCels[`${activeLayerId}-${activeFrameId}`] = newData;
+      return { cels: newCels, moveStartPos: null, moveOffset: null };
     }),
   undo: () => {
     get().applyPendingActions();
@@ -2976,27 +2929,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   clearDrawBuffer: () =>
     set((state) => {
-      const { activeLayerId, drawBuffer, updateHistory } = state;
+      const { activeLayerId, activeFrameId, drawBuffer, updateHistory } = state;
       if (drawBuffer.length === 0)
         return { drawnPixels: new Set(), lastDrawPos: null };
       const action: DrawAction = {
         action: "draw",
         layerId: activeLayerId,
+        frameId: activeFrameId,
         pixels: drawBuffer,
       };
       updateHistory(action);
       return { drawBuffer: [], drawnPixels: new Set(), lastDrawPos: null };
     }),
   cut: () => {
-    const {
-      showSelectionPreview,
-      isPasting,
-      getActiveLayer,
-      deleteSelection,
-      copy,
-    } = get();
+    const { showSelectionPreview, isPasting, getLayer, deleteSelection, copy } =
+      get();
     if (!showSelectionPreview) return;
-    const layer = getActiveLayer();
+    const layer = getLayer();
     if (layer.locked && !isPasting) return;
     copy();
     deleteSelection();
@@ -3024,14 +2973,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   paste: () =>
     set((state) => {
-      const {
-        gridSize,
-        mousePos,
-        clipboard,
-        applyPendingActions,
-        getActiveLayer,
-      } = state;
-      const layer = getActiveLayer();
+      const { gridSize, mousePos, clipboard, applyPendingActions, getLayer } =
+        state;
+      const layer = getLayer();
       if (layer.locked || !clipboard) return {};
       applyPendingActions();
 
@@ -3077,16 +3021,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   transformEdit: () => {
     get().applyPendingActions();
     set((state) => {
-      const { activeLayerId, gridSize, getActiveLayer, getPixelsInRect } =
-        state;
-      const layer = getActiveLayer();
+      const { gridSize, getCel, getPixelsInRect } = state;
+      const cel = getCel();
       let minX = gridSize.x;
       let minY = gridSize.y;
       let maxX = -1;
       let maxY = -1;
       for (let y = 0; y < gridSize.y; y++) {
         for (let x = 0; x < gridSize.x; x++) {
-          const alpha = layer.data[getBaseIndex(x, y, gridSize.x) + 3];
+          const alpha = cel[getBaseIndex(x, y, gridSize.x) + 3];
           if (alpha > 0) {
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
@@ -3106,7 +3049,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         selectedTool: "select",
         selectedArea,
-        selectedPixels: getPixelsInRect(selectedArea, null, activeLayerId),
+        selectedPixels: getPixelsInRect(selectedArea, null),
         showSelectionPreview: true,
       };
     });
