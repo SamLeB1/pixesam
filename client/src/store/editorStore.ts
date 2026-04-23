@@ -2755,11 +2755,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().discardPendingActions();
     const {
       layers,
+      frames,
       gridSize,
       undoHistory,
       redoHistory,
-      getLayer,
-      setLayerData,
+      getCel,
+      setCelData,
       floodFill,
     } = get();
     if (redoHistory.length === 0) return;
@@ -2769,8 +2770,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newUndoHistory = [action, ...undoHistory];
 
     if (action.action === "draw") {
-      const layer = getLayer(action.layerId);
-      const newData = new Uint8ClampedArray(layer.data);
+      const cel = getCel(action.layerId, action.frameId);
+      const newData = new Uint8ClampedArray(cel);
       for (let i = action.pixels.length - 1; i >= 0; i--) {
         const { x, y, color } = action.pixels[i];
         const baseIndex = getBaseIndex(x, y, gridSize.x);
@@ -2779,25 +2780,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         newData[baseIndex + 2] = color.b;
         newData[baseIndex + 3] = color.a;
       }
-      setLayerData(newData, action.layerId);
-      set({ activeLayerId: action.layerId });
+      setCelData(newData, action.layerId, action.frameId);
+      set({ activeLayerId: action.layerId, activeFrameId: action.frameId });
     } else if (action.action === "bucket") {
-      const { layerId, x, y, color } = action;
-      set({ activeLayerId: layerId });
+      const { layerId, frameId, x, y, color } = action;
+      set({ activeLayerId: layerId, activeFrameId: frameId });
       floodFill(x, y, color, false);
     } else if (action.action === "transform") {
-      const { layerId, srcRect, srcMask, dstRect, dstPixels, dstMask } = action;
-      const layer = getLayer(layerId);
-      const newData = new Uint8ClampedArray(layer.data);
+      const {
+        layerId,
+        frameId,
+        srcRect,
+        srcMask,
+        dstRect,
+        dstPixels,
+        dstMask,
+      } = action;
+      const cel = getCel(layerId, frameId);
+      const newData = new Uint8ClampedArray(cel);
       clearRectContent(srcRect, newData, gridSize, srcMask);
       drawRectContent(dstRect, dstPixels, newData, gridSize, dstMask);
-      setLayerData(newData, layerId);
-      set({ activeLayerId: layerId });
+      setCelData(newData, layerId, frameId);
+      set({ activeLayerId: layerId, activeFrameId: frameId });
     } else if (action.action === "move") {
-      const { layerId, offset } = action;
-      const layer = getLayer(layerId);
+      const { layerId, frameId, offset } = action;
+      const cel = getCel(layerId, frameId);
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
-
       for (let y = 0; y < gridSize.y; y++) {
         for (let x = 0; x < gridSize.x; x++) {
           const srcX = x - offset.x;
@@ -2805,51 +2813,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           if (isValidIndex(srcX, srcY, gridSize)) {
             const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
             const dstIndex = getBaseIndex(x, y, gridSize.x);
-            newData[dstIndex] = layer.data[srcIndex];
-            newData[dstIndex + 1] = layer.data[srcIndex + 1];
-            newData[dstIndex + 2] = layer.data[srcIndex + 2];
-            newData[dstIndex + 3] = layer.data[srcIndex + 3];
+            newData[dstIndex] = cel[srcIndex];
+            newData[dstIndex + 1] = cel[srcIndex + 1];
+            newData[dstIndex + 2] = cel[srcIndex + 2];
+            newData[dstIndex + 3] = cel[srcIndex + 3];
           }
         }
       }
-      setLayerData(newData, layerId);
-      set({ activeLayerId: layerId });
+      setCelData(newData, layerId, frameId);
+      set({ activeLayerId: layerId, activeFrameId: frameId });
     } else if (action.action === "delete") {
-      const { layerId, area, mask } = action;
-      const layer = getLayer(layerId);
-      const newData = new Uint8ClampedArray(layer.data);
+      const { layerId, frameId, area, mask } = action;
+      const cel = getCel(layerId, frameId);
+      const newData = new Uint8ClampedArray(cel);
       clearRectContent(area, newData, gridSize, mask);
-      setLayerData(newData, layerId);
-      set({ activeLayerId: layerId });
+      setCelData(newData, layerId, frameId);
+      set({ activeLayerId: layerId, activeFrameId: frameId });
     } else if (action.action === "paste") {
-      const { layerId, area, pixels, mask } = action;
-      const layer = getLayer(layerId);
-      const newData = new Uint8ClampedArray(layer.data);
+      const { layerId, frameId, area, pixels, mask } = action;
+      const cel = getCel(layerId, frameId);
+      const newData = new Uint8ClampedArray(cel);
       drawRectContent(area, pixels, newData, gridSize, mask);
-      setLayerData(newData, layerId);
-      set({ activeLayerId: layerId });
-    } else if (action.action === "new") {
-      const { layers, activeLayerId, size } = action;
-      let pxSize = BASE_CANVAS_SIZE / Math.max(size.x, size.y);
-      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
-      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
-      const zoomLevel = pxSize / BASE_PX_SIZE;
-      set({
-        layers,
-        activeLayerId,
-        gridSize: size,
-        panOffset: { x: 0, y: 0 },
-        zoomLevel,
-      });
+      setCelData(newData, layerId, frameId);
+      set({ activeLayerId: layerId, activeFrameId: frameId });
     } else if (action.action === "clear") {
       const newData = new Uint8ClampedArray(gridSize.x * gridSize.y * 4);
-      setLayerData(newData, action.layerId);
-      set({ activeLayerId: action.layerId });
+      setCelData(newData, action.layerId, action.frameId);
+      set({ activeLayerId: action.layerId, activeFrameId: action.frameId });
     } else if (action.action === "rotate-canvas") {
-      const newLayers: Layer[] = layers.map((l) => ({
-        ...l,
-        data: rotatePixels(l.data, gridSize, action.degrees),
-      }));
+      const newCels: Cels = {};
+      for (const layer of layers) {
+        for (const frame of frames) {
+          const cel = getCel(layer.id, frame.id);
+          newCels[`${layer.id}-${frame.id}`] = rotatePixels(
+            cel,
+            gridSize,
+            action.degrees,
+          );
+        }
+      }
       const newSize =
         action.degrees === 180
           ? { x: gridSize.x, y: gridSize.y }
@@ -2859,12 +2861,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
       const zoomLevel = pxSize / BASE_PX_SIZE;
       set({
-        layers: newLayers,
+        cels: newCels,
         gridSize: newSize,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
       });
-    } else if (action.action === "rotate-layer") {
+    } else if (action.action === "rotate-cel") {
       const rotatedSize =
         action.degrees === 180
           ? { x: gridSize.x, y: gridSize.y }
@@ -2883,36 +2885,48 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }
         }
       }
-      setLayerData(newData, action.layerId);
-      set({ activeLayerId: action.layerId });
+      setCelData(newData, action.layerId, action.frameId);
+      set({ activeLayerId: action.layerId, activeFrameId: action.frameId });
     } else if (action.action === "flip-canvas") {
-      const newLayers: Layer[] = layers.map((l) => ({
-        ...l,
-        data: flipPixels(l.data, gridSize, action.direction),
-      }));
-      set({ layers: newLayers });
-    } else if (action.action === "flip-layer") {
-      const layer = getLayer(action.layerId);
-      setLayerData(
-        flipPixels(layer.data, gridSize, action.direction),
-        action.layerId,
-      );
-      set({ activeLayerId: action.layerId });
-    } else if (action.action === "layer-structure") {
-      const restoredLayers = action.layers.map((layer) => {
-        const curr = layers.find((l) => l.id === layer.id);
-        if (curr) {
-          return {
-            ...layer,
-            name: curr.name,
-            visible: curr.visible,
-            locked: curr.locked,
-            opacity: curr.opacity,
-          };
+      const newCels: Cels = {};
+      for (const layer of layers) {
+        for (const frame of frames) {
+          const cel = getCel(layer.id, frame.id);
+          newCels[`${layer.id}-${frame.id}`] = flipPixels(
+            cel,
+            gridSize,
+            action.direction,
+          );
         }
-        return layer;
+      }
+      set({ cels: newCels });
+    } else if (action.action === "flip-cel") {
+      const cel = getCel(action.layerId, action.frameId);
+      setCelData(
+        flipPixels(cel, gridSize, action.direction),
+        action.layerId,
+        action.frameId,
+      );
+      set({ activeLayerId: action.layerId, activeFrameId: action.frameId });
+    } else if (action.action === "resize") {
+      let pxSize = BASE_CANVAS_SIZE / Math.max(action.size.x, action.size.y);
+      if (pxSize < MIN_PX_SIZE) pxSize = MIN_PX_SIZE;
+      if (pxSize > MAX_PX_SIZE) pxSize = MAX_PX_SIZE;
+      const zoomLevel = pxSize / BASE_PX_SIZE;
+      set({
+        cels: action.cels,
+        gridSize: action.size,
+        panOffset: { x: 0, y: 0 },
+        zoomLevel,
       });
-      set({ layers: restoredLayers, activeLayerId: action.activeLayerId });
+    } else if (action.action === "layer-structure") {
+      set({
+        layers: action.layers,
+        cels: action.cels,
+        activeLayerId: action.activeLayerId,
+      });
+    } else if (action.action === "layer-move") {
+      set({ layers: action.layers, activeLayerId: action.activeLayerId });
     } else if (action.action === "layer-toggle") {
       if (action.toggle === "visible") {
         set({
@@ -2945,6 +2959,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           l.id === action.layerId ? { ...l, blendMode: action.blendMode } : l,
         ),
       });
+    } else if (action.action === "frame-structure") {
+      set({
+        frames: action.frames,
+        cels: action.cels,
+        activeFrameId: action.activeFrameId,
+      });
+    } else if (action.action === "frame-move") {
+      set({ frames: action.frames, activeFrameId: action.activeFrameId });
     }
 
     set({
