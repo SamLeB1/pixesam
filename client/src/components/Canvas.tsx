@@ -22,7 +22,7 @@ import {
 } from "../utils/geometry";
 import { compositeLayers, compositeLayersWithOverride } from "../utils/layers";
 import { BASE_PX_SIZE, CHECKER_LIGHT, CHECKER_DARK } from "../constants";
-import type { Direction } from "../types";
+import type { Direction, LayerWithCel } from "../types";
 
 const FILTER_STRENGTH = 25;
 const RESIZE_HANDLES: { name: Direction; x: number; y: number }[] = [
@@ -41,6 +41,7 @@ export default function Canvas() {
   const {
     layers,
     activeLayerId,
+    activeFrameId,
     gridSize,
     visibleGridSize,
     panOffset,
@@ -87,9 +88,10 @@ export default function Canvas() {
     setMoveStartPos,
     setMoveOffset,
     setMousePos,
-    getActiveLayer,
+    getLayer,
+    getCel,
     getActiveColorRGBA,
-    getPixelColor,
+    getCompositedPixelColor,
     getEffectiveSelectionBounds,
     getRectInBounds,
     getTransformedSelection,
@@ -135,7 +137,7 @@ export default function Canvas() {
     selectionAction === "move" ||
     selectionAction === "resize";
   const showNotAllowedCursor =
-    getActiveLayer().locked &&
+    getLayer().locked &&
     selectedTool !== "color-picker" &&
     selectedTool !== "select";
   const { zoomStepTowardsCursor } = useCanvasZoom();
@@ -173,9 +175,9 @@ export default function Canvas() {
   }, [gridSize]);
 
   const buildLinePreviewData = useCallback(
-    (layerData: Uint8ClampedArray) => {
+    (data: Uint8ClampedArray) => {
       if (!lineStartPos || !lineEndPos) return null;
-      const newData = new Uint8ClampedArray(layerData);
+      const newData = new Uint8ClampedArray(data);
       const color = getActiveColorRGBA();
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
@@ -217,9 +219,9 @@ export default function Canvas() {
   );
 
   const buildShapePreviewData = useCallback(
-    (layerData: Uint8ClampedArray) => {
+    (data: Uint8ClampedArray) => {
       if (!shapeStartPos || !shapeEndPos) return null;
-      const newData = new Uint8ClampedArray(layerData);
+      const newData = new Uint8ClampedArray(data);
       const color = getActiveColorRGBA();
       const drawnPixels = new Set<string>();
       const offset = -Math.floor(brushSize / 2);
@@ -268,7 +270,7 @@ export default function Canvas() {
   );
 
   const buildMovePreviewData = useCallback(
-    (layerData: Uint8ClampedArray) => {
+    (data: Uint8ClampedArray) => {
       if (!moveOffset) return null;
       const offset = { ...moveOffset };
       if (modifierKeys.shift) {
@@ -284,10 +286,10 @@ export default function Canvas() {
           if (isValidIndex(srcX, srcY, gridSize)) {
             const srcIndex = getBaseIndex(srcX, srcY, gridSize.x);
             const dstIndex = getBaseIndex(x, y, gridSize.x);
-            newData[dstIndex] = layerData[srcIndex];
-            newData[dstIndex + 1] = layerData[srcIndex + 1];
-            newData[dstIndex + 2] = layerData[srcIndex + 2];
-            newData[dstIndex + 3] = layerData[srcIndex + 3];
+            newData[dstIndex] = data[srcIndex];
+            newData[dstIndex + 1] = data[srcIndex + 1];
+            newData[dstIndex + 2] = data[srcIndex + 2];
+            newData[dstIndex + 3] = data[srcIndex + 3];
           }
         }
       }
@@ -297,12 +299,12 @@ export default function Canvas() {
   );
 
   const buildSelectionPreviewData = useCallback(
-    (layerData: Uint8ClampedArray) => {
+    (data: Uint8ClampedArray) => {
       const bounds = getEffectiveSelectionBounds();
       const transformed = getTransformedSelection();
       if (!selectedArea || !bounds || !transformed) return null;
 
-      const newData = new Uint8ClampedArray(layerData);
+      const newData = new Uint8ClampedArray(data);
       if (!isPasting)
         clearRectContent(selectedArea, newData, gridSize, selectionMask);
       drawRectContent(
@@ -329,15 +331,14 @@ export default function Canvas() {
   );
 
   const overrideData = useMemo(() => {
-    const layer = getActiveLayer();
-    if (lineStartPos && lineEndPos) return buildLinePreviewData(layer.data);
-    else if (shapeStartPos && shapeEndPos)
-      return buildShapePreviewData(layer.data);
-    else if (moveOffset) return buildMovePreviewData(layer.data);
-    else if (showSelectionPreview) return buildSelectionPreviewData(layer.data);
+    const cel = getCel();
+    if (lineStartPos && lineEndPos) return buildLinePreviewData(cel);
+    else if (shapeStartPos && shapeEndPos) return buildShapePreviewData(cel);
+    else if (moveOffset) return buildMovePreviewData(cel);
+    else if (showSelectionPreview) return buildSelectionPreviewData(cel);
     else return null;
   }, [
-    getActiveLayer,
+    getCel,
     lineStartPos,
     lineEndPos,
     buildLinePreviewData,
@@ -350,19 +351,21 @@ export default function Canvas() {
     buildSelectionPreviewData,
   ]);
 
-  const composited = useMemo(
-    () =>
-      overrideData
-        ? compositeLayersWithOverride(
-            layers,
-            gridSize.x,
-            gridSize.y,
-            activeLayerId,
-            overrideData,
-          )
-        : compositeLayers(layers, gridSize.x, gridSize.y),
-    [layers, activeLayerId, gridSize, overrideData],
-  );
+  const composited = useMemo(() => {
+    const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
+      ...layer,
+      cel: getCel(layer.id, activeFrameId),
+    }));
+    return overrideData
+      ? compositeLayersWithOverride(
+          layersToComposite,
+          gridSize.x,
+          gridSize.y,
+          activeLayerId,
+          overrideData,
+        )
+      : compositeLayers(layersToComposite, gridSize.x, gridSize.y);
+  }, [layers, activeLayerId, activeFrameId, gridSize, overrideData, getCel]);
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     ctx.imageSmoothingEnabled = false;
@@ -379,7 +382,7 @@ export default function Canvas() {
     );
   }
 
-  function drawCompositedLayers(ctx: CanvasRenderingContext2D) {
+  function drawActiveFrame(ctx: CanvasRenderingContext2D) {
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = gridSize.x;
     tempCanvas.height = gridSize.y;
@@ -670,7 +673,7 @@ export default function Canvas() {
   }
 
   function getHoverColor(x: number, y: number, strength = 25) {
-    const pixel = getPixelColor(x, y);
+    const pixel = getCompositedPixelColor(x, y);
     const checker =
       y % 2 === x % 2
         ? tinycolor(CHECKER_DARK).toRgb()
@@ -699,7 +702,7 @@ export default function Canvas() {
   }
 
   function handlePencilAction(e: MouseEvent) {
-    if (getActiveLayer().locked) return;
+    if (getLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -710,7 +713,7 @@ export default function Canvas() {
   }
 
   function handleEraserAction(e: MouseEvent) {
-    if (getActiveLayer().locked) return;
+    if (getLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -729,7 +732,7 @@ export default function Canvas() {
     const y = Math.floor((e.clientY - rect.top) / getPxSize() + panOffset.y);
     if (!isValidIndex(x, y, gridSize)) return;
 
-    const rgba = getPixelColor(x, y);
+    const rgba = getCompositedPixelColor(x, y);
     const hex = tinycolor(rgba).toHexString();
     activeMouseButton.current === 0
       ? setPrimaryColor(hex)
@@ -737,7 +740,7 @@ export default function Canvas() {
   }
 
   function handleBucketAction(e: MouseEvent) {
-    if (getActiveLayer().locked) return;
+    if (getLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -748,7 +751,7 @@ export default function Canvas() {
   }
 
   function handleLineAction(e: MouseEvent, isInitialClick: boolean) {
-    if (getActiveLayer().locked) return;
+    if (getLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -762,7 +765,7 @@ export default function Canvas() {
   }
 
   function handleShapeAction(e: MouseEvent, isInitialClick: boolean) {
-    if (getActiveLayer().locked) return;
+    if (getLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -776,7 +779,7 @@ export default function Canvas() {
   }
 
   function handleShadeAction(e: MouseEvent) {
-    if (getActiveLayer().locked) return;
+    if (getLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -797,7 +800,7 @@ export default function Canvas() {
     if (isInitialClick) {
       if (selectionAction) return;
       if (hoveredResizeHandle) {
-        if (getActiveLayer().locked) return;
+        if (getLayer().locked) return;
         const resizeStartPos = getResizeStartPos();
         if (!resizeStartPos) return;
         setSelectionAction("resize");
@@ -811,7 +814,7 @@ export default function Canvas() {
         };
         return;
       } else if (isInSelectedArea(x, y)) {
-        if (getActiveLayer().locked) return;
+        if (getLayer().locked) return;
         setSelectionAction("move");
         const offset = selectionMoveOffset
           ? selectionMoveOffset
@@ -927,7 +930,7 @@ export default function Canvas() {
   }
 
   function handleMoveAction(e: MouseEvent, isInitialClick: boolean) {
-    if (getActiveLayer().locked) return;
+    if (getLayer().locked) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -1019,7 +1022,7 @@ export default function Canvas() {
 
     ctx.clearRect(0, 0, canvasSize.x, canvasSize.y);
     drawCheckerboard(ctx);
-    drawCompositedLayers(ctx);
+    drawActiveFrame(ctx);
 
     if (selectedTool !== "move" && !showNotAllowedCursor) {
       if (showSelectionPreview) {
