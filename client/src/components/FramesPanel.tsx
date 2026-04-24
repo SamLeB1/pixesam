@@ -14,15 +14,25 @@ import {
   MdArrowBack,
   MdArrowForward,
 } from "react-icons/md";
+import { useEditorStore } from "../store/editorStore";
 import Tooltip from "./Tooltip";
+import { DEFAULT_FPS } from "../constants";
 
 export default function FramesPanel() {
+  const {
+    frames,
+    activeFrameId,
+    selectFrame,
+    newFrame,
+    duplicateFrame,
+    deleteFrame,
+    moveFrameLeft,
+    moveFrameRight,
+  } = useEditorStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [frames, setFrames] = useState([crypto.randomUUID()]);
-  const [selectedFrame, setSelectedFrame] = useState(frames[0]);
-  const selectedFrameIndex = frames.findIndex(
-    (frame) => frame === selectedFrame,
+  const activeFrameIndex = frames.findIndex(
+    (frame) => frame.id === activeFrameId,
   );
 
   return (
@@ -34,7 +44,7 @@ export default function FramesPanel() {
         >
           <div className="flex items-center">
             <span className="mr-2 text-sm text-neutral-300">
-              Frame: {selectedFrameIndex + 1}/{frames.length}
+              Frame: {activeFrameIndex + 1}/{frames.length}
             </span>
             <Tooltip content="Go to first frame" side="top">
               <button
@@ -42,7 +52,7 @@ export default function FramesPanel() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedFrame(frames[0]);
+                  selectFrame(frames[0].id);
                 }}
               >
                 <MdSkipPrevious size={20} />
@@ -54,8 +64,8 @@ export default function FramesPanel() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (selectedFrameIndex > 0)
-                    setSelectedFrame(frames[selectedFrameIndex - 1]);
+                  if (activeFrameIndex > 0)
+                    selectFrame(frames[activeFrameIndex - 1].id);
                 }}
               >
                 <MdChevronLeft size={20} />
@@ -94,8 +104,8 @@ export default function FramesPanel() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (selectedFrameIndex < frames.length - 1)
-                    setSelectedFrame(frames[selectedFrameIndex + 1]);
+                  if (activeFrameIndex < frames.length - 1)
+                    selectFrame(frames[activeFrameIndex + 1].id);
                 }}
               >
                 <MdChevronRight size={20} />
@@ -107,7 +117,7 @@ export default function FramesPanel() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedFrame(frames[frames.length - 1]);
+                  selectFrame(frames[frames.length - 1].id);
                 }}
               >
                 <MdSkipNext size={20} />
@@ -130,13 +140,7 @@ export default function FramesPanel() {
                 <button
                   className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
                   type="button"
-                  onClick={() => {
-                    const frame = crypto.randomUUID();
-                    const newFrames = [...frames];
-                    newFrames.splice(selectedFrameIndex + 1, 0, frame);
-                    setFrames(newFrames);
-                    setSelectedFrame(frame);
-                  }}
+                  onClick={() => newFrame()}
                 >
                   <MdAdd size={20} />
                 </button>
@@ -145,13 +149,7 @@ export default function FramesPanel() {
                 <button
                   className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
                   type="button"
-                  onClick={() => {
-                    const frame = crypto.randomUUID();
-                    const newFrames = [...frames];
-                    newFrames.splice(selectedFrameIndex + 1, 0, frame);
-                    setFrames(newFrames);
-                    setSelectedFrame(frame);
-                  }}
+                  onClick={duplicateFrame}
                 >
                   <MdContentCopy size={20} />
                 </button>
@@ -161,17 +159,7 @@ export default function FramesPanel() {
                   <button
                     className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
                     type="button"
-                    onClick={() => {
-                      const newFrames = frames.filter(
-                        (frame) => frame !== selectedFrame,
-                      );
-                      const newSelectedFrame =
-                        selectedFrameIndex > newFrames.length - 1
-                          ? newFrames[newFrames.length - 1]
-                          : newFrames[selectedFrameIndex];
-                      setFrames(newFrames);
-                      setSelectedFrame(newSelectedFrame);
-                    }}
+                    onClick={deleteFrame}
                   >
                     <MdDelete size={20} />
                   </button>
@@ -183,22 +171,12 @@ export default function FramesPanel() {
                   </button>
                 </Tooltip>
               )}
-              {selectedFrameIndex > 0 ? (
+              {activeFrameIndex > 0 ? (
                 <Tooltip content="Move frame left" side="top">
                   <button
                     className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
                     type="button"
-                    onClick={() => {
-                      const newFrames = [...frames];
-                      [
-                        newFrames[selectedFrameIndex],
-                        newFrames[selectedFrameIndex - 1],
-                      ] = [
-                        newFrames[selectedFrameIndex - 1],
-                        newFrames[selectedFrameIndex],
-                      ];
-                      setFrames(newFrames);
-                    }}
+                    onClick={moveFrameLeft}
                   >
                     <MdArrowBack size={20} />
                   </button>
@@ -210,22 +188,12 @@ export default function FramesPanel() {
                   </button>
                 </Tooltip>
               )}
-              {selectedFrameIndex < frames.length - 1 ? (
+              {activeFrameIndex < frames.length - 1 ? (
                 <Tooltip content="Move frame right" side="top">
                   <button
                     className="mr-auto cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
                     type="button"
-                    onClick={() => {
-                      const newFrames = [...frames];
-                      [
-                        newFrames[selectedFrameIndex],
-                        newFrames[selectedFrameIndex + 1],
-                      ] = [
-                        newFrames[selectedFrameIndex + 1],
-                        newFrames[selectedFrameIndex],
-                      ];
-                      setFrames(newFrames);
-                    }}
+                    onClick={moveFrameRight}
                   >
                     <MdArrowForward size={20} />
                   </button>
@@ -249,7 +217,7 @@ export default function FramesPanel() {
                     type="number"
                     min="1"
                     max="60"
-                    defaultValue="12"
+                    defaultValue={DEFAULT_FPS}
                   />
                 </label>
               </Tooltip>
@@ -266,16 +234,16 @@ export default function FramesPanel() {
               {frames.map((frame, i) => (
                 <div
                   className={`relative h-24 min-w-24 cursor-pointer rounded-lg border-2 bg-white ${
-                    selectedFrame === frame
+                    frame.id === activeFrameId
                       ? "border-blue-500"
                       : "border-neutral-600 hover:border-neutral-400"
                   }`}
-                  key={frame}
-                  onClick={() => setSelectedFrame(frame)}
+                  key={frame.id}
+                  onClick={() => selectFrame(frame.id)}
                 >
                   <div
                     className={`absolute top-1 left-1 flex h-6 w-6 items-center justify-center rounded-lg text-xs font-medium ${
-                      selectedFrame === frame
+                      frame.id === activeFrameId
                         ? "bg-blue-500 text-white"
                         : "bg-neutral-200 text-black"
                     }`}
@@ -288,11 +256,7 @@ export default function FramesPanel() {
                 <button
                   className="flex h-24 min-w-24 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-neutral-600 text-neutral-400 hover:border-neutral-400 hover:text-neutral-200"
                   type="button"
-                  onClick={() => {
-                    const frame = crypto.randomUUID();
-                    setFrames([...frames, frame]);
-                    setSelectedFrame(frame);
-                  }}
+                  onClick={() => newFrame(true)}
                 >
                   <MdAdd size={32} />
                 </button>
