@@ -2,14 +2,21 @@ import { useEffect, useMemo, useCallback, useRef } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { compositeLayers } from "../utils/layers";
 import { CHECKER_LIGHT, CHECKER_DARK } from "../constants";
-import type { Rect } from "../types";
+import type { Rect, LayerWithCel } from "../types";
 
 const CONTAINER_WIDTH = 256;
 const CONTAINER_HEIGHT = 128;
 
 export default function CanvasPreview() {
-  const { layers, gridSize, visibleGridSize, panOffset, setPanOffset } =
-    useEditorStore();
+  const {
+    layers,
+    activeFrameId,
+    gridSize,
+    visibleGridSize,
+    panOffset,
+    setPanOffset,
+    getCel,
+  } = useEditorStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDragging = useRef(false);
   const dragStartMouse = useRef({ x: 0, y: 0 });
@@ -46,10 +53,13 @@ export default function CanvasPreview() {
     return tile;
   }, [gridSize, canvasSize]);
 
-  const composited = useMemo(
-    () => compositeLayers(layers, gridSize.x, gridSize.y),
-    [layers, gridSize.x, gridSize.y],
-  );
+  const composited = useMemo(() => {
+    const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
+      ...layer,
+      cel: getCel(layer.id, activeFrameId),
+    }));
+    return compositeLayers(layersToComposite, gridSize.x, gridSize.y);
+  }, [layers, activeFrameId, gridSize.x, gridSize.y, getCel]);
 
   const viewportRect: Rect | null = useMemo(() => {
     const showsAll =
