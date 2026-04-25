@@ -22,12 +22,12 @@ export default function LayerPropertiesWindow({
   const {
     layers,
     activeLayerId,
-    getActiveLayer,
+    getLayer,
     renameLayer,
     setLayerOpacity,
     setLayerBlendMode,
   } = useEditorStore();
-  const layer = getActiveLayer();
+  const layer = getLayer();
   const [name, setName] = useState(layer.name);
   const [opacity, setOpacity] = useState(layer.opacity);
   const cancelRef = useRef(false);

@@ -20,7 +20,7 @@ export default function BtnEdit({
     undoHistory,
     redoHistory,
     clipboard,
-    getActiveLayer,
+    getLayer,
     undo,
     redo,
     cut,
@@ -33,7 +33,7 @@ export default function BtnEdit({
   } = useEditorStore();
   const [isRotateOpen, setIsRotateOpen] = useState(false);
 
-  const layer = getActiveLayer();
+  const layer = getLayer();
   const undoEnabled = undoHistory.length > 0;
   const redoEnabled = redoHistory.length > 0;
   const cutEnabled = showSelectionPreview && !layer.locked;
