@@ -40,6 +40,7 @@ const RESIZE_HANDLE_RADIUS = 8;
 export default function Canvas() {
   const {
     layers,
+    cels,
     activeLayerId,
     activeFrameId,
     gridSize,
@@ -365,7 +366,15 @@ export default function Canvas() {
           overrideData,
         )
       : compositeLayers(layersToComposite, gridSize.x, gridSize.y);
-  }, [layers, activeLayerId, activeFrameId, gridSize, overrideData, getCel]);
+  }, [
+    layers,
+    cels,
+    activeLayerId,
+    activeFrameId,
+    gridSize,
+    overrideData,
+    getCel,
+  ]);
 
   function drawCheckerboard(ctx: CanvasRenderingContext2D) {
     ctx.imageSmoothingEnabled = false;

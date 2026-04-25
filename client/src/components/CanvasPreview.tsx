@@ -10,6 +10,7 @@ const CONTAINER_HEIGHT = 128;
 export default function CanvasPreview() {
   const {
     layers,
+    cels,
     activeFrameId,
     gridSize,
     visibleGridSize,
@@ -59,7 +60,7 @@ export default function CanvasPreview() {
       cel: getCel(layer.id, activeFrameId),
     }));
     return compositeLayers(layersToComposite, gridSize.x, gridSize.y);
-  }, [layers, activeFrameId, gridSize.x, gridSize.y, getCel]);
+  }, [layers, cels, activeFrameId, gridSize.x, gridSize.y, getCel]);
 
   const viewportRect: Rect | null = useMemo(() => {
     const showsAll =
