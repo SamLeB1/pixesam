@@ -15,6 +15,7 @@ import {
   MdArrowForward,
 } from "react-icons/md";
 import { useEditorStore } from "../store/editorStore";
+import Frame from "./Frame";
 import Tooltip from "./Tooltip";
 import { DEFAULT_FPS } from "../constants";
 
@@ -232,25 +233,7 @@ export default function FramesPanel() {
             </div>
             <div className="flex gap-2 overflow-x-auto p-2">
               {frames.map((frame, i) => (
-                <div
-                  className={`relative h-24 min-w-24 cursor-pointer rounded-lg border-2 bg-white ${
-                    frame.id === activeFrameId
-                      ? "border-blue-500"
-                      : "border-neutral-600 hover:border-neutral-400"
-                  }`}
-                  key={frame.id}
-                  onClick={() => selectFrame(frame.id)}
-                >
-                  <div
-                    className={`absolute top-1 left-1 flex h-6 w-6 items-center justify-center rounded-lg text-xs font-medium ${
-                      frame.id === activeFrameId
-                        ? "bg-blue-500 text-white"
-                        : "bg-neutral-200 text-black"
-                    }`}
-                  >
-                    {i + 1}
-                  </div>
-                </div>
+                <Frame key={frame.id} frame={frame} number={i + 1} />
               ))}
               <Tooltip content="New frame" side="top">
                 <button
