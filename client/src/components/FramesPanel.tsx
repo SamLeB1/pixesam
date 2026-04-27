@@ -175,44 +175,28 @@ export default function FramesPanel() {
                   </button>
                 </Tooltip>
               )}
-              {activeFrameIndex > 0 ? (
-                <Tooltip content="Move frame left" side="top">
-                  <button
-                    className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-                    type="button"
-                    onClick={moveFrameLeft}
-                  >
-                    <MdArrowBack size={20} />
-                  </button>
-                </Tooltip>
-              ) : (
-                <Tooltip content="Move frame left" side="top">
-                  <button className="rounded-lg p-1" type="button" disabled>
-                    <MdArrowBack size={20} color="oklch(55.6% 0 0)" />
-                  </button>
-                </Tooltip>
-              )}
-              {activeFrameIndex < frames.length - 1 ? (
-                <Tooltip content="Move frame right" side="top">
-                  <button
-                    className="mr-auto cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
-                    type="button"
-                    onClick={moveFrameRight}
-                  >
-                    <MdArrowForward size={20} />
-                  </button>
-                </Tooltip>
-              ) : (
-                <Tooltip content="Move frame right" side="top">
-                  <button
-                    className="mr-auto rounded-lg p-1"
-                    type="button"
-                    disabled
-                  >
-                    <MdArrowForward size={20} color="oklch(55.6% 0 0)" />
-                  </button>
-                </Tooltip>
-              )}
+              <Tooltip content="Move frame left" side="top">
+                <button
+                  className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+                  type="button"
+                  onClick={() => {
+                    if (activeFrameIndex > 0) moveFrameLeft();
+                  }}
+                >
+                  <MdArrowBack size={20} />
+                </button>
+              </Tooltip>
+              <Tooltip content="Move frame right" side="top">
+                <button
+                  className="mr-auto cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
+                  type="button"
+                  onClick={() => {
+                    if (activeFrameIndex < frames.length - 1) moveFrameRight();
+                  }}
+                >
+                  <MdArrowForward size={20} />
+                </button>
+              </Tooltip>
               <FpsInput className="mr-2" />
               <Tooltip content="Onion skin" side="top">
                 <button
