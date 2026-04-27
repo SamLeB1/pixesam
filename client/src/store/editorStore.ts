@@ -266,6 +266,7 @@ type EditorState = {
   panOffset: { x: number; y: number };
   zoomLevel: number;
   fps: number;
+  isPlayingAnimation: boolean;
   selectedTool: Tool;
   primaryColor: string;
   secondaryColor: string;
@@ -307,6 +308,7 @@ type EditorState = {
   setPanOffset: (panOffset: { x: number; y: number }) => void;
   setZoomLevel: (n: number) => void;
   setFps: (fps: number) => void;
+  setIsPlayingAnimation: (isPlaying: boolean) => void;
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setIsPrimaryColorActive: (active: boolean) => void;
@@ -460,6 +462,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   panOffset: { x: 0, y: 0 },
   zoomLevel: 1,
   fps: DEFAULT_FPS,
+  isPlayingAnimation: false,
   selectedTool: "pencil",
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
@@ -501,6 +504,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPanOffset: (panOffset) => set({ panOffset }),
   setZoomLevel: (n) => set({ zoomLevel: n }),
   setFps: (fps) => set({ fps }),
+  setIsPlayingAnimation: (isPlaying) => set({ isPlayingAnimation: isPlaying }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setIsPrimaryColorActive: (active) => set({ isPrimaryColorActive: active }),

@@ -15,6 +15,7 @@ import {
   MdArrowForward,
 } from "react-icons/md";
 import { useEditorStore } from "../store/editorStore";
+import useAnimationPlayback from "../hooks/useAnimationPlayback";
 import Frame from "./Frame";
 import Tooltip from "./Tooltip";
 import { DEFAULT_FPS } from "../constants";
@@ -23,6 +24,8 @@ export default function FramesPanel() {
   const {
     frames,
     activeFrameId,
+    isPlayingAnimation,
+    setIsPlayingAnimation,
     selectFrame,
     newFrame,
     duplicateFrame,
@@ -30,8 +33,8 @@ export default function FramesPanel() {
     moveFrameLeft,
     moveFrameRight,
   } = useEditorStore();
+  useAnimationPlayback();
   const [isOpen, setIsOpen] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const activeFrameIndex = frames.findIndex(
     (frame) => frame.id === activeFrameId,
   );
@@ -72,14 +75,14 @@ export default function FramesPanel() {
                 <MdChevronLeft size={20} />
               </button>
             </Tooltip>
-            {isPlaying ? (
+            {isPlayingAnimation ? (
               <Tooltip content="Pause animation" side="top">
                 <button
                   className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsPlaying(false);
+                    setIsPlayingAnimation(false);
                   }}
                 >
                   <MdPause size={20} />
@@ -92,7 +95,7 @@ export default function FramesPanel() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsPlaying(true);
+                    if (frames.length > 1) setIsPlayingAnimation(true);
                   }}
                 >
                   <MdPlayArrow size={20} />
