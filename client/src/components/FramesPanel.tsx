@@ -17,8 +17,8 @@ import {
 import { useEditorStore } from "../store/editorStore";
 import useAnimationPlayback from "../hooks/useAnimationPlayback";
 import Frame from "./Frame";
+import FpsInput from "./FpsInput";
 import Tooltip from "./Tooltip";
-import { DEFAULT_FPS } from "../constants";
 
 export default function FramesPanel() {
   const {
@@ -213,18 +213,7 @@ export default function FramesPanel() {
                   </button>
                 </Tooltip>
               )}
-              <Tooltip content="Frames per second" side="top">
-                <label className="label mr-2 flex items-center text-sm text-white">
-                  FPS
-                  <input
-                    className="input input-xs ml-1 w-12 pl-2"
-                    type="number"
-                    min="1"
-                    max="60"
-                    defaultValue={DEFAULT_FPS}
-                  />
-                </label>
-              </Tooltip>
+              <FpsInput className="mr-2" />
               <Tooltip content="Onion skin" side="top">
                 <button
                   className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
