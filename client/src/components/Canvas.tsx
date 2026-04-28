@@ -47,6 +47,7 @@ export default function Canvas() {
     visibleGridSize,
     panOffset,
     zoomLevel,
+    isPlayingAnimation,
     selectedTool,
     brushSize,
     lineStartPos,
@@ -136,7 +137,8 @@ export default function Canvas() {
       hoveredPixel &&
       isInSelectedArea(hoveredPixel.x, hoveredPixel.y)) ||
     selectionAction === "move" ||
-    selectionAction === "resize";
+    selectionAction === "resize" ||
+    isPlayingAnimation;
   const showNotAllowedCursor =
     getLayer().locked &&
     selectedTool !== "color-picker" &&
@@ -986,7 +988,7 @@ export default function Canvas() {
 
   function handleAction(e: MouseEvent, isInitialClick = false) {
     const btn = activeMouseButton.current;
-    if (btn === 1) {
+    if (btn === 1 || isPlayingAnimation) {
       handlePanAction(e, isInitialClick);
       return;
     }
@@ -1033,7 +1035,11 @@ export default function Canvas() {
     drawCheckerboard(ctx);
     drawActiveFrame(ctx);
 
-    if (selectedTool !== "move" && !showNotAllowedCursor) {
+    if (
+      selectedTool !== "move" &&
+      !showNotAllowedCursor &&
+      !isPlayingAnimation
+    ) {
       if (showSelectionPreview) {
         drawMarchingAnts(ctx);
         drawResizeHandles(ctx);
