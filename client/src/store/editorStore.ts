@@ -504,7 +504,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPanOffset: (panOffset) => set({ panOffset }),
   setZoomLevel: (n) => set({ zoomLevel: n }),
   setFps: (fps) => set({ fps }),
-  setIsPlayingAnimation: (isPlaying) => set({ isPlayingAnimation: isPlaying }),
+  setIsPlayingAnimation: (isPlaying) =>
+    set((state) => {
+      state.applyPendingActions();
+      return { isPlayingAnimation: isPlaying };
+    }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setIsPrimaryColorActive: (active) => set({ isPrimaryColorActive: active }),
@@ -741,6 +745,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         cels: newCels,
         activeLayerId: newLayer.id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -784,6 +789,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         cels: newCels,
         activeLayerId: newLayer.id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -814,6 +820,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         cels: newCels,
         activeLayerId: newLayers[newActiveIndex].id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -836,7 +843,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      return { layers: newLayers };
+      return { layers: newLayers, isPlayingAnimation: false };
     }),
   moveLayerDown: () =>
     set((state) => {
@@ -857,7 +864,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      return { layers: newLayers };
+      return { layers: newLayers, isPlayingAnimation: false };
     }),
   mergeLayerDown: () => {
     get().applyPendingActions();
@@ -909,6 +916,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: newLayers,
         cels: newCels,
         activeLayerId: bottomLayer.id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -955,6 +963,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         layers: [flattened],
         cels: newCels,
         activeLayerId: flattened.id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -996,6 +1005,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         frames: newFrames,
         cels: newCels,
         activeFrameId: newFrame.id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -1031,6 +1041,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         frames: newFrames,
         cels: newCels,
         activeFrameId: newFrame.id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -1062,6 +1073,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         frames: newFrames,
         cels: newCels,
         activeFrameId: newFrames[newActiveIndex].id,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -1084,7 +1096,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      return { frames: newFrames };
+      return { frames: newFrames, isPlayingAnimation: false };
     }),
   moveFrameRight: () =>
     set((state) => {
@@ -1105,7 +1117,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      return { frames: newFrames };
+      return { frames: newFrames, isPlayingAnimation: false };
     }),
   clearCel: () => {
     get().applyPendingActions();
@@ -1135,7 +1147,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       newCels[`${activeLayerId}-${activeFrameId}`] = new Uint8ClampedArray(
         gridSize.x * gridSize.y * 4,
       );
-      return { cels: newCels };
+      return { cels: newCels, isPlayingAnimation: false };
     });
   },
   rotateCel: (degrees) => {
@@ -1184,7 +1196,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const newCels: Cels = { ...cels };
       newCels[`${activeLayerId}-${activeFrameId}`] = newData;
-      return { cels: newCels };
+      return { cels: newCels, isPlayingAnimation: false };
     });
   },
   flipCel: (direction) => {
@@ -1214,7 +1226,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const newCels: Cels = { ...cels };
       newCels[`${activeLayerId}-${activeFrameId}`] = newData;
-      return { cels: newCels };
+      return { cels: newCels, isPlayingAnimation: false };
     });
   },
   getActiveColorHex: () => {
@@ -1733,6 +1745,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       panOffset: { x: 0, y: 0 },
       zoomLevel,
       fps: DEFAULT_FPS,
+      isPlayingAnimation: false,
       undoHistory: [],
       redoHistory: [],
     });
@@ -1848,6 +1861,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         gridSize: size,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -1997,6 +2011,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         gridSize: newSize,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -2035,6 +2050,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         gridSize: newSize,
         panOffset: { x: 0, y: 0 },
         zoomLevel,
+        isPlayingAnimation: false,
       };
     });
   },
@@ -2060,7 +2076,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
       updateHistory(action);
 
-      return { cels: newCels };
+      return { cels: newCels, isPlayingAnimation: false };
     });
   },
   importFromPxsm: (data) => {
@@ -2096,6 +2112,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       panOffset: { x: 0, y: 0 },
       zoomLevel,
       fps: data.fps,
+      isPlayingAnimation: false,
       undoHistory: [],
       redoHistory: [],
     });
@@ -2149,6 +2166,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         panOffset: { x: 0, y: 0 },
         zoomLevel,
         fps: DEFAULT_FPS,
+        isPlayingAnimation: false,
         undoHistory: [],
         redoHistory: [],
       });
@@ -2751,6 +2769,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     set({
+      isPlayingAnimation: false,
       undoHistory: newUndoHistory,
       redoHistory: newRedoHistory,
     });
@@ -2974,6 +2993,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     set({
+      isPlayingAnimation: false,
       undoHistory: newUndoHistory,
       redoHistory: newRedoHistory,
     });
@@ -3054,6 +3074,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         height,
       };
       return {
+        isPlayingAnimation: false,
         selectedTool: "select",
         selectionMask: mask,
         selectedArea: newSelectedArea,
@@ -3106,6 +3127,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         height: maxY - minY + 1,
       };
       return {
+        isPlayingAnimation: false,
         selectedTool: "select",
         selectedArea,
         selectedPixels: getPixelsInRect(selectedArea, null),
