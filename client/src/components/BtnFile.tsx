@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { toast } from "sonner";
 import { useEditorStore } from "../store/editorStore";
 import ModalNew from "./ModalNew";
-import ModalExportToImage from "./ModalExportToImage";
+import ModalExport from "./ModalExport";
 import type { PxsmData } from "../types";
 
 type BtnFileProps = {
@@ -152,7 +152,7 @@ export default function BtnFile({
               onClick={() => {
                 onClose();
                 const modal = document.getElementById(
-                  "modal-export-to-image",
+                  "modal-export",
                 ) as HTMLDialogElement;
                 if (modal) modal.showModal();
               }}
@@ -177,7 +177,7 @@ export default function BtnFile({
         onChange={handleImageFileChange}
       />
       <ModalNew />
-      <ModalExportToImage />
+      <ModalExport />
     </>
   );
 }

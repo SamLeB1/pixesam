@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 
-const MAX_IMAGE_SIZE = 4096;
+const MAX_SIZE = 4096;
 
-export default function ModalExportToImage() {
-  const { gridSize } = useEditorStore();
+export default function ModalExport() {
+  const { frames, gridSize } = useEditorStore();
   const [scale, setScale] = useState(1);
   const [isEmptyScaleInput, setIsEmptyScaleInput] = useState(false);
-  const maxScale = Math.floor(
-    MAX_IMAGE_SIZE / Math.max(gridSize.x, gridSize.y),
-  );
+  const maxScale = Math.floor(MAX_SIZE / Math.max(gridSize.x, gridSize.y));
 
   function onClose() {
     setScale(1);
@@ -30,7 +28,7 @@ export default function ModalExportToImage() {
   }
 
   return (
-    <dialog id="modal-export-to-image" className="modal">
+    <dialog id="modal-export" className="modal">
       <div className="modal-box">
         <form method="dialog">
           <button
@@ -40,9 +38,7 @@ export default function ModalExportToImage() {
             ✕
           </button>
         </form>
-        <h3 className="mb-4 text-2xl font-medium text-white">
-          Export to Image
-        </h3>
+        <h3 className="mb-4 text-2xl font-medium text-white">Export</h3>
         <label className="label mb-1 block" htmlFor="export-scale">
           Scale
         </label>
@@ -67,17 +63,35 @@ export default function ModalExportToImage() {
             />
           </label>
         </div>
-        <p className="mb-4">
+        <p className="mb-8 text-neutral-300">
           Dimensions: {Math.floor(gridSize.x * scale)} x{" "}
           {Math.floor(gridSize.y * scale)}
         </p>
-        <div className="modal-action">
+        {frames.length < 2 ? (
           <form method="dialog">
-            <button className="btn btn-primary" onClick={onClose}>
-              Download .png
+            <span className="mr-2 text-sm">Export .png</span>
+            <button className="btn btn-primary btn-sm" onClick={onClose}>
+              Download
             </button>
           </form>
-        </div>
+        ) : (
+          <form method="dialog">
+            <div className="mb-2">
+              <span className="mr-2 text-sm">Export .gif</span>
+              <button className="btn btn-primary btn-sm" onClick={onClose}>
+                Download
+              </button>
+            </div>
+            <div>
+              <span className="mr-2 text-sm">
+                Export selected frame as .png
+              </span>
+              <button className="btn btn-primary btn-sm" onClick={onClose}>
+                Download
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </dialog>
   );
