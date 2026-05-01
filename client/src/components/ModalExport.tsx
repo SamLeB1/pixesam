@@ -4,7 +4,7 @@ import { useEditorStore } from "../store/editorStore";
 const MAX_SIZE = 4096;
 
 export default function ModalExport() {
-  const { frames, gridSize } = useEditorStore();
+  const { frames, gridSize, exportFrameToPng } = useEditorStore();
   const [scale, setScale] = useState(1);
   const [isEmptyScaleInput, setIsEmptyScaleInput] = useState(false);
   const maxScale = Math.floor(MAX_SIZE / Math.max(gridSize.x, gridSize.y));
@@ -70,7 +70,13 @@ export default function ModalExport() {
         {frames.length < 2 ? (
           <form method="dialog">
             <span className="mr-2 text-sm">Export .png</span>
-            <button className="btn btn-primary btn-sm" onClick={onClose}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                exportFrameToPng(scale);
+                onClose();
+              }}
+            >
               Download
             </button>
           </form>
@@ -86,7 +92,13 @@ export default function ModalExport() {
               <span className="mr-2 text-sm">
                 Export selected frame as .png
               </span>
-              <button className="btn btn-primary btn-sm" onClick={onClose}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  exportFrameToPng(scale);
+                  onClose();
+                }}
+              >
                 Download
               </button>
             </div>

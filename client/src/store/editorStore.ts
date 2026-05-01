@@ -421,6 +421,7 @@ type EditorState = {
   importFromPxsm: (data: PxsmData) => void;
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
+  exportFrameToPng: (scale: number, frameId?: string) => void;
   initSelection: () => void;
   endSelectionAction: () => void;
   applySelectionAction: () => void;
@@ -2217,6 +2218,64 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  },
+  exportFrameToPng: (scale, frameId) => {
+    const { layers, activeFrameId, gridSize, getCel } = get();
+    if (!frameId) frameId = activeFrameId;
+    const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
+      ...layer,
+      cel: getCel(layer.id, frameId),
+    }));
+    const imageData = new ImageData(
+      compositeLayers(
+        layersToComposite,
+        gridSize.x,
+        gridSize.y,
+      ) as ImageDataArray,
+      gridSize.x,
+      gridSize.y,
+    );
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast.error("Failed to export.");
+      return;
+    }
+    canvas.width = Math.floor(gridSize.x * scale);
+    canvas.height = Math.floor(gridSize.y * scale);
+
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
+    if (!tempCtx) {
+      toast.error("Failed to export.");
+      return;
+    }
+    tempCanvas.width = gridSize.x;
+    tempCanvas.height = gridSize.y;
+    tempCtx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      tempCanvas,
+      0,
+      0,
+      gridSize.x,
+      gridSize.y,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+
+    const id = Math.random().toString(36).substring(2, 15);
+    const dataURL = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = dataURL;
+    link.download = `new-pixesam-${id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
   initSelection: () =>
     set({
