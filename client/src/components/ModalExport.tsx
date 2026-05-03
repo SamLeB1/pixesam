@@ -4,7 +4,7 @@ import { useEditorStore } from "../store/editorStore";
 const MAX_SIZE = 4096;
 
 export default function ModalExport() {
-  const { frames, gridSize, exportFrameToPng } = useEditorStore();
+  const { frames, gridSize, exportFrameToPng, exportToGif } = useEditorStore();
   const [scale, setScale] = useState(1);
   const [isEmptyScaleInput, setIsEmptyScaleInput] = useState(false);
   const maxScale = Math.floor(MAX_SIZE / Math.max(gridSize.x, gridSize.y));
@@ -84,7 +84,13 @@ export default function ModalExport() {
           <form method="dialog">
             <div className="mb-2">
               <span className="mr-2 text-sm">Export .gif</span>
-              <button className="btn btn-primary btn-sm" onClick={onClose}>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  exportToGif(scale);
+                  onClose();
+                }}
+              >
                 Download
               </button>
             </div>

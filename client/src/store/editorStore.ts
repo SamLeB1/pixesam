@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import tinycolor from "tinycolor2";
 import { toast } from "sonner";
+import { GIFEncoder, quantize, applyPalette } from "gifenc";
 import {
   getBaseIndex,
   isValidIndex,
@@ -422,6 +423,7 @@ type EditorState = {
   importImage: (dataURL: string) => void;
   exportToPxsm: () => void;
   exportFrameToPng: (scale: number, frameId?: string) => void;
+  exportToGif: (scale: number) => void;
   initSelection: () => void;
   endSelectionAction: () => void;
   applySelectionAction: () => void;
@@ -2276,6 +2278,83 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  },
+  exportToGif: (scale) => {
+    const { layers, frames, gridSize, fps, getCel } = get();
+    if (frames.length < 2) return;
+
+    const w = Math.floor(gridSize.x * scale);
+    const h = Math.floor(gridSize.y * scale);
+
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = gridSize.x;
+    tempCanvas.height = gridSize.y;
+    const tempCtx = tempCanvas.getContext("2d");
+
+    const scaleCanvas = document.createElement("canvas");
+    scaleCanvas.width = w;
+    scaleCanvas.height = h;
+    const scaleCtx = scaleCanvas.getContext("2d");
+
+    if (!tempCtx || !scaleCtx) {
+      toast.error("Failed to export.");
+      return;
+    }
+    scaleCtx.imageSmoothingEnabled = false;
+
+    const scaledFrames: Uint8ClampedArray[] = frames.map((frame) => {
+      const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
+        ...layer,
+        cel: getCel(layer.id, frame.id),
+      }));
+      const composite = compositeLayers(
+        layersToComposite,
+        gridSize.x,
+        gridSize.y,
+      ) as ImageDataArray;
+
+      tempCtx.putImageData(
+        new ImageData(composite, gridSize.x, gridSize.y),
+        0,
+        0,
+      );
+      scaleCtx.clearRect(0, 0, w, h);
+      scaleCtx.drawImage(tempCanvas, 0, 0, gridSize.x, gridSize.y, 0, 0, w, h);
+      return scaleCtx.getImageData(0, 0, w, h).data;
+    });
+
+    const allPixels = new Uint8ClampedArray(scaledFrames.length * w * h * 4);
+    scaledFrames.forEach((f, i) => allPixels.set(f, i * w * h * 4));
+    const palette = quantize(allPixels, 256, {
+      format: "rgba4444",
+      oneBitAlpha: true,
+    });
+    const transparentIndex = palette.findIndex((c) => c[3] === 0);
+
+    const gif = GIFEncoder();
+    const delay = Math.round(1000 / fps);
+
+    scaledFrames.forEach((frame) => {
+      const indexed = applyPalette(frame, palette, "rgba4444");
+      gif.writeFrame(indexed, w, h, {
+        palette,
+        delay,
+        transparent: transparentIndex !== -1,
+        transparentIndex: transparentIndex === -1 ? 0 : transparentIndex,
+      });
+    });
+    gif.finish();
+
+    const id = Math.random().toString(36).substring(2, 15);
+    const blob = new Blob([gif.bytes() as BlobPart], { type: "image/gif" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `new-pixesam-${id}.gif`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   },
   initSelection: () =>
     set({
