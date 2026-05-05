@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useEditorStore } from "../store/editorStore";
 import ModalNew from "./ModalNew";
 import ModalExport from "./ModalExport";
+import ModalExportSpriteSheet from "./ModalExportSpriteSheet";
 import type { PxsmData } from "../types";
 
 type BtnFileProps = {
@@ -159,6 +160,19 @@ export default function BtnFile({
             >
               Export
             </button>
+            <button
+              className="w-full cursor-pointer px-2 py-1 text-start text-sm hover:bg-zinc-500"
+              type="button"
+              onClick={() => {
+                onClose();
+                const modal = document.getElementById(
+                  "modal-export-sprite-sheet",
+                ) as HTMLDialogElement;
+                if (modal) modal.showModal();
+              }}
+            >
+              Export sprite sheet
+            </button>
           </div>
         )}
       </div>
@@ -178,6 +192,7 @@ export default function BtnFile({
       />
       <ModalNew />
       <ModalExport />
+      <ModalExportSpriteSheet />
     </>
   );
 }
