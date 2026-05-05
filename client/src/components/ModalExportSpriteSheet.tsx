@@ -8,10 +8,15 @@ const MAX_FRAME_SIZE = 1024;
 
 export default function ModalExportSpriteSheet() {
   const { frames, gridSize } = useEditorStore();
-  const autoRowColCount = useMemo(
-    () => ({ rows: 1, cols: frames.length }),
-    [frames.length],
-  );
+  const autoRowColCount = useMemo(() => {
+    let rows = 1;
+    let cols = 1;
+    while (rows * cols < frames.length) {
+      if (rows === cols) rows++;
+      else cols++;
+    }
+    return { rows, cols };
+  }, [frames.length]);
 
   const [container, setContainer] = useState<HTMLDialogElement | null>(null);
   const [scale, setScale] = useState(1);
