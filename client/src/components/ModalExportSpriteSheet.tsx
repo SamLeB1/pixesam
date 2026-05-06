@@ -7,7 +7,7 @@ type Layout = "horizontal-strip" | "vertical-strip" | "by-rows" | "by-columns";
 const MAX_FRAME_SIZE = 1024;
 
 export default function ModalExportSpriteSheet() {
-  const { frames, gridSize } = useEditorStore();
+  const { frames, gridSize, exportToSpriteSheet } = useEditorStore();
   const autoRowColCount = useMemo(() => {
     let rows = 1;
     let cols = 1;
@@ -228,7 +228,19 @@ export default function ModalExportSpriteSheet() {
         </div>
         <form method="dialog">
           <span className="mr-2 text-sm">Export .png</span>
-          <button className="btn btn-primary btn-sm" onClick={onClose}>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              exportToSpriteSheet(
+                scale,
+                rowColCount.rows,
+                rowColCount.cols,
+                selectedLayout === "by-columns" ||
+                  selectedLayout === "vertical-strip",
+              );
+              onClose();
+            }}
+          >
             Download
           </button>
         </form>

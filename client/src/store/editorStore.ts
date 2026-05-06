@@ -424,6 +424,12 @@ type EditorState = {
   exportToPxsm: () => void;
   exportFrameToPng: (scale: number, frameId?: string) => void;
   exportToGif: (scale: number) => void;
+  exportToSpriteSheet: (
+    scale: number,
+    rows: number,
+    cols: number,
+    byColumns: boolean,
+  ) => void;
   initSelection: () => void;
   endSelectionAction: () => void;
   applySelectionAction: () => void;
@@ -2355,6 +2361,69 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  },
+  exportToSpriteSheet: (scale, rows, cols, byColumns) => {
+    const { layers, frames, gridSize, getCel } = get();
+
+    const frameW = Math.floor(gridSize.x * scale);
+    const frameH = Math.floor(gridSize.y * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = frameW * cols;
+    canvas.height = frameH * rows;
+    const ctx = canvas.getContext("2d");
+
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = gridSize.x;
+    tempCanvas.height = gridSize.y;
+    const tempCtx = tempCanvas.getContext("2d");
+
+    if (!ctx || !tempCtx) {
+      toast.error("Failed to export.");
+      return;
+    }
+    ctx.imageSmoothingEnabled = false;
+
+    frames.forEach((frame, i) => {
+      const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
+        ...layer,
+        cel: getCel(layer.id, frame.id),
+      }));
+      const composite = compositeLayers(
+        layersToComposite,
+        gridSize.x,
+        gridSize.y,
+      ) as ImageDataArray;
+
+      tempCtx.putImageData(
+        new ImageData(composite, gridSize.x, gridSize.y),
+        0,
+        0,
+      );
+
+      const col = byColumns ? Math.floor(i / rows) : i % cols;
+      const row = byColumns ? i % rows : Math.floor(i / cols);
+      ctx.drawImage(
+        tempCanvas,
+        0,
+        0,
+        gridSize.x,
+        gridSize.y,
+        col * frameW,
+        row * frameH,
+        frameW,
+        frameH,
+      );
+    });
+
+    const id = Math.random().toString(36).substring(2, 15);
+    const dataURL = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = dataURL;
+    link.download = `new-pixesam-${id}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
   initSelection: () =>
     set({
