@@ -40,6 +40,7 @@ const RESIZE_HANDLE_RADIUS = 8;
 export default function Canvas() {
   const {
     layers,
+    frames,
     cels,
     activeLayerId,
     activeFrameId,
@@ -48,6 +49,7 @@ export default function Canvas() {
     panOffset,
     zoomLevel,
     isPlayingAnimation,
+    showOnionSkin,
     selectedTool,
     brushSize,
     lineStartPos,
@@ -391,6 +393,48 @@ export default function Canvas() {
       canvasSize.x,
       canvasSize.y,
     );
+  }
+
+  function drawOnionFrame(
+    ctx: CanvasRenderingContext2D,
+    frameId: string,
+    opacity = 0.4,
+  ) {
+    const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
+      ...layer,
+      cel: getCel(layer.id, frameId),
+    }));
+    const composite = compositeLayers(
+      layersToComposite,
+      gridSize.x,
+      gridSize.y,
+    );
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = gridSize.x;
+    tempCanvas.height = gridSize.y;
+    const tempCtx = tempCanvas.getContext("2d")!;
+    const imageData = new ImageData(
+      composite as ImageDataArray,
+      gridSize.x,
+      gridSize.y,
+    );
+    tempCtx.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = false;
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(
+      tempCanvas,
+      panOffset.x,
+      panOffset.y,
+      visibleGridSize.x,
+      visibleGridSize.y,
+      0,
+      0,
+      canvasSize.x,
+      canvasSize.y,
+    );
+    ctx.globalAlpha = prevAlpha;
   }
 
   function drawActiveFrame(ctx: CanvasRenderingContext2D) {
@@ -1033,6 +1077,12 @@ export default function Canvas() {
 
     ctx.clearRect(0, 0, canvasSize.x, canvasSize.y);
     drawCheckerboard(ctx);
+    if (showOnionSkin && !isPlayingAnimation) {
+      const idx = frames.findIndex((f) => f.id === activeFrameId);
+      if (idx > 0) drawOnionFrame(ctx, frames[idx - 1].id);
+      if (idx >= 0 && idx < frames.length - 1)
+        drawOnionFrame(ctx, frames[idx + 1].id);
+    }
     drawActiveFrame(ctx);
 
     if (

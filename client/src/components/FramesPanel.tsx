@@ -25,7 +25,9 @@ export default function FramesPanel() {
     frames,
     activeFrameId,
     isPlayingAnimation,
+    showOnionSkin,
     setIsPlayingAnimation,
+    setShowOnionSkin,
     selectFrame,
     newFrame,
     duplicateFrame,
@@ -202,6 +204,7 @@ export default function FramesPanel() {
                 <button
                   className="cursor-pointer rounded-lg p-1 hover:bg-neutral-600"
                   type="button"
+                  onClick={() => setShowOnionSkin(!showOnionSkin)}
                 >
                   <div className="h-5 w-5 bg-white" />
                 </button>

@@ -268,6 +268,7 @@ type EditorState = {
   zoomLevel: number;
   fps: number;
   isPlayingAnimation: boolean;
+  showOnionSkin: boolean;
   selectedTool: Tool;
   primaryColor: string;
   secondaryColor: string;
@@ -310,6 +311,7 @@ type EditorState = {
   setZoomLevel: (n: number) => void;
   setFps: (fps: number) => void;
   setIsPlayingAnimation: (isPlaying: boolean) => void;
+  setShowOnionSkin: (show: boolean) => void;
   setPrimaryColor: (hex: string) => void;
   setSecondaryColor: (hex: string) => void;
   setIsPrimaryColorActive: (active: boolean) => void;
@@ -472,6 +474,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   zoomLevel: 1,
   fps: DEFAULT_FPS,
   isPlayingAnimation: false,
+  showOnionSkin: false,
   selectedTool: "pencil",
   primaryColor: "#000000",
   secondaryColor: "#ffffff",
@@ -518,6 +521,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       state.applyPendingActions();
       return { isPlayingAnimation: isPlaying };
     }),
+  setShowOnionSkin: (show) => set({ showOnionSkin: show }),
   setPrimaryColor: (hex) => set({ primaryColor: hex }),
   setSecondaryColor: (hex) => set({ secondaryColor: hex }),
   setIsPrimaryColorActive: (active) => set({ isPrimaryColorActive: active }),
