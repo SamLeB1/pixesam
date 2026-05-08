@@ -24,7 +24,8 @@ import { compositeLayers, compositeLayersWithOverride } from "../utils/layers";
 import { BASE_PX_SIZE, CHECKER_LIGHT, CHECKER_DARK } from "../constants";
 import type { Direction, LayerWithCel } from "../types";
 
-const FILTER_STRENGTH = 25;
+const FILTER_STRENGTH = 20;
+const ONION_SKIN_OPACITY = 0.3;
 const RESIZE_HANDLES: { name: Direction; x: number; y: number }[] = [
   { name: "nw", x: 0, y: 0 },
   { name: "n", x: 0.5, y: 0 },
@@ -395,11 +396,7 @@ export default function Canvas() {
     );
   }
 
-  function drawOnionFrame(
-    ctx: CanvasRenderingContext2D,
-    frameId: string,
-    opacity = 0.4,
-  ) {
+  function drawOnionFrame(ctx: CanvasRenderingContext2D, frameId: string) {
     const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
       ...layer,
       cel: getCel(layer.id, frameId),
@@ -422,7 +419,7 @@ export default function Canvas() {
 
     ctx.imageSmoothingEnabled = false;
     const prevAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = opacity;
+    ctx.globalAlpha = ONION_SKIN_OPACITY;
     ctx.drawImage(
       tempCanvas,
       panOffset.x,
@@ -476,7 +473,7 @@ export default function Canvas() {
         const px = x + j;
         const py = y + i;
         if (isValidIndex(px, py, gridSize)) {
-          ctx.fillStyle = getHoverColor(px, py, FILTER_STRENGTH);
+          ctx.fillStyle = getHoverColor(px, py);
           ctx.fillRect(
             (px - panOffset.x) * pxSize,
             (py - panOffset.y) * pxSize,
@@ -493,7 +490,7 @@ export default function Canvas() {
     for (let i = 0; i < lassoPath.length; i++) {
       const { x, y } = lassoPath[i];
       if (isValidIndex(x, y, gridSize)) {
-        ctx.fillStyle = getHoverColor(x, y, FILTER_STRENGTH);
+        ctx.fillStyle = getHoverColor(x, y);
         ctx.fillRect(
           (x - panOffset.x) * pxSize,
           (y - panOffset.y) * pxSize,
@@ -727,18 +724,40 @@ export default function Canvas() {
     setMousePos({ x, y });
   }
 
-  function getHoverColor(x: number, y: number, strength = 25) {
-    const pixel = getCompositedPixelColor(x, y);
+  function getHoverColor(x: number, y: number, strength = FILTER_STRENGTH) {
     const checker =
       y % 2 === x % 2
         ? tinycolor(CHECKER_DARK).toRgb()
         : tinycolor(CHECKER_LIGHT).toRgb();
-    const alpha = pixel.a / 255;
-    const blended = {
-      r: Math.round(pixel.r * alpha + checker.r * (1 - alpha)),
-      g: Math.round(pixel.g * alpha + checker.g * (1 - alpha)),
-      b: Math.round(pixel.b * alpha + checker.b * (1 - alpha)),
-    };
+    let blended = { r: checker.r, g: checker.g, b: checker.b };
+
+    function blendOver(
+      px: { r: number; g: number; b: number; a: number },
+      opacity = 1,
+    ) {
+      const a = (px.a / 255) * opacity;
+      blended = {
+        r: Math.round(px.r * a + blended.r * (1 - a)),
+        g: Math.round(px.g * a + blended.g * (1 - a)),
+        b: Math.round(px.b * a + blended.b * (1 - a)),
+      };
+    }
+
+    if (showOnionSkin && !isPlayingAnimation) {
+      const idx = frames.findIndex((f) => f.id === activeFrameId);
+      if (idx > 0)
+        blendOver(
+          getCompositedPixelColor(x, y, frames[idx - 1].id),
+          ONION_SKIN_OPACITY,
+        );
+      if (idx >= 0 && idx < frames.length - 1)
+        blendOver(
+          getCompositedPixelColor(x, y, frames[idx + 1].id),
+          ONION_SKIN_OPACITY,
+        );
+    }
+    blendOver(getCompositedPixelColor(x, y));
+
     const tc = tinycolor(blended);
     return tc.isLight()
       ? tc.darken(strength).toHexString()
