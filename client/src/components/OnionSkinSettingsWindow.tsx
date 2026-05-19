@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import FloatingWindow from "./FloatingWindow";
 
 type OnionSkinSettingsWindowProps = {
   onClose: () => void;
 };
+
+const MAX_ONION_FRAME_COUNT = 99;
 
 export default function OnionSkinSettingsWindow({
   onClose,
@@ -24,6 +27,34 @@ export default function OnionSkinSettingsWindow({
     (s) => s.setOnionSkinOpacityStep,
   );
   const setOnionSkinDisplay = useEditorStore((s) => s.setOnionSkinDisplay);
+  const [isEmptyPrevInput, setIsEmptyPrevInput] = useState(false);
+  const [isEmptyNextInput, setIsEmptyNextInput] = useState(false);
+
+  function handleChangePrev(e: React.ChangeEvent<HTMLInputElement>) {
+    let value = parseInt(e.target.value);
+    if (isNaN(value)) {
+      setPrevOnionFrameCount(0);
+      setIsEmptyPrevInput(true);
+    } else {
+      if (value < 0) value = 0;
+      if (value > MAX_ONION_FRAME_COUNT) value = MAX_ONION_FRAME_COUNT;
+      setPrevOnionFrameCount(value);
+      setIsEmptyPrevInput(false);
+    }
+  }
+
+  function handleChangeNext(e: React.ChangeEvent<HTMLInputElement>) {
+    let value = parseInt(e.target.value);
+    if (isNaN(value)) {
+      setNextOnionFrameCount(0);
+      setIsEmptyNextInput(true);
+    } else {
+      if (value < 0) value = 0;
+      if (value > MAX_ONION_FRAME_COUNT) value = MAX_ONION_FRAME_COUNT;
+      setNextOnionFrameCount(value);
+      setIsEmptyNextInput(false);
+    }
+  }
 
   return (
     <FloatingWindow title="Onion Skin Settings" onClose={onClose}>
@@ -34,8 +65,16 @@ export default function OnionSkinSettingsWindow({
             <input
               className="input input-xs ml-1 w-12 pl-2 text-white"
               type="number"
-              value={prevOnionFrameCount}
-              onChange={(e) => setPrevOnionFrameCount(Number(e.target.value))}
+              min="0"
+              max={MAX_ONION_FRAME_COUNT}
+              value={isEmptyPrevInput ? "" : prevOnionFrameCount}
+              onChange={handleChangePrev}
+              onBlur={() => {
+                if (isEmptyPrevInput) {
+                  setPrevOnionFrameCount(0);
+                  setIsEmptyPrevInput(false);
+                }
+              }}
             />
           </label>
           <label className="label text-sm text-neutral-300">
@@ -43,8 +82,16 @@ export default function OnionSkinSettingsWindow({
             <input
               className="input input-xs ml-1 w-12 pl-2 text-white"
               type="number"
-              value={nextOnionFrameCount}
-              onChange={(e) => setNextOnionFrameCount(Number(e.target.value))}
+              min="0"
+              max={MAX_ONION_FRAME_COUNT}
+              value={isEmptyNextInput ? "" : nextOnionFrameCount}
+              onChange={handleChangeNext}
+              onBlur={() => {
+                if (isEmptyNextInput) {
+                  setNextOnionFrameCount(0);
+                  setIsEmptyNextInput(false);
+                }
+              }}
             />
           </label>
         </div>

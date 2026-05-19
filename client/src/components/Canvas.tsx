@@ -26,7 +26,6 @@ import { BASE_PX_SIZE, CHECKER_LIGHT, CHECKER_DARK } from "../constants";
 import type { Direction, LayerWithCel } from "../types";
 
 const FILTER_STRENGTH = 20;
-const ONION_SKIN_OPACITY = 0.3;
 const RESIZE_HANDLES: { name: Direction; x: number; y: number }[] = [
   { name: "nw", x: 0, y: 0 },
   { name: "n", x: 0.5, y: 0 },
@@ -50,6 +49,7 @@ export default function Canvas() {
   const zoomLevel = useEditorStore((s) => s.zoomLevel);
   const isPlayingAnimation = useEditorStore((s) => s.isPlayingAnimation);
   const showOnionSkin = useEditorStore((s) => s.showOnionSkin);
+  const onionSkinOpacity = useEditorStore((s) => s.onionSkinOpacity);
   const selectedTool = useEditorStore((s) => s.selectedTool);
   const brushSize = useEditorStore((s) => s.brushSize);
   const lineStartPos = useEditorStore((s) => s.lineStartPos);
@@ -411,7 +411,7 @@ export default function Canvas() {
 
     ctx.imageSmoothingEnabled = false;
     const prevAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = ONION_SKIN_OPACITY;
+    ctx.globalAlpha = onionSkinOpacity;
     ctx.drawImage(
       tempCanvas,
       panOffset.x,
@@ -740,12 +740,12 @@ export default function Canvas() {
       if (idx > 0)
         blendOver(
           getCompositedPixelColor(x, y, frames[idx - 1].id),
-          ONION_SKIN_OPACITY,
+          onionSkinOpacity,
         );
       if (idx >= 0 && idx < frames.length - 1)
         blendOver(
           getCompositedPixelColor(x, y, frames[idx + 1].id),
-          ONION_SKIN_OPACITY,
+          onionSkinOpacity,
         );
     }
     blendOver(getCompositedPixelColor(x, y));
