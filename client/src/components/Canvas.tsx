@@ -49,7 +49,11 @@ export default function Canvas() {
   const zoomLevel = useEditorStore((s) => s.zoomLevel);
   const isPlayingAnimation = useEditorStore((s) => s.isPlayingAnimation);
   const showOnionSkin = useEditorStore((s) => s.showOnionSkin);
+  const prevOnionFrameCount = useEditorStore((s) => s.prevOnionFrameCount);
+  const nextOnionFrameCount = useEditorStore((s) => s.nextOnionFrameCount);
   const onionSkinOpacity = useEditorStore((s) => s.onionSkinOpacity);
+  const onionSkinOpacityStep = useEditorStore((s) => s.onionSkinOpacityStep);
+  const onionSkinDisplay = useEditorStore((s) => s.onionSkinDisplay);
   const selectedTool = useEditorStore((s) => s.selectedTool);
   const brushSize = useEditorStore((s) => s.brushSize);
   const lineStartPos = useEditorStore((s) => s.lineStartPos);
@@ -388,7 +392,11 @@ export default function Canvas() {
     );
   }
 
-  function drawOnionFrame(ctx: CanvasRenderingContext2D, frameId: string) {
+  function drawOnionFrame(
+    ctx: CanvasRenderingContext2D,
+    frameId: string,
+    opacity: number,
+  ) {
     const layersToComposite: LayerWithCel[] = layers.map((layer) => ({
       ...layer,
       cel: getCel(layer.id, frameId),
@@ -411,7 +419,7 @@ export default function Canvas() {
 
     ctx.imageSmoothingEnabled = false;
     const prevAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = onionSkinOpacity;
+    ctx.globalAlpha = opacity;
     ctx.drawImage(
       tempCanvas,
       panOffset.x,
@@ -424,6 +432,25 @@ export default function Canvas() {
       canvasSize.y,
     );
     ctx.globalAlpha = prevAlpha;
+  }
+
+  function drawOnionSkin(ctx: CanvasRenderingContext2D) {
+    const idx = frames.findIndex((f) => f.id === activeFrameId);
+    if (idx < 0) return;
+    for (let d = prevOnionFrameCount; d >= 1; d--) {
+      const i = idx - d;
+      if (i < 0) continue;
+      const opacity = onionSkinOpacity - (d - 1) * onionSkinOpacityStep;
+      if (opacity <= 0) continue;
+      drawOnionFrame(ctx, frames[i].id, opacity);
+    }
+    for (let d = nextOnionFrameCount; d >= 1; d--) {
+      const i = idx + d;
+      if (i >= frames.length) continue;
+      const opacity = onionSkinOpacity - (d - 1) * onionSkinOpacityStep;
+      if (opacity <= 0) continue;
+      drawOnionFrame(ctx, frames[i].id, opacity);
+    }
   }
 
   function drawActiveFrame(ctx: CanvasRenderingContext2D) {
@@ -735,20 +762,29 @@ export default function Canvas() {
       };
     }
 
-    if (showOnionSkin && !isPlayingAnimation) {
+    function blendOnion() {
       const idx = frames.findIndex((f) => f.id === activeFrameId);
-      if (idx > 0)
-        blendOver(
-          getCompositedPixelColor(x, y, frames[idx - 1].id),
-          onionSkinOpacity,
-        );
-      if (idx >= 0 && idx < frames.length - 1)
-        blendOver(
-          getCompositedPixelColor(x, y, frames[idx + 1].id),
-          onionSkinOpacity,
-        );
+      if (idx < 0) return;
+      for (let d = prevOnionFrameCount; d >= 1; d--) {
+        const i = idx - d;
+        if (i < 0) continue;
+        const opacity = onionSkinOpacity - (d - 1) * onionSkinOpacityStep;
+        if (opacity <= 0) continue;
+        blendOver(getCompositedPixelColor(x, y, frames[i].id), opacity);
+      }
+      for (let d = nextOnionFrameCount; d >= 1; d--) {
+        const i = idx + d;
+        if (i >= frames.length) continue;
+        const opacity = onionSkinOpacity - (d - 1) * onionSkinOpacityStep;
+        if (opacity <= 0) continue;
+        blendOver(getCompositedPixelColor(x, y, frames[i].id), opacity);
+      }
     }
+
+    const showOnion = showOnionSkin && !isPlayingAnimation;
+    if (showOnion && onionSkinDisplay === "below") blendOnion();
     blendOver(getCompositedPixelColor(x, y));
+    if (showOnion && onionSkinDisplay === "above") blendOnion();
 
     const tc = tinycolor(blended);
     return tc.isLight()
@@ -1088,13 +1124,10 @@ export default function Canvas() {
 
     ctx.clearRect(0, 0, canvasSize.x, canvasSize.y);
     drawCheckerboard(ctx);
-    if (showOnionSkin && !isPlayingAnimation) {
-      const idx = frames.findIndex((f) => f.id === activeFrameId);
-      if (idx > 0) drawOnionFrame(ctx, frames[idx - 1].id);
-      if (idx >= 0 && idx < frames.length - 1)
-        drawOnionFrame(ctx, frames[idx + 1].id);
-    }
+    const showOnion = showOnionSkin && !isPlayingAnimation;
+    if (showOnion && onionSkinDisplay === "below") drawOnionSkin(ctx);
     drawActiveFrame(ctx);
+    if (showOnion && onionSkinDisplay === "above") drawOnionSkin(ctx);
 
     if (
       selectedTool !== "move" &&
